@@ -4,8 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-client = ["oinq"]
-server = ["oinq"]
+client = ["oinq", "quinn", "serde"]
+server = ["oinq", "quinn", "serde"]
 
 [dependencies]
+anyhow = "1"
 oinq = { git = "https://github.com/petabi/oinq.git", tag = "0.10.0", optional = true }
+quinn = { version = "0.10", optional = true }
+serde = { version = "1", optional = true }

@@ -1,0 +1,11 @@
+[package]
+name = "review-protocol"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+client = ["oinq"]
+server = ["oinq"]
+
+[dependencies]
+oinq = { git = "https://github.com/petabi/oinq.git", tag = "0.10.0", optional = true }

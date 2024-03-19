@@ -4,6 +4,8 @@ pub mod client;
 pub mod server;
 pub mod types;
 
+#[cfg(any(feature = "client", feature = "server"))]
+pub use oinq::message::HandshakeError;
 #[cfg(feature = "client")]
 pub use oinq::request;
 

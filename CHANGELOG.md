@@ -16,6 +16,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   - `PigletConfig`
   - `ReconvergeConfig`
   - `ResourceUsage`
+- `HandshakeError` for the handshake process.
 
 ## [0.1.0] - 2024-03-15
 

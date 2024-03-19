@@ -1,5 +1,6 @@
 #[cfg(feature = "client")]
 pub mod client;
+pub mod protocol_types;
 #[cfg(feature = "server")]
 pub mod server;
 

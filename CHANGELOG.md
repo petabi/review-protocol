@@ -5,6 +5,17 @@ file is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and
 this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Types for agent configuration under `protocol_types`:
+  - `Config`
+  - `CrusherConfig`
+  - `HogConfig`
+  - `PigletConfig`
+  - `ReconvergeConfig`
+
 ## [0.1.0] - 2024-03-15
 
 ### Added
@@ -15,4 +26,5 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - `client::handshake` implements the application-level handshake process for the
   client after a QUIC connection is established.
 
+[Unreleased]: https://github.com/petabi/review-protocol/compare/0.1.0...main
 [0.1.0]: https://github.com/petabi/review-protocol/tree/0.1.0

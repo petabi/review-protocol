@@ -9,7 +9,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Types for agent configuration under `protocol_types`:
+- Types for agent configuration under `types`:
   - `Config`
   - `CrusherConfig`
   - `HogConfig`

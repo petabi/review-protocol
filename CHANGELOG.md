@@ -15,6 +15,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   - `HogConfig`
   - `PigletConfig`
   - `ReconvergeConfig`
+  - `ResourceUsage`
 
 ## [0.1.0] - 2024-03-15
 

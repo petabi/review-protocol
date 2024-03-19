@@ -23,7 +23,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Build documentation
-        run: cargo doc --no-deps
+        run: cargo doc --all-features --no-deps
       - name: Fix permissions
         run: chmod a+r target/doc/.lock
       - name: Create the root index

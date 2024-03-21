@@ -18,6 +18,11 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   - `ReconvergeConfig`
   - `ResourceUsage`
 - `HandshakeError` for the handshake process.
+- `frame` module for low-level protocol communication. This module provides the
+  necessary communication primitives and ensures compatibility with the `oinq`
+  crate until the protocol's full implementation.
+- `client::send_request` method to facilitate initiating requests from the
+  client to the server.
 
 ## [0.1.0] - 2024-03-15
 

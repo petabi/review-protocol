@@ -9,6 +9,6 @@ server = ["quinn", "serde"]
 
 [dependencies]
 anyhow = "1"
-oinq = { git = "https://github.com/petabi/oinq.git", tag = "0.10.0" }
+oinq = { git = "https://github.com/petabi/oinq.git", tag = "0.11.0" }
 quinn = { version = "0.10", optional = true }
 serde = { version = "1", optional = true }

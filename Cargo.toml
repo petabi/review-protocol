@@ -11,4 +11,5 @@ server = ["quinn", "serde"]
 anyhow = "1"
 oinq = { git = "https://github.com/petabi/oinq.git", tag = "0.11.0" }
 quinn = { version = "0.10", optional = true }
-serde = { version = "1", optional = true }
+semver = "1"
+serde = { version = "1", features = ["derive"], optional = true }

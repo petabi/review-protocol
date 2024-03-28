@@ -4,12 +4,24 @@ pub mod client;
 pub mod server;
 pub mod types;
 
+use std::net::SocketAddr;
+
 #[cfg(feature = "client")]
 pub use oinq::frame;
 #[cfg(any(feature = "client", feature = "server"))]
 pub use oinq::message::HandshakeError;
 #[cfg(feature = "client")]
 pub use oinq::request;
+use serde::{Deserialize, Serialize};
+
+/// Properties of an agent.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct AgentInfo {
+    pub app_name: String,
+    pub version: String,
+    pub protocol_version: String,
+    pub addr: SocketAddr,
+}
 
 /// Sends a unary request and returns the response.
 ///

@@ -10,9 +10,6 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - `AgentInfo` to represent the agent's information during the handshake process.
-- `client::handshake` and `server::handshake` implement the application-level
-  handshake process between the client and the server after a QUIC connection is
-  established.
 
 ## [0.1.2] - 2024-03-25
 

@@ -12,7 +12,6 @@ use std::net::SocketAddr;
 
 #[cfg(feature = "client")]
 pub use oinq::frame;
-#[cfg(any(feature = "client", feature = "server"))]
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -47,8 +46,7 @@ impl From<oinq::frame::SendError> for HandshakeError {
 }
 
 /// Properties of an agent.
-#[derive(Clone, Debug)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AgentInfo {
     pub app_name: String,
     pub version: String,

@@ -10,6 +10,8 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - `AgentInfo` to represent the agent's information during the handshake process.
+- `request::Handler`, `request::handle`, and other related types needed to
+  implement a request handler.
 
 ### Changed
 

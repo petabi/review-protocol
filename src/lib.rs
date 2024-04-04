@@ -1,5 +1,7 @@
 #[cfg(feature = "client")]
 pub mod client;
+#[cfg(feature = "client")]
+pub mod request;
 #[cfg(feature = "server")]
 pub mod server;
 #[cfg(test)]
@@ -10,8 +12,6 @@ use std::net::SocketAddr;
 
 #[cfg(feature = "client")]
 pub use oinq::frame;
-#[cfg(feature = "client")]
-pub use oinq::request;
 #[cfg(any(feature = "client", feature = "server"))]
 use serde::{Deserialize, Serialize};
 use thiserror::Error;

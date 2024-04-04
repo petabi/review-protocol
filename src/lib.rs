@@ -10,12 +10,41 @@ use std::net::SocketAddr;
 
 #[cfg(feature = "client")]
 pub use oinq::frame;
-#[cfg(any(feature = "client", feature = "server"))]
-pub use oinq::message::HandshakeError;
 #[cfg(feature = "client")]
 pub use oinq::request;
 #[cfg(any(feature = "client", feature = "server"))]
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
+
+/// The error type for a handshake failure.
+#[cfg(any(feature = "client", feature = "server"))]
+#[derive(Debug, Error)]
+pub enum HandshakeError {
+    #[error("connection closed by peer")]
+    ConnectionClosed,
+    #[error("connection lost")]
+    ConnectionLost(#[from] quinn::ConnectionError),
+    #[error("cannot receive a message")]
+    ReadError(#[from] quinn::ReadError),
+    #[error("cannot send a message")]
+    WriteError(#[from] quinn::WriteError),
+    #[error("arguments are too long")]
+    MessageTooLarge,
+    #[error("invalid message")]
+    InvalidMessage,
+    #[error("protocol version {0} is not supported; version {1} is required")]
+    IncompatibleProtocol(String, String),
+}
+
+#[cfg(any(feature = "client", feature = "server"))]
+impl From<oinq::frame::SendError> for HandshakeError {
+    fn from(e: oinq::frame::SendError) -> Self {
+        match e {
+            oinq::frame::SendError::MessageTooLarge => HandshakeError::MessageTooLarge,
+            oinq::frame::SendError::WriteError(e) => HandshakeError::WriteError(e),
+        }
+    }
+}
 
 /// Properties of an agent.
 #[derive(Clone, Debug)]

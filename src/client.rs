@@ -41,10 +41,7 @@ pub async fn handshake(
     let mut buf = Vec::new();
     if let Err(e) = frame::send(&mut send, &mut buf, &agent_info).await {
         match e {
-            SendError::SerializationFailure(e) => {
-                return Err(HandshakeError::SerializationFailure(e))
-            }
-            SendError::MessageTooLarge(_) => return Err(HandshakeError::MessageTooLarge),
+            SendError::MessageTooLarge => return Err(HandshakeError::MessageTooLarge),
             SendError::WriteError(e) => return Err(HandshakeError::WriteError(e)),
         }
     }

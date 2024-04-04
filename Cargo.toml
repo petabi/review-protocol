@@ -1,6 +1,6 @@
 [package]
 name = "review-protocol"
-version = "0.1.2"
+version = "0.2.0-alpha.1"
 edition = "2021"
 
 [features]
@@ -9,7 +9,7 @@ server = ["quinn", "serde"]
 
 [dependencies]
 anyhow = "1"
-oinq = { git = "https://github.com/petabi/oinq.git", tag = "0.11.0" }
+oinq = { git = "https://github.com/petabi/oinq.git", rev = "445e786e" }
 quinn = { version = "0.10", optional = true }
 semver = "1"
 serde = { version = "1", features = ["derive"], optional = true }

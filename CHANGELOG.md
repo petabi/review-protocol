@@ -11,6 +11,15 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 - `AgentInfo` to represent the agent's information during the handshake process.
 
+### Changed
+
+- `SendError::MessageTooLarge` no longer contains the underlying error,
+  `std::num::TryFromIntError`, since it does not provide any useful information.
+- Merge `SendError`'s `MessageTooLarge` and `SerializationFailure`, and
+  `HandshakeError`'s `MessageTooLarge` and `SerializationFailure` into
+  `MessageTooLarge`, since serialization into a memory buffer fails only when
+  the message is too large.
+
 ## [0.1.2] - 2024-03-25
 
 ### Added

@@ -11,8 +11,8 @@ pub(crate) struct Channel {
 
 pub(crate) struct Endpoint {
     pub(crate) conn: Connection,
-    pub(crate) _send: SendStream,
-    pub(crate) _recv: RecvStream,
+    pub(crate) send: SendStream,
+    pub(crate) recv: RecvStream,
 }
 
 lazy_static! {
@@ -81,13 +81,13 @@ pub(crate) async fn channel() -> Channel {
     Channel {
         server: self::Endpoint {
             conn: server_connection,
-            _send: server_send,
-            _recv: server_recv,
+            send: server_send,
+            recv: server_recv,
         },
         client: self::Endpoint {
             conn: client_connection,
-            _send: client_send,
-            _recv: client_recv,
+            send: client_send,
+            recv: client_recv,
         },
     }
 }

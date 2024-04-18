@@ -1,6 +1,8 @@
 #[cfg(feature = "client")]
 pub mod client;
 #[cfg(feature = "client")]
+pub mod frame;
+#[cfg(feature = "client")]
 pub mod request;
 #[cfg(feature = "server")]
 pub mod server;
@@ -8,11 +10,8 @@ pub mod server;
 mod test;
 pub mod types;
 
-use std::net::SocketAddr;
-
-#[cfg(feature = "client")]
-pub use oinq::frame;
 use serde::{Deserialize, Serialize};
+use std::net::SocketAddr;
 use thiserror::Error;
 
 /// The error type for a handshake failure.

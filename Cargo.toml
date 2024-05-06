@@ -4,8 +4,8 @@ version = "0.2.0"
 edition = "2021"
 
 [features]
-client = ["oinq", "quinn", "bincode"]
-server = ["oinq", "quinn"]
+client = ["bincode", "oinq", "quinn"]
+server = ["bincode", "oinq", "quinn"]
 
 [dependencies]
 anyhow = "1"

@@ -11,6 +11,8 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Added a public API that provides `frame` functionality to avoid exposing `oinq`'s
   `frame`. This change improves the modularity of the `review-protocol`.
+- `server::send_trusted_domain_list` to facilitate sending the trusted domain
+  list from the server to the client.
 
 ## [0.2.0] - 2024-04-04
 

@@ -1,15 +1,16 @@
 //! Server-specific protocol implementation.
 
-use std::net::SocketAddr;
-
+use crate::{
+    client::RequestCode, handle_handshake_recv_io_error, handle_handshake_send_io_error, AgentInfo,
+    HandshakeError,
+};
 use oinq::{
     frame,
     message::{send_err, send_ok},
 };
 use quinn::Connection;
 use semver::{Version, VersionReq};
-
-use crate::{client::RequestCode, AgentInfo, HandshakeError};
+use std::net::SocketAddr;
 
 /// Processes a handshake message and sends a response.
 ///
@@ -33,7 +34,7 @@ pub async fn handshake(
     let mut buf = Vec::new();
     let mut agent_info = frame::recv::<AgentInfo>(&mut recv, &mut buf)
         .await
-        .map_err(|_| HandshakeError::InvalidMessage)?;
+        .map_err(handle_handshake_recv_io_error)?;
     agent_info.addr = addr;
     let version_req = VersionReq::parse(version_req).expect("valid version requirement");
     let protocol_version = Version::parse(&agent_info.protocol_version).map_err(|_| {
@@ -48,13 +49,13 @@ pub async fn handshake(
         if protocol_version <= highest_protocol_version {
             send_ok(&mut send, &mut buf, highest_protocol_version.to_string())
                 .await
-                .map_err(HandshakeError::from)?;
+                .map_err(handle_handshake_send_io_error)?;
             Ok(agent_info)
         } else {
             send_err(&mut send, &mut buf, &highest_protocol_version)
                 .await
-                .map_err(HandshakeError::from)?;
-            send.finish().await.ok();
+                .map_err(handle_handshake_send_io_error)?;
+            send.finish().ok();
             Err(HandshakeError::IncompatibleProtocol(
                 protocol_version.to_string(),
                 version_req.to_string(),
@@ -63,8 +64,8 @@ pub async fn handshake(
     } else {
         send_err(&mut send, &mut buf, version_req.to_string())
             .await
-            .map_err(HandshakeError::from)?;
-        send.finish().await.ok();
+            .map_err(handle_handshake_send_io_error)?;
+        send.finish().ok();
         Err(HandshakeError::IncompatibleProtocol(
             protocol_version.to_string(),
             version_req.to_string(),

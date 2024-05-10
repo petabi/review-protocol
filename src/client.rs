@@ -6,7 +6,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 #[cfg(any(feature = "client", feature = "server"))]
 use num_enum::{FromPrimitive, IntoPrimitive};
 #[cfg(feature = "client")]
-use oinq::frame::{self, SendError};
+use oinq::frame::{self};
 #[cfg(feature = "client")]
 pub use oinq::message::{send_err, send_ok, send_request};
 #[cfg(feature = "client")]
@@ -106,7 +106,7 @@ pub async fn handshake(
     // TODO: This is unnecessary in handshake, and thus should be removed in the
     // future.
 
-    use std::io;
+    use crate::{handle_handshake_recv_io_error, handle_handshake_send_io_error};
     let addr = if conn.remote_address().is_ipv6() {
         SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0)
     } else {
@@ -122,12 +122,9 @@ pub async fn handshake(
 
     let (mut send, mut recv) = conn.open_bi().await?;
     let mut buf = Vec::new();
-    if let Err(e) = frame::send(&mut send, &mut buf, &agent_info).await {
-        match e {
-            SendError::MessageTooLarge => return Err(HandshakeError::MessageTooLarge),
-            SendError::WriteError(e) => return Err(HandshakeError::WriteError(e)),
-        }
-    }
+    frame::send(&mut send, &mut buf, &agent_info)
+        .await
+        .map_err(handle_handshake_send_io_error)?;
 
     match frame::recv::<Result<&str, &str>>(&mut recv, &mut buf).await {
         Ok(Ok(_)) => Ok((send, recv)),
@@ -135,10 +132,6 @@ pub async fn handshake(
             protocol_version.to_string(),
             e.to_string(),
         )),
-        Err(e) => match e.kind() {
-            io::ErrorKind::InvalidData => Err(HandshakeError::InvalidMessage),
-            io::ErrorKind::UnexpectedEof => Err(HandshakeError::ConnectionClosed),
-            _ => Err(HandshakeError::ReadError(e)),
-        },
+        Err(e) => Err(handle_handshake_recv_io_error(e)),
     }
 }

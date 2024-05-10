@@ -9,9 +9,8 @@ pub mod server;
 mod test;
 pub mod types;
 
-use std::net::SocketAddr;
-
 use serde::{Deserialize, Serialize};
+use std::net::SocketAddr;
 #[cfg(any(feature = "client", feature = "server"))]
 use thiserror::Error;
 
@@ -24,9 +23,9 @@ pub enum HandshakeError {
     #[error("connection lost")]
     ConnectionLost(#[from] quinn::ConnectionError),
     #[error("cannot receive a message: {0}")]
-    ReadError(#[from] std::io::Error),
+    ReadError(std::io::Error),
     #[error("cannot send a message")]
-    WriteError(#[from] quinn::WriteError),
+    WriteError(std::io::Error),
     #[error("arguments are too long")]
     MessageTooLarge,
     #[error("invalid message")]
@@ -36,12 +35,20 @@ pub enum HandshakeError {
 }
 
 #[cfg(any(feature = "client", feature = "server"))]
-impl From<oinq::frame::SendError> for HandshakeError {
-    fn from(e: oinq::frame::SendError) -> Self {
-        match e {
-            oinq::frame::SendError::MessageTooLarge => HandshakeError::MessageTooLarge,
-            oinq::frame::SendError::WriteError(e) => HandshakeError::WriteError(e),
-        }
+fn handle_handshake_send_io_error(e: std::io::Error) -> HandshakeError {
+    if e.kind() == std::io::ErrorKind::InvalidData {
+        HandshakeError::MessageTooLarge
+    } else {
+        HandshakeError::WriteError(e)
+    }
+}
+
+#[cfg(any(feature = "client", feature = "server"))]
+fn handle_handshake_recv_io_error(e: std::io::Error) -> HandshakeError {
+    match e.kind() {
+        std::io::ErrorKind::InvalidData => HandshakeError::InvalidMessage,
+        std::io::ErrorKind::UnexpectedEof => HandshakeError::ConnectionClosed,
+        _ => HandshakeError::ReadError(e),
     }
 }
 

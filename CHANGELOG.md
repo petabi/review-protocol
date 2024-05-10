@@ -19,6 +19,17 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - `HandshakeError::ReadError` now provides the underlying error as
   `std::io::Error`, which is more informative than the previous custom error
   type.
+- Update `oinq` to version `0.13.0`. Updating to this version results in the
+  following changes.
+  - Bump dependencies.
+    - Update quinn to version 0.11.
+    - Update rustls to version 0.23.
+    - Update rcgen to version 0.13.
+  - Fixed the handling of the error types provided by `oinq`. `oinq` has
+    changed from providing the `RecvError`/`SendError` error type to providing
+    the `std::io::Error` error type. As a result, `review-protocol` has also
+    been modified to `std::io::Error` or convert to the correct internally
+    defined error type.
 
 ## [0.2.0] - 2024-04-04
 

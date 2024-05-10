@@ -1,9 +1,7 @@
-use std::io;
-
 use oinq::frame;
 use quinn::{RecvStream, SendStream};
 use serde::{de::DeserializeOwned, Serialize};
-use thiserror::Error;
+use std::io;
 
 /// Receives a message as a stream.
 ///
@@ -18,37 +16,17 @@ where
     frame::recv(recv, &mut buf).await
 }
 
-/// The error type for sending a message as a frame.
-#[derive(Debug, Error)]
-pub enum SendMessageError {
-    #[error("message is too large")]
-    MessageTooLarge,
-    #[error("failed to write to a stream")]
-    WriteError(#[from] quinn::WriteError),
-}
-
-impl From<frame::SendError> for SendMessageError {
-    fn from(e: frame::SendError) -> Self {
-        match e {
-            frame::SendError::MessageTooLarge => SendMessageError::MessageTooLarge,
-            frame::SendError::WriteError(e) => SendMessageError::WriteError(e),
-        }
-    }
-}
-
 /// Sends a message as a stream.
 ///
 /// # Errors
 ///
-/// * `SendMessageError::MessageTooLarge`: if the message is too large
-/// * `SendMessageError::WriteError`: if the message could not be written
-pub async fn send_msg<T>(send: &mut SendStream, msg: T) -> Result<(), SendMessageError>
+/// Return an error if sending the message failed.
+pub async fn send_msg<T>(send: &mut SendStream, msg: T) -> io::Result<()>
 where
     T: Serialize,
 {
     let mut buf = Vec::new();
-    frame::send(send, &mut buf, msg).await?;
-    Ok(())
+    frame::send(send, &mut buf, msg).await
 }
 
 #[cfg(test)]

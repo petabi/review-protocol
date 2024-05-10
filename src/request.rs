@@ -16,9 +16,9 @@ use crate::{
 #[derive(Debug, Error)]
 pub enum HandlerError {
     #[error("failed to receive request")]
-    RecvError(#[from] io::Error),
+    RecvError(io::Error),
     #[error("failed to send response")]
-    SendError(#[from] oinq::frame::SendError),
+    SendError(io::Error),
 }
 
 /// A request handler that can handle a request to an agent.
@@ -136,103 +136,153 @@ pub async fn handle<H: Handler>(
                 if e.kind() == io::ErrorKind::UnexpectedEof {
                     break;
                 }
-                return Err(e.into());
+                return Err(HandlerError::RecvError(e));
             }
         };
 
         let req = RequestCode::from_primitive(code);
         match req {
             RequestCode::DnsStart => {
-                send_response(send, &mut buf, handler.dns_start().await).await?;
+                send_response(send, &mut buf, handler.dns_start().await)
+                    .await
+                    .map_err(HandlerError::SendError)?;
             }
             RequestCode::DnsStop => {
-                send_response(send, &mut buf, handler.dns_stop().await).await?;
+                send_response(send, &mut buf, handler.dns_stop().await)
+                    .await
+                    .map_err(HandlerError::SendError)?;
             }
             RequestCode::Reboot => {
-                send_response(send, &mut buf, handler.reboot().await).await?;
+                send_response(send, &mut buf, handler.reboot().await)
+                    .await
+                    .map_err(HandlerError::SendError)?;
             }
             RequestCode::ReloadConfig => {
-                send_response(send, &mut buf, handler.reload_config().await).await?;
+                send_response(send, &mut buf, handler.reload_config().await)
+                    .await
+                    .map_err(HandlerError::SendError)?;
             }
             RequestCode::ReloadTi => {
-                let version = parse_args::<&str>(body)?;
+                let version = parse_args::<&str>(body).map_err(HandlerError::RecvError)?;
                 let result = handler.reload_ti(version).await;
-                send_response(send, &mut buf, result).await?;
+                send_response(send, &mut buf, result)
+                    .await
+                    .map_err(HandlerError::SendError)?;
             }
             RequestCode::ResourceUsage => {
-                send_response(send, &mut buf, handler.resource_usage().await).await?;
+                send_response(send, &mut buf, handler.resource_usage().await)
+                    .await
+                    .map_err(HandlerError::SendError)?;
             }
             RequestCode::TorExitNodeList => {
-                let nodes = parse_args::<Vec<&str>>(body)?;
+                let nodes = parse_args::<Vec<&str>>(body).map_err(HandlerError::RecvError)?;
                 let result = handler.tor_exit_node_list(&nodes).await;
-                send_response(send, &mut buf, result).await?;
+                send_response(send, &mut buf, result)
+                    .await
+                    .map_err(HandlerError::SendError)?;
             }
             RequestCode::SamplingPolicyList => {
                 let result = handler.sampling_policy_list(body).await;
-                send_response(send, &mut buf, result).await?;
+                send_response(send, &mut buf, result)
+                    .await
+                    .map_err(HandlerError::SendError)?;
             }
             RequestCode::DeleteSamplingPolicy => {
                 let result = handler.delete_sampling_policy(body).await;
-                send_response(send, &mut buf, result).await?;
+                send_response(send, &mut buf, result)
+                    .await
+                    .map_err(HandlerError::SendError)?;
             }
             RequestCode::TrustedDomainList => {
-                let domains = parse_args::<Result<Vec<&str>, String>>(body)?;
+                let domains = parse_args::<Result<Vec<&str>, String>>(body)
+                    .map_err(HandlerError::RecvError)?;
                 let result = if let Ok(domains) = domains {
                     handler.trusted_domain_list(&domains).await
                 } else {
                     Err("invalid request".to_string())
                 };
-                send_response(send, &mut buf, result).await?;
+                send_response(send, &mut buf, result)
+                    .await
+                    .map_err(HandlerError::SendError)?;
             }
             RequestCode::InternalNetworkList => {
-                let network_list = parse_args::<HostNetworkGroup>(body)?;
+                let network_list =
+                    parse_args::<HostNetworkGroup>(body).map_err(HandlerError::RecvError)?;
                 let result = handler.internal_network_list(network_list).await;
-                send_response(send, &mut buf, result).await?;
+                send_response(send, &mut buf, result)
+                    .await
+                    .map_err(HandlerError::SendError)?;
             }
             RequestCode::AllowList => {
-                let allow_list = parse_args::<HostNetworkGroup>(body)?;
+                let allow_list =
+                    parse_args::<HostNetworkGroup>(body).map_err(HandlerError::RecvError)?;
                 let result = handler.allow_list(allow_list).await;
-                send_response(send, &mut buf, result).await?;
+                send_response(send, &mut buf, result)
+                    .await
+                    .map_err(HandlerError::SendError)?;
             }
             RequestCode::BlockList => {
-                let block_list = parse_args::<HostNetworkGroup>(body)?;
+                let block_list =
+                    parse_args::<HostNetworkGroup>(body).map_err(HandlerError::RecvError)?;
                 let result = handler.block_list(block_list).await;
-                send_response(send, &mut buf, result).await?;
+                send_response(send, &mut buf, result)
+                    .await
+                    .map_err(HandlerError::SendError)?;
             }
             RequestCode::EchoRequest => {
-                send_response(send, &mut buf, Ok::<(), String>(())).await?;
+                send_response(send, &mut buf, Ok::<(), String>(()))
+                    .await
+                    .map_err(HandlerError::SendError)?;
             }
             RequestCode::TrustedUserAgentList => {
-                let user_agent_list = parse_args::<Vec<&str>>(body)?;
+                let user_agent_list =
+                    parse_args::<Vec<&str>>(body).map_err(HandlerError::RecvError)?;
                 let result = handler.trusted_user_agent_list(&user_agent_list).await;
-                send_response(send, &mut buf, result).await?;
+                send_response(send, &mut buf, result)
+                    .await
+                    .map_err(HandlerError::SendError)?;
             }
             RequestCode::ReloadFilterRule => {
-                let rules = parse_args::<Vec<TrafficFilterRule>>(body)?;
+                let rules =
+                    parse_args::<Vec<TrafficFilterRule>>(body).map_err(HandlerError::RecvError)?;
                 let result = handler.update_traffic_filter_rules(&rules).await;
-                send_response(send, &mut buf, result).await?;
+                send_response(send, &mut buf, result)
+                    .await
+                    .map_err(HandlerError::SendError)?;
             }
             RequestCode::GetConfig => {
-                send_response(send, &mut buf, handler.get_config().await).await?;
+                send_response(send, &mut buf, handler.get_config().await)
+                    .await
+                    .map_err(HandlerError::SendError)?;
             }
             RequestCode::SetConfig => {
-                let conf = parse_args::<Config>(body)?;
+                let conf = parse_args::<Config>(body).map_err(HandlerError::RecvError)?;
                 let result = handler.set_config(conf).await;
-                send_response(send, &mut buf, result).await?;
+                send_response(send, &mut buf, result)
+                    .await
+                    .map_err(HandlerError::SendError)?;
             }
             RequestCode::ProcessList => {
-                send_response(send, &mut buf, handler.process_list().await).await?;
+                send_response(send, &mut buf, handler.process_list().await)
+                    .await
+                    .map_err(HandlerError::SendError)?;
             }
             RequestCode::SemiSupervisedModels => {
                 let result = handler.update_semi_supervised_models(body).await;
-                send_response(send, &mut buf, result).await?;
+                send_response(send, &mut buf, result)
+                    .await
+                    .map_err(HandlerError::SendError)?;
             }
             RequestCode::Shutdown => {
-                send_response(send, &mut buf, handler.shutdown().await).await?;
+                send_response(send, &mut buf, handler.shutdown().await)
+                    .await
+                    .map_err(HandlerError::SendError)?;
             }
             RequestCode::Unknown => {
                 let err_msg = format!("unknown request code: {code}");
-                oinq::message::send_err(send, &mut buf, err_msg).await?;
+                oinq::message::send_err(send, &mut buf, err_msg)
+                    .await
+                    .map_err(HandlerError::SendError)?;
             }
         }
     }

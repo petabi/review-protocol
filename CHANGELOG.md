@@ -14,6 +14,12 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - `server::send_trusted_domain_list` to facilitate sending the trusted domain
   list from the server to the client.
 
+## Changed
+
+- `HandshakeError::ReadError` now provides the underlying error as
+  `std::io::Error`, which is more informative than the previous custom error
+  type.
+
 ## [0.2.0] - 2024-04-04
 
 ### Added

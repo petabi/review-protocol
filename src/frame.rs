@@ -1,40 +1,21 @@
+use std::io;
+
 use oinq::frame;
 use quinn::{RecvStream, SendStream};
 use serde::{de::DeserializeOwned, Serialize};
 use thiserror::Error;
 
-/// The error type for receiving and deserializing a frame.
-#[derive(Debug, Error)]
-pub enum RecvMessageError {
-    #[error("failed deserializing message")]
-    DeserializationFailure(#[from] bincode::Error),
-    #[error("failed to read from a stream")]
-    ReadError(#[from] quinn::ReadExactError),
-}
-
-impl From<frame::RecvError> for RecvMessageError {
-    fn from(e: frame::RecvError) -> Self {
-        match e {
-            frame::RecvError::DeserializationFailure(e) => {
-                RecvMessageError::DeserializationFailure(e)
-            }
-            frame::RecvError::ReadError(e) => RecvMessageError::ReadError(e),
-        }
-    }
-}
-
 /// Receives a message as a stream.
 ///
 /// # Errors
 ///
-/// * `RecvMessageError::DeserializationFailure`: if the message could not be deserialized
-/// * `RecvMessageError::ReadError`: if the message could not be read
-pub async fn recv_msg<T>(recv: &mut RecvStream) -> Result<T, RecvMessageError>
+/// Returns an error if receiving the message failed.
+pub async fn recv_msg<T>(recv: &mut RecvStream) -> io::Result<T>
 where
     T: DeserializeOwned,
 {
     let mut buf = Vec::new();
-    Ok(frame::recv(recv, &mut buf).await?)
+    frame::recv(recv, &mut buf).await
 }
 
 /// The error type for sending a message as a frame.

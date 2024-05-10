@@ -1,5 +1,7 @@
 //! Request handling for the agent.
 
+use std::io;
+
 use async_trait::async_trait;
 use num_enum::FromPrimitive;
 pub use oinq::request::{parse_args, send_response};
@@ -14,7 +16,7 @@ use crate::{
 #[derive(Debug, Error)]
 pub enum HandlerError {
     #[error("failed to receive request")]
-    RecvError(#[from] oinq::frame::RecvError),
+    RecvError(#[from] io::Error),
     #[error("failed to send response")]
     SendError(#[from] oinq::frame::SendError),
 }
@@ -130,10 +132,10 @@ pub async fn handle<H: Handler>(
     loop {
         let (code, body) = match oinq::message::recv_request_raw(recv, &mut buf).await {
             Ok(res) => res,
-            Err(oinq::frame::RecvError::ReadError(quinn::ReadExactError::FinishedEarly)) => {
-                break;
-            }
             Err(e) => {
+                if e.kind() == io::ErrorKind::UnexpectedEof {
+                    break;
+                }
                 return Err(e.into());
             }
         };

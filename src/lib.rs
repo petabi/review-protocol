@@ -23,8 +23,8 @@ pub enum HandshakeError {
     ConnectionClosed,
     #[error("connection lost")]
     ConnectionLost(#[from] quinn::ConnectionError),
-    #[error("cannot receive a message")]
-    ReadError(#[from] quinn::ReadError),
+    #[error("cannot receive a message: {0}")]
+    ReadError(#[from] std::io::Error),
     #[error("cannot send a message")]
     WriteError(#[from] quinn::WriteError),
     #[error("arguments are too long")]

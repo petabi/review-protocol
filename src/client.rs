@@ -6,7 +6,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 #[cfg(any(feature = "client", feature = "server"))]
 use num_enum::{FromPrimitive, IntoPrimitive};
 #[cfg(feature = "client")]
-use oinq::frame::{self, RecvError, SendError};
+use oinq::frame::{self, SendError};
 #[cfg(feature = "client")]
 pub use oinq::message::{send_err, send_ok, send_request};
 #[cfg(feature = "client")]
@@ -105,6 +105,8 @@ pub async fn handshake(
     //
     // TODO: This is unnecessary in handshake, and thus should be removed in the
     // future.
+
+    use std::io;
     let addr = if conn.remote_address().is_ipv6() {
         SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0)
     } else {
@@ -133,12 +135,10 @@ pub async fn handshake(
             protocol_version.to_string(),
             e.to_string(),
         )),
-        Err(RecvError::DeserializationFailure(_)) => Err(HandshakeError::InvalidMessage),
-        Err(RecvError::ReadError(quinn::ReadExactError::FinishedEarly)) => {
-            Err(HandshakeError::ConnectionClosed)
-        }
-        Err(RecvError::ReadError(quinn::ReadExactError::ReadError(e))) => {
-            Err(HandshakeError::ReadError(e))
-        }
+        Err(e) => match e.kind() {
+            io::ErrorKind::InvalidData => Err(HandshakeError::InvalidMessage),
+            io::ErrorKind::UnexpectedEof => Err(HandshakeError::ConnectionClosed),
+            _ => Err(HandshakeError::ReadError(e)),
+        },
     }
 }

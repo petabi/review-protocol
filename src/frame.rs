@@ -1,7 +1,8 @@
+use std::io;
+
 use oinq::frame;
 use quinn::{RecvStream, SendStream};
 use serde::{de::DeserializeOwned, Serialize};
-use std::io;
 
 /// Receives a message as a stream.
 ///
@@ -34,8 +35,9 @@ mod tests {
 
     #[tokio::test]
     async fn send_and_recv() {
-        use crate::test::{channel, TOKEN};
         use serde::{Deserialize, Serialize};
+
+        use crate::test::{channel, TOKEN};
 
         #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
         struct Msg {

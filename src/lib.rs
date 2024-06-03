@@ -9,8 +9,9 @@ pub mod server;
 mod test;
 pub mod types;
 
-use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
+
+use serde::{Deserialize, Serialize};
 #[cfg(any(feature = "client", feature = "server"))]
 use thiserror::Error;
 

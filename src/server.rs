@@ -1,16 +1,18 @@
 //! Server-specific protocol implementation.
 
-use crate::{
-    client::RequestCode, handle_handshake_recv_io_error, handle_handshake_send_io_error, AgentInfo,
-    HandshakeError,
-};
+use std::net::SocketAddr;
+
 use oinq::{
     frame,
     message::{send_err, send_ok},
 };
 use quinn::Connection;
 use semver::{Version, VersionReq};
-use std::net::SocketAddr;
+
+use crate::{
+    client::RequestCode, handle_handshake_recv_io_error, handle_handshake_send_io_error, AgentInfo,
+    HandshakeError,
+};
 
 /// Processes a handshake message and sends a response.
 ///

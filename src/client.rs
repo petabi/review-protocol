@@ -10,7 +10,7 @@ use oinq::frame::{self};
 #[cfg(feature = "client")]
 pub use oinq::message::{send_err, send_ok, send_request};
 #[cfg(feature = "client")]
-use quinn::{Connection, RecvStream, SendStream};
+use quinn::Connection;
 
 #[cfg(feature = "client")]
 use crate::{AgentInfo, HandshakeError};
@@ -99,7 +99,7 @@ pub async fn handshake(
     app_name: &str,
     app_version: &str,
     protocol_version: &str,
-) -> Result<(SendStream, RecvStream), HandshakeError> {
+) -> Result<(), HandshakeError> {
     // A placeholder for the address of this agent. Will be replaced by the
     // server.
     //
@@ -127,7 +127,7 @@ pub async fn handshake(
         .map_err(handle_handshake_send_io_error)?;
 
     match frame::recv::<Result<&str, &str>>(&mut recv, &mut buf).await {
-        Ok(Ok(_)) => Ok((send, recv)),
+        Ok(Ok(_)) => Ok(()),
         Ok(Err(e)) => Err(HandshakeError::IncompatibleProtocol(
             protocol_version.to_string(),
             e.to_string(),

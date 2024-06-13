@@ -14,6 +14,11 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   but not used by the caller, so they have been removed to simplify the
   function's return type.
 
+### Removed
+
+- Removed `ReconvergeConfig`.
+- Removed `review_address` field from `HogConfig`, `PigletConfig`, `CrusherConfig`
+
 ## [0.3.0] - 2024-05-28
 
 ### Added

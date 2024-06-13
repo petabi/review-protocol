@@ -40,13 +40,11 @@ pub struct Process {
 pub enum Config {
     Hog(HogConfig),
     Piglet(PigletConfig),
-    Reconverge(ReconvergeConfig),
     Crusher(CrusherConfig),
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct HogConfig {
-    pub review_address: SocketAddr,
     pub giganto_address: Option<SocketAddr>,
     pub active_protocols: Option<Vec<String>>,
     pub active_sources: Option<Vec<String>>,
@@ -54,21 +52,13 @@ pub struct HogConfig {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PigletConfig {
-    pub review_address: SocketAddr,
     pub giganto_address: Option<SocketAddr>,
     pub log_options: Option<Vec<String>>,
     pub http_file_types: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct ReconvergeConfig {
-    pub review_address: SocketAddr,
-    pub giganto_address: Option<SocketAddr>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
 pub struct CrusherConfig {
-    pub review_address: SocketAddr,
     pub giganto_ingest_address: Option<SocketAddr>,
     pub giganto_publish_address: Option<SocketAddr>,
 }

@@ -88,6 +88,90 @@ pub(crate) enum RequestCode {
     Unknown = u32::MAX,
 }
 
+#[cfg(feature = "client")]
+pub enum ConnectionError {}
+
+/// Connects to the server and performs a handshake.
+///
+/// # Errors
+///
+/// Returns an error if the connection fails or the server requires a different
+/// protocol version.
+#[cfg(feature = "client")]
+pub async fn connect(
+    endpoint: &quinn::Endpoint,
+    server_addr: SocketAddr,
+    server_name: &str,
+    app_name: &str,
+    app_version: &str,
+    protocol_version: &str,
+) -> std::io::Result<Connection> {
+    use std::io;
+
+    let connecting = endpoint
+        .connect(server_addr, server_name)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
+    let conn = connecting.await.map_err(|e| {
+        // quinn (as of 0.11) provides automatic conversion from
+        // `ConnectionError` to `ReadError`, and from `ReadError` to
+        // `io::Error`. However, the conversion treats all `ConnectionError`
+        // variants as `NotConnected`, which is too generic. We need to provide
+        // more specific error messages.
+        use quinn::ConnectionError;
+        match e {
+            ConnectionError::ApplicationClosed(e) => {
+                std::io::Error::new(io::ErrorKind::ConnectionAborted, e.to_string())
+            }
+            ConnectionError::CidsExhausted => {
+                io::Error::new(io::ErrorKind::Other, "connection IDs exhausted")
+            }
+            ConnectionError::ConnectionClosed(e) => {
+                std::io::Error::new(io::ErrorKind::ConnectionAborted, e.to_string())
+            }
+            ConnectionError::LocallyClosed => {
+                io::Error::new(io::ErrorKind::NotConnected, "locally closed")
+            }
+            ConnectionError::Reset => io::Error::from(io::ErrorKind::ConnectionReset),
+            ConnectionError::TimedOut => io::Error::from(io::ErrorKind::TimedOut),
+            ConnectionError::TransportError(e) => {
+                std::io::Error::new(io::ErrorKind::InvalidData, e.to_string())
+            }
+            ConnectionError::VersionMismatch => {
+                io::Error::new(io::ErrorKind::ConnectionRefused, "version mismatch")
+            }
+        }
+    })?;
+
+    // A placeholder for the address of this agent. Will be replaced by the
+    // server.
+    //
+    // TODO: This is unnecessary in handshake, and thus should be removed in the
+    // future.
+    let addr = if conn.remote_address().is_ipv6() {
+        SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0)
+    } else {
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0)
+    };
+
+    let agent_info = AgentInfo {
+        app_name: app_name.to_string(),
+        version: app_version.to_string(),
+        protocol_version: protocol_version.to_string(),
+        addr,
+    };
+
+    let (mut send, mut recv) = conn.open_bi().await?;
+    let mut buf = Vec::new();
+    frame::send(&mut send, &mut buf, &agent_info).await?;
+    match frame::recv::<Result<&str, &str>>(&mut recv, &mut buf).await? {
+        Ok(_) => Ok(conn),
+        Err(e) => Err(io::Error::new(
+            io::ErrorKind::ConnectionRefused,
+            format!("server requires protocol version {e}"),
+        )),
+    }
+}
+
 /// Sends a handshake request and processes the response.
 ///
 /// # Errors

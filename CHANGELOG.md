@@ -7,6 +7,14 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `client::connect` function that combines `quinn::Endpoint::connect` and
+  `review-protocol::client::handshake`. This simplifies the connection process
+  for applications using review-protocol, reducing code duplication.
+  Applications using review-protocol should now use `client::connect` instead of
+  calling `Endpoint::connect` and `client::handshake` separately.
+
 ### Changed
 
 - The `handshake` function in the `client` module no longer returns the

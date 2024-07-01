@@ -16,8 +16,12 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Removed
 
-- Removed `ReconvergeConfig`.
-- Removed `review_address` field from `HogConfig`, `PigletConfig`, `CrusherConfig`
+- Removed unused configurations and fields to streamline the crate and improve
+  maintainability. These removals are based on the observation that these items
+  were not being utilized by any applications depending on review-database.
+  - `ReconvergeConfig` has been eliminated.
+  - `review_address` field has been removed from `HogConfig`, `PigletConfig`,
+    and `CrusherConfig`.
 
 ## [0.3.0] - 2024-05-28
 

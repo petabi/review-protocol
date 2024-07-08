@@ -14,6 +14,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   for applications using review-protocol, reducing code duplication.
   Applications using review-protocol should now use `client::connect` instead of
   calling `Endpoint::connect` and `client::handshake` separately.
+- Moved `EventCategory` definition from review-database.
 
 ### Changed
 

@@ -12,11 +12,11 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - New `Endpoint` struct in the `client` module that wraps `quinn::Endpoint`.
   This provides a protocol-specific endpoint for outbound connections, improving
   encapsulation and making the API more idiomatic to review-protocol.
-- `client::connect` function that combines `quinn::Endpoint::connect` and
+- `Endpoint::connect` function that combines `quinn::Endpoint::connect` and
   `review-protocol::client::handshake`. This simplifies the connection process
   for applications using review-protocol, reducing code duplication.
   Applications using review-protocol should now create an `Endpoint` instance
-  and call `client::connect` instead of calling `quinn::Endpoint::connect` and
+  and call `Endpoint::connect` instead of calling `quinn::Endpoint::connect` and
   `client::handshake` separately.
 - Introduced `EventCategory` enum to categorize security events.
 

@@ -88,6 +88,52 @@ pub(crate) enum RequestCode {
     Unknown = u32::MAX,
 }
 
+#[cfg(feature = "client")]
+/// A protocol endpoint for outbound connections.
+///
+/// An endpoint may host many connections.
+pub struct Endpoint {
+    inner: quinn::Endpoint,
+}
+
+#[cfg(feature = "client")]
+impl Endpoint {
+    /// Creates a new endpoint for outbound connections.
+    ///
+    /// Note that `addr` is the *local* address to bind to.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the TLS configuration is invalid.
+    pub fn new(
+        addr: IpAddr,
+        roots: rustls::RootCertStore,
+        cert: rustls::pki_types::CertificateDer<'static>,
+        key: rustls::pki_types::PrivateKeyDer<'static>,
+    ) -> std::io::Result<Endpoint> {
+        use std::sync::Arc;
+        use std::time::Duration;
+
+        const KEEP_ALIVE_INTERVAL: Duration = Duration::from_millis(5_000);
+
+        let tls_cfg = rustls::ClientConfig::builder()
+            .with_root_certificates(roots)
+            .with_client_auth_cert(vec![cert], key)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
+        let mut transport = quinn::TransportConfig::default();
+        transport.keep_alive_interval(Some(KEEP_ALIVE_INTERVAL));
+        let mut config = quinn::ClientConfig::new(Arc::new(
+            quinn::crypto::rustls::QuicClientConfig::try_from(tls_cfg)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?,
+        ));
+        config.transport_config(Arc::new(transport));
+
+        let mut inner = quinn::Endpoint::client(SocketAddr::new(addr, 0))?;
+        inner.set_default_client_config(config);
+        Ok(Self { inner })
+    }
+}
+
 /// Connects to the server and performs a handshake.
 ///
 /// # Errors
@@ -96,7 +142,7 @@ pub(crate) enum RequestCode {
 /// protocol version.
 #[cfg(feature = "client")]
 pub async fn connect(
-    endpoint: &quinn::Endpoint,
+    endpoint: &Endpoint,
     server_addr: SocketAddr,
     server_name: &str,
     app_name: &str,
@@ -106,6 +152,7 @@ pub async fn connect(
     use std::io;
 
     let connecting = endpoint
+        .inner
         .connect(server_addr, server_name)
         .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
     let conn = connecting.await.map_err(|e| {

@@ -88,9 +88,6 @@ pub(crate) enum RequestCode {
     Unknown = u32::MAX,
 }
 
-#[cfg(feature = "client")]
-pub enum ConnectionError {}
-
 /// Connects to the server and performs a handshake.
 ///
 /// # Errors

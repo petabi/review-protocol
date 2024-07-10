@@ -89,36 +89,67 @@ pub(crate) enum RequestCode {
 }
 
 #[cfg(feature = "client")]
-/// A protocol endpoint for outbound connections.
-///
-/// An endpoint may host many connections.
-pub struct Endpoint {
-    inner: quinn::Endpoint,
+/// A builder for creating a new endpoint.
+pub struct EndpointBuilder {
+    addr: IpAddr,
+    roots: rustls::RootCertStore,
+    cert: rustls::pki_types::CertificateDer<'static>,
+    key: rustls::pki_types::PrivateKeyDer<'static>,
 }
 
 #[cfg(feature = "client")]
-impl Endpoint {
-    /// Creates a new endpoint for outbound connections.
+impl EndpointBuilder {
+    /// Creates a new builder with the given address, certificate, and key.
     ///
     /// Note that `addr` is the *local* address to bind to.
     ///
     /// # Errors
     ///
-    /// Returns an error if the TLS configuration is invalid.
-    pub fn new(
-        addr: IpAddr,
-        roots: rustls::RootCertStore,
-        cert: rustls::pki_types::CertificateDer<'static>,
-        key: rustls::pki_types::PrivateKeyDer<'static>,
-    ) -> std::io::Result<Endpoint> {
+    /// Returns an error if the key is invalid.
+    pub fn new(addr: IpAddr, cert: Vec<u8>, key: Vec<u8>) -> std::io::Result<Self> {
+        Ok(Self {
+            addr,
+            roots: rustls::RootCertStore::empty(),
+            cert: cert.into(),
+            key: key
+                .try_into()
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?,
+        })
+    }
+
+    /// Adds root certificates to the certificate store.
+    ///
+    /// It reads certificates from the given reader, filtering out any PEM
+    /// sections.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the reader is invalid or the certificates are
+    /// invalid.
+    pub fn add_root_certs(&mut self, rd: &mut dyn std::io::BufRead) -> std::io::Result<&mut Self> {
+        for cert in rustls_pemfile::certs(rd) {
+            let cert = cert?;
+            self.roots
+                .add(cert)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        }
+        Ok(self)
+    }
+
+    /// Creates a new endpoint.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the stored TLS configuration is invalid.
+    pub fn build(self) -> std::io::Result<Endpoint> {
         use std::sync::Arc;
         use std::time::Duration;
 
         const KEEP_ALIVE_INTERVAL: Duration = Duration::from_millis(5_000);
 
         let tls_cfg = rustls::ClientConfig::builder()
-            .with_root_certificates(roots)
-            .with_client_auth_cert(vec![cert], key)
+            .with_root_certificates(self.roots)
+            .with_client_auth_cert(vec![self.cert], self.key)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
         let mut transport = quinn::TransportConfig::default();
         transport.keep_alive_interval(Some(KEEP_ALIVE_INTERVAL));
@@ -128,11 +159,22 @@ impl Endpoint {
         ));
         config.transport_config(Arc::new(transport));
 
-        let mut inner = quinn::Endpoint::client(SocketAddr::new(addr, 0))?;
+        let mut inner = quinn::Endpoint::client(SocketAddr::new(self.addr, 0))?;
         inner.set_default_client_config(config);
-        Ok(Self { inner })
+        Ok(Endpoint { inner })
     }
+}
 
+#[cfg(feature = "client")]
+/// A protocol endpoint for outbound connections.
+///
+/// An endpoint may host many connections.
+pub struct Endpoint {
+    inner: quinn::Endpoint,
+}
+
+#[cfg(feature = "client")]
+impl Endpoint {
     /// Connects to the server and performs a handshake.
     ///
     /// # Errors

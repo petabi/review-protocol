@@ -9,15 +9,23 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- New `Endpoint` struct in the `client` module that wraps `quinn::Endpoint`.
-  This provides a protocol-specific endpoint for outbound connections, improving
+- New `EndpointBuilder` struct in the `client` module for creating customized
+  endpoints. This allows for more flexible configuration of TLS settings and
+  root certificates.
+  - `EndpointBuilder::new` function to create a new builder with a given
+    address, certificate, and key.
+  - `EndpointBuilder::add_root_certs` method to add root certificates to the
+    endpoint's certificate store.
+  - `EndpointBuilder::build` method to construct the final `Endpoint` instance.
+- `Endpoint` struct in the `client` module that wraps `quinn::Endpoint`. This
+  provides a protocol-specific endpoint for outbound connections, improving
   encapsulation and making the API more idiomatic to review-protocol.
-- `Endpoint::connect` function that combines `quinn::Endpoint::connect` and
-  `review-protocol::client::handshake`. This simplifies the connection process
-  for applications using review-protocol, reducing code duplication.
-  Applications using review-protocol should now create an `Endpoint` instance
-  and call `Endpoint::connect` instead of calling `quinn::Endpoint::connect` and
-  `client::handshake` separately.
+  - `Endpoint::connect` function that combines `quinn::Endpoint::connect` and
+    `review-protocol::client::handshake`. This simplifies the connection process
+    for applications using review-protocol, reducing code duplication.
+    Applications using review-protocol should now create an `Endpoint` instance
+    using `EndpointBuilder` and call `Endpoint::connect` instead of calling
+    `quinn::Endpoint::connect` and `client::handshake` separately.
 - Introduced `EventCategory` enum to categorize security events.
 
 ### Changed

@@ -4,7 +4,7 @@ version = "0.3.0"
 edition = "2021"
 
 [features]
-client = ["bincode", "oinq", "quinn"]
+client = ["bincode", "oinq", "quinn", "rustls", "rustls-pemfile"]
 server = ["bincode", "oinq", "quinn"]
 
 [dependencies]
@@ -15,8 +15,8 @@ ipnet = { version = "2", features = ["serde"] }
 num_enum = "0.7"
 oinq = { git = "https://github.com/petabi/oinq.git", tag = "0.13.0", optional = true }
 quinn = { version = "0.11", optional = true }
-rustls = { version = "0.23", default-features = false }
-rustls-pemfile = "2"
+rustls = { version = "0.23", default-features = false, optional = true }
+rustls-pemfile = { version = "2", optional = true }
 semver = "1"
 serde = { version = "1", features = ["derive"] }
 thiserror = "1"

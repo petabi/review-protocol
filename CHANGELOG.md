@@ -9,23 +9,27 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- New `EndpointBuilder` struct in the `client` module for creating customized
-  endpoints. This allows for more flexible configuration of TLS settings and
+- New `ConnectionBuilder` struct in the `client` module for creating customized
+  connections. This allows for more flexible configuration of TLS settings and
   root certificates.
-  - `EndpointBuilder::new` function to create a new builder with a given
-    address, certificate, and key.
-  - `EndpointBuilder::add_root_certs` method to add root certificates to the
+  - `ConnectionBuilder::new` function to create a new builder with given remote
+    and local configurations.
+  - `ConnectionBuilder::add_root_certs` method to add root certificates to the
     endpoint's certificate store.
-  - `EndpointBuilder::build` method to construct the final `Endpoint` instance.
-- `Endpoint` struct in the `client` module that wraps `quinn::Endpoint`. This
-  provides a protocol-specific endpoint for outbound connections, improving
-  encapsulation and making the API more idiomatic to review-protocol.
-  - `Endpoint::connect` function that combines `quinn::Endpoint::connect` and
+  - `ConnectionBuilder::local_addr` method to set a specific local address for
+    binding.
+  - `ConnectionBuilder::connect` method to construct the final `Connection`
+    instance. This combines `quinn::Endpoint::connect` and
     `review-protocol::client::handshake`. This simplifies the connection process
     for applications using review-protocol, reducing code duplication.
-    Applications using review-protocol should now create an `Endpoint` instance
-    using `EndpointBuilder` and call `Endpoint::connect` instead of calling
-    `quinn::Endpoint::connect` and `client::handshake` separately.
+    Applications using review-protocol should now create a `Connection` instance
+    using `ConnectionBuilder` instead of calling `quinn::Endpoint::connect` and
+    `client::handshake` separately.
+- `Connection` struct in the `client` module. This provides a protocol-specific
+  connection, improving encapsulation and making the API more idiomatic to
+  review-protocol.
+  - Methods like `local_addr`, `remote_addr`, `close_reason`, `open_bi`, and `accept_bi`
+    to interact with the connection.
 - Introduced `EventCategory` enum to categorize security events.
 
 ### Changed
@@ -37,6 +41,8 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Removed
 
+- Direct dependency on `quinn::Connection` in the public API. The `Connection`
+  struct now encapsulates the `quinn::Connection` and `quinn::Endpoint`.
 - Removed unused configurations and fields to streamline the crate and improve
   maintainability. These removals are based on the observation that these items
   were not being utilized by any applications depending on review-database.

@@ -9,8 +9,6 @@ use num_enum::{FromPrimitive, IntoPrimitive};
 use oinq::frame::{self};
 #[cfg(feature = "client")]
 pub use oinq::message::{send_err, send_ok, send_request};
-#[cfg(feature = "client")]
-use quinn::Connection;
 
 #[cfg(feature = "client")]
 use crate::{AgentInfo, HandshakeError};
@@ -90,15 +88,21 @@ pub(crate) enum RequestCode {
 
 #[cfg(feature = "client")]
 /// A builder for creating a new endpoint.
-pub struct EndpointBuilder {
-    addr: IpAddr,
+#[derive(Debug)]
+pub struct ConnectionBuilder {
+    remote_name: String,
+    remote_addr: SocketAddr,
+    local_addr: IpAddr,
+    app_name: String,
+    app_version: String,
+    protocol_version: String,
     roots: rustls::RootCertStore,
     cert: rustls::pki_types::CertificateDer<'static>,
     key: rustls::pki_types::PrivateKeyDer<'static>,
 }
 
 #[cfg(feature = "client")]
-impl EndpointBuilder {
+impl ConnectionBuilder {
     /// Creates a new builder with the given address, certificate, and key.
     ///
     /// Note that `addr` is the *local* address to bind to.
@@ -106,9 +110,27 @@ impl EndpointBuilder {
     /// # Errors
     ///
     /// Returns an error if the key is invalid.
-    pub fn new(addr: IpAddr, cert: Vec<u8>, key: Vec<u8>) -> std::io::Result<Self> {
+    pub fn new(
+        remote_name: &str,
+        remote_addr: SocketAddr,
+        app_name: &str,
+        app_version: &str,
+        protocol_version: &str,
+        cert: Vec<u8>,
+        key: Vec<u8>,
+    ) -> std::io::Result<Self> {
+        let local_addr = if remote_addr.is_ipv6() {
+            IpAddr::V6(Ipv6Addr::UNSPECIFIED)
+        } else {
+            IpAddr::V4(Ipv4Addr::UNSPECIFIED)
+        };
         Ok(Self {
-            addr,
+            remote_name: remote_name.to_string(),
+            remote_addr,
+            local_addr,
+            app_name: app_name.to_string(),
+            app_version: app_version.to_string(),
+            protocol_version: protocol_version.to_string(),
             roots: rustls::RootCertStore::empty(),
             cert: cert.into(),
             key: key
@@ -136,45 +158,15 @@ impl EndpointBuilder {
         Ok(self)
     }
 
-    /// Creates a new endpoint.
+    /// Sets the local address to bind to.
     ///
-    /// # Errors
-    ///
-    /// Returns an error if the stored TLS configuration is invalid.
-    pub fn build(self) -> std::io::Result<Endpoint> {
-        use std::sync::Arc;
-        use std::time::Duration;
-
-        const KEEP_ALIVE_INTERVAL: Duration = Duration::from_millis(5_000);
-
-        let tls_cfg = rustls::ClientConfig::builder()
-            .with_root_certificates(self.roots)
-            .with_client_auth_cert(vec![self.cert], self.key)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
-        let mut transport = quinn::TransportConfig::default();
-        transport.keep_alive_interval(Some(KEEP_ALIVE_INTERVAL));
-        let mut config = quinn::ClientConfig::new(Arc::new(
-            quinn::crypto::rustls::QuicClientConfig::try_from(tls_cfg)
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?,
-        ));
-        config.transport_config(Arc::new(transport));
-
-        let mut inner = quinn::Endpoint::client(SocketAddr::new(self.addr, 0))?;
-        inner.set_default_client_config(config);
-        Ok(Endpoint { inner })
+    /// This is only necessary if the unspecified address (:: for IPv6 and
+    /// 0.0.0.0 for IPv4) is not desired.
+    pub fn local_addr(&mut self, addr: IpAddr) -> &mut Self {
+        self.local_addr = addr;
+        self
     }
-}
 
-#[cfg(feature = "client")]
-/// A protocol endpoint for outbound connections.
-///
-/// An endpoint may host many connections.
-pub struct Endpoint {
-    inner: quinn::Endpoint,
-}
-
-#[cfg(feature = "client")]
-impl Endpoint {
     /// Connects to the server and performs a handshake.
     ///
     /// # Errors
@@ -182,21 +174,14 @@ impl Endpoint {
     /// Returns an error if the connection fails or the server requires a different
     /// protocol version.
     #[cfg(feature = "client")]
-    pub async fn connect(
-        &self,
-        server_addr: SocketAddr,
-        server_name: &str,
-        app_name: &str,
-        app_version: &str,
-        protocol_version: &str,
-    ) -> std::io::Result<Connection> {
+    pub async fn connect(&self) -> std::io::Result<Connection> {
         use std::io;
 
-        let connecting = self
-            .inner
-            .connect(server_addr, server_name)
+        let endpoint = self.build_endpoint()?;
+        let connecting = endpoint
+            .connect(self.remote_addr, &self.remote_name)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
-        let conn = connecting.await.map_err(|e| {
+        let connection = connecting.await.map_err(|e| {
             // quinn (as of 0.11) provides automatic conversion from
             // `ConnectionError` to `ReadError`, and from `ReadError` to
             // `io::Error`. However, the conversion treats all `ConnectionError`
@@ -232,29 +217,113 @@ impl Endpoint {
         //
         // TODO: This is unnecessary in handshake, and thus should be removed in the
         // future.
-        let addr = if conn.remote_address().is_ipv6() {
+        let addr = if connection.remote_address().is_ipv6() {
             SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0)
         } else {
             SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0)
         };
 
         let agent_info = AgentInfo {
-            app_name: app_name.to_string(),
-            version: app_version.to_string(),
-            protocol_version: protocol_version.to_string(),
+            app_name: self.app_name.clone(),
+            version: self.app_version.clone(),
+            protocol_version: self.protocol_version.clone(),
             addr,
         };
 
-        let (mut send, mut recv) = conn.open_bi().await?;
+        let (mut send, mut recv) = connection.open_bi().await?;
         let mut buf = Vec::new();
         frame::send(&mut send, &mut buf, &agent_info).await?;
         match frame::recv::<Result<&str, &str>>(&mut recv, &mut buf).await? {
-            Ok(_) => Ok(conn),
+            Ok(_) => Ok(Connection {
+                endpoint,
+                connection,
+            }),
             Err(e) => Err(io::Error::new(
                 io::ErrorKind::ConnectionRefused,
                 format!("server requires protocol version {e}"),
             )),
         }
+    }
+
+    /// Creates a new endpoint.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the stored TLS configuration is invalid.
+    fn build_endpoint(&self) -> std::io::Result<quinn::Endpoint> {
+        use std::sync::Arc;
+        use std::time::Duration;
+
+        const KEEP_ALIVE_INTERVAL: Duration = Duration::from_millis(5_000);
+
+        let tls_cfg = rustls::ClientConfig::builder()
+            .with_root_certificates(self.roots.clone())
+            .with_client_auth_cert(vec![self.cert.clone()], self.key.clone_key())
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
+        let mut transport = quinn::TransportConfig::default();
+        transport.keep_alive_interval(Some(KEEP_ALIVE_INTERVAL));
+        let mut config = quinn::ClientConfig::new(Arc::new(
+            quinn::crypto::rustls::QuicClientConfig::try_from(tls_cfg)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?,
+        ));
+        config.transport_config(Arc::new(transport));
+
+        let mut endpoint = quinn::Endpoint::client(SocketAddr::new(self.local_addr, 0))?;
+        endpoint.set_default_client_config(config);
+        Ok(endpoint)
+    }
+}
+
+#[cfg(feature = "client")]
+/// A connection to a server.
+#[derive(Clone, Debug)]
+pub struct Connection {
+    endpoint: quinn::Endpoint,
+    connection: quinn::Connection,
+}
+
+#[cfg(feature = "client")]
+impl Connection {
+    /// Gets the local address of the connection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the call to the underlying
+    /// [`local_addr`](quinn::Connection::local_addr) fails.
+    pub fn local_addr(&self) -> std::io::Result<SocketAddr> {
+        self.endpoint.local_addr()
+    }
+
+    /// Gets the remote address of the connection.
+    #[must_use]
+    pub fn remote_addr(&self) -> SocketAddr {
+        self.connection.remote_address()
+    }
+
+    /// If the connection is cloesd, returns the reason; otherwise, returns `None`.
+    #[must_use]
+    pub fn close_reason(&self) -> Option<std::io::Error> {
+        self.connection.close_reason().map(Into::into)
+    }
+
+    /// Initiates an outgoing bidirectional stream.
+    ///
+    /// This directly corresponds to the `open_bi` method of the underlying
+    /// `quinn::Connection`. In the future, this method may be removed in favor
+    /// of this crate's own implementation to provide additional features.
+    #[must_use]
+    pub fn open_bi(&self) -> quinn::OpenBi {
+        self.connection.open_bi()
+    }
+
+    /// Accepts an incoming bidirectional stream.
+    ///
+    /// This directly corresponds to the `accept_bi` method of the underlying
+    /// `quinn::Connection`. In the future, this method may be removed in favor
+    /// of this crate's own implementation to provide additional features.
+    #[must_use]
+    pub fn accept_bi(&self) -> quinn::AcceptBi {
+        self.connection.accept_bi()
     }
 }
 
@@ -265,7 +334,7 @@ impl Endpoint {
 /// Returns `HandshakeError` if the handshake failed.
 #[cfg(feature = "client")]
 pub async fn handshake(
-    conn: &Connection,
+    conn: &quinn::Connection,
     app_name: &str,
     app_version: &str,
     protocol_version: &str,

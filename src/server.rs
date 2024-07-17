@@ -2,6 +2,8 @@
 
 use std::net::SocketAddr;
 
+#[cfg(any(feature = "client", feature = "server"))]
+use num_enum::{FromPrimitive, IntoPrimitive};
 use oinq::{
     frame,
     message::{send_err, send_ok},
@@ -10,9 +12,58 @@ use quinn::Connection;
 use semver::{Version, VersionReq};
 
 use crate::{
-    client::RequestCode, handle_handshake_recv_io_error, handle_handshake_send_io_error, AgentInfo,
+    client, handle_handshake_recv_io_error, handle_handshake_send_io_error, AgentInfo,
     HandshakeError,
 };
+
+/// Numeric representation of the message types that a server should handle.
+#[cfg(feature = "client")]
+#[derive(Clone, Copy, Debug, Eq, FromPrimitive, IntoPrimitive, PartialEq)]
+#[repr(u32)]
+pub(crate) enum RequestCode {
+    GetDataSource = 0,
+    GetIndicator = 1,
+    GetMaxEventIdNum = 2,
+    GetModel = 3,
+    GetModelNames = 4,
+    InsertColumnStatistics = 5,
+    InsertModel = 6,
+    InsertTimeSeries = 7,
+    RemoveModel = 8,
+    RemoveOutliers = 9,
+    UpdateClusters = 10,
+    UpdateModel = 11,
+    UpdateOutliers = 12,
+    InsertEventLabels = 13,
+    GetDataSourceList = 14,
+    GetTidbPatterns = 15,
+    InsertTidb = 16,
+    GetTidbList = 17,
+    RemoveTidb = 18,
+    UpdateTidb = 19,
+    InsertDataSource = 20,
+    #[deprecated]
+    PasswordRecovery = 21,
+    RenewCertificate = 23,
+    GetTrustedDomainList = 24,
+    GetOutliers = 25,
+    GetTorExitNodeList = 26,
+    InsertIndicator = 27,
+    RemoveIndicator = 28,
+    GetIndicatorList = 29,
+    #[deprecated]
+    GetNodeSettings = 30,
+    GetInternalNetworkList = 31,
+    GetAllowList = 32,
+    GetBlockList = 33,
+    GetPretrainedModel = 34,
+    GetTrustedUserAgentList = 35,
+    GetConfig = 36,
+
+    /// Unknown request
+    #[num_enum(default)]
+    Unknown = u32::MAX,
+}
 
 /// Processes a handshake message and sends a response.
 ///
@@ -84,7 +135,8 @@ pub async fn send_trusted_domain_list(conn: &Connection, list: &[String]) -> any
     use anyhow::anyhow;
     use bincode::Options;
 
-    let Ok(mut msg) = bincode::serialize::<u32>(&RequestCode::TrustedDomainList.into()) else {
+    let Ok(mut msg) = bincode::serialize::<u32>(&client::RequestCode::TrustedDomainList.into())
+    else {
         unreachable!("serialization of u32 into memory buffer should not fail")
     };
     let ser = bincode::DefaultOptions::new();

@@ -31,6 +31,9 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   - Methods like `local_addr`, `remote_addr`, `close_reason`, `open_bi`, and `accept_bi`
     to interact with the connection.
 - Introduced `EventCategory` enum to categorize security events.
+- New client API `get_config()` to fetch configuration from the server. This
+  method allows clients to request and receive configuration data from the
+  server. The format of the configuration is left to the caller to interpret.
 
 ### Changed
 

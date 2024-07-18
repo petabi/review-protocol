@@ -3,7 +3,6 @@ pub mod client;
 pub mod frame;
 #[cfg(feature = "client")]
 pub mod request;
-#[cfg(feature = "server")]
 pub mod server;
 #[cfg(test)]
 mod test;
@@ -74,19 +73,15 @@ pub async fn unary_request<I, O>(
     recv: &mut quinn::RecvStream,
     code: u32,
     input: I,
-) -> anyhow::Result<O>
+) -> std::io::Result<O>
 where
     I: serde::Serialize,
     O: serde::de::DeserializeOwned,
 {
-    use anyhow::Context;
-
     let mut buf = vec![];
     oinq::message::send_request(send, &mut buf, code, input).await?;
 
-    oinq::frame::recv(recv, &mut buf)
-        .await
-        .context("invalid response")
+    oinq::frame::recv(recv, &mut buf).await
 }
 
 #[cfg(test)]

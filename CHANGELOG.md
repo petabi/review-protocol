@@ -41,6 +41,12 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   `SendStream` and `RecvStream` handles. These values were previously returned
   but not used by the caller, so they have been removed to simplify the
   function's return type.
+- Minimized dependencies when only default features are used.
+  - Made several dependencies optional and tied them to specific features.
+    `anyhow`, `async-trait`, `num_enum`, `semver`, and `thiserror` are now
+    optional dependencies.
+  - Modified `unary_request` function to return `std::io::Result` instead of
+    `anyhow::Result`.
 
 ### Removed
 

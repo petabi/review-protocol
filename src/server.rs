@@ -1,16 +1,19 @@
 //! Server-specific protocol implementation.
 
+#[cfg(feature = "server")]
 use std::net::SocketAddr;
 
-#[cfg(any(feature = "client", feature = "server"))]
+#[cfg(feature = "client")]
 use num_enum::{FromPrimitive, IntoPrimitive};
+#[cfg(feature = "server")]
 use oinq::{
     frame,
     message::{send_err, send_ok},
 };
-use quinn::Connection;
+#[cfg(feature = "server")]
 use semver::{Version, VersionReq};
 
+#[cfg(feature = "server")]
 use crate::{
     client, handle_handshake_recv_io_error, handle_handshake_send_io_error, AgentInfo,
     HandshakeError,
@@ -65,6 +68,7 @@ pub(crate) enum RequestCode {
     Unknown = u32::MAX,
 }
 
+#[cfg(feature = "server")]
 /// Processes a handshake message and sends a response.
 ///
 /// # Errors
@@ -75,7 +79,7 @@ pub(crate) enum RequestCode {
 ///
 /// * panic if it failed to parse version requirement string.
 pub async fn handshake(
-    conn: &Connection,
+    conn: &quinn::Connection,
     addr: SocketAddr,
     version_req: &str,
     highest_protocol_version: &str,
@@ -126,12 +130,16 @@ pub async fn handshake(
     }
 }
 
+#[cfg(feature = "server")]
 /// Sends a list of trusted domains to the client.
 ///
 /// # Errors
 ///
 /// Returns an error if serialization failed or communication with the client failed.
-pub async fn send_trusted_domain_list(conn: &Connection, list: &[String]) -> anyhow::Result<()> {
+pub async fn send_trusted_domain_list(
+    conn: &quinn::Connection,
+    list: &[String],
+) -> anyhow::Result<()> {
     use anyhow::anyhow;
     use bincode::Options;
 

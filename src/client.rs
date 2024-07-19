@@ -116,14 +116,24 @@ impl ConnectionBuilder {
         app_name: &str,
         app_version: &str,
         protocol_version: &str,
-        cert: Vec<u8>,
-        key: Vec<u8>,
+        cert: &[u8],
+        key: &[u8],
     ) -> std::io::Result<Self> {
         let local_addr = if remote_addr.is_ipv6() {
             IpAddr::V6(Ipv6Addr::UNSPECIFIED)
         } else {
             IpAddr::V4(Ipv4Addr::UNSPECIFIED)
         };
+        let cert = rustls_pemfile::certs(&mut std::io::Cursor::new(cert))
+            .next()
+            .ok_or_else(|| {
+                std::io::Error::new(std::io::ErrorKind::InvalidData, "no certificate")
+            })??;
+        let key = rustls_pemfile::private_key(&mut std::io::Cursor::new(key))
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?
+            .ok_or_else(|| {
+                std::io::Error::new(std::io::ErrorKind::InvalidData, "no private key")
+            })?;
         Ok(Self {
             remote_name: remote_name.to_string(),
             remote_addr,
@@ -132,10 +142,8 @@ impl ConnectionBuilder {
             app_version: app_version.to_string(),
             protocol_version: protocol_version.to_string(),
             roots: rustls::RootCertStore::empty(),
-            cert: cert.into(),
-            key: key
-                .try_into()
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?,
+            cert,
+            key,
         })
     }
 

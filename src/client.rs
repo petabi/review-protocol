@@ -363,6 +363,10 @@ impl Connection {
 ///
 /// Returns `HandshakeError` if the handshake failed.
 #[cfg(feature = "client")]
+#[deprecated(
+    since = "0.4.1",
+    note = "Use `ConnectionBuilder::connect` instead, which provides more flexibility."
+)]
 pub async fn handshake(
     conn: &quinn::Connection,
     app_name: &str,

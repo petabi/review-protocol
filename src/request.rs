@@ -42,7 +42,12 @@ pub trait Handler: Send {
         return Err("not supported".to_string());
     }
 
+    #[deprecated(since = "0.4.1", note = "Use `update_config` instead")]
     async fn reload_config(&mut self) -> Result<(), String> {
+        return Err("not supported".to_string());
+    }
+
+    async fn update_config(&mut self) -> Result<(), String> {
         return Err("not supported".to_string());
     }
 
@@ -158,6 +163,7 @@ pub async fn handle<H: Handler>(
                     .map_err(HandlerError::SendError)?;
             }
             RequestCode::ReloadConfig => {
+                #[allow(deprecated)]
                 send_response(send, &mut buf, handler.reload_config().await)
                     .await
                     .map_err(HandlerError::SendError)?;

@@ -19,6 +19,9 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   
   These additions provide more flexibility in managing secure connections by
   allowing certificates and keys to be updated dynamically.
+- The `update_config` is added to the `request::Handler` trait. This function
+  allows the server to notify agents to take actions to update their
+  configuration.
 
 ### Deprecated
 
@@ -27,6 +30,10 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   review-protocol should now create a `Connection` instance using
   `ConnectionBuilder` instead of calling `quinn::Endpoint::connect` and
   `client::handshake` separately.
+- The `reload_config` function in the `request::Handler` trait is deprecated.
+  This function will be removed in the next major/minor release. Applications
+  using review-protocol should now use the `update_config` function in the
+  client API to make agents update their configuration.
 
 ## [0.4.0] - 2024-07-22
 

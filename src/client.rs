@@ -147,6 +147,58 @@ impl ConnectionBuilder {
         })
     }
 
+    /// Sets the certificate for the connection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the certificate is invalid.
+    pub fn cert(&mut self, cert: &[u8]) -> std::io::Result<&mut Self> {
+        self.cert = rustls_pemfile::certs(&mut std::io::Cursor::new(cert))
+            .next()
+            .ok_or_else(|| {
+                std::io::Error::new(std::io::ErrorKind::InvalidData, "no certificate")
+            })??;
+        Ok(self)
+    }
+
+    /// Sets the private key for the connection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the key is invalid.
+    pub fn key(&mut self, key: &[u8]) -> std::io::Result<&mut Self> {
+        self.key = rustls_pemfile::private_key(&mut std::io::Cursor::new(key))
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?
+            .ok_or_else(|| {
+                std::io::Error::new(std::io::ErrorKind::InvalidData, "no private key")
+            })?;
+        Ok(self)
+    }
+
+    /// Sets the root certificates for the connection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any of the certificates are invalid.
+    pub fn root_certs<I>(&mut self, certs: I) -> std::io::Result<&mut Self>
+    where
+        I: IntoIterator,
+        I::Item: AsRef<[u8]>,
+    {
+        self.roots = rustls::RootCertStore::empty();
+        for cert in certs {
+            let cert = rustls_pemfile::certs(&mut std::io::Cursor::new(cert.as_ref()))
+                .next()
+                .ok_or_else(|| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidData, "invalid certificate")
+                })??;
+            self.roots
+                .add(cert)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        }
+        Ok(self)
+    }
+
     /// Adds root certificates to the certificate store.
     ///
     /// It reads certificates from the given reader, filtering out any PEM

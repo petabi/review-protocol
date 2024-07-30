@@ -7,6 +7,19 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- The `ConnectionBuilder` struct has been enhanced to allow for the setting of
+  certificates, private keys, and root certificates. This includes new methods
+  to set and replace these components:
+
+  - `ConnectionBuilder::cert` sets the client certificate for the connection.
+  - `ConnectionBuilder::key` sets the client's private key for the connection.
+  - `root_certs` sets the root certificates for the connection.
+  
+  These additions provide more flexibility in managing secure connections by
+  allowing certificates and keys to be updated dynamically.
+
 ### Deprecated
 
 - The `handshake` function in the `client` module is deprecated. This function

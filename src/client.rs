@@ -376,6 +376,16 @@ impl Connection {
         self.connection.open_bi()
     }
 
+    /// Initiates an outgoing unidirectional stream.
+    ///
+    /// This directly corresponds to the `open_uni` method of the underlying
+    /// `quinn::Connection`. In the future, this method may be removed in favor
+    /// of this crate's own implementation to provide additional features.
+    #[must_use]
+    pub fn open_uni(&self) -> quinn::OpenUni {
+        self.connection.open_uni()
+    }
+
     /// Accepts an incoming bidirectional stream.
     ///
     /// This directly corresponds to the `accept_bi` method of the underlying

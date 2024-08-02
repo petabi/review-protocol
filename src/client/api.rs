@@ -1,5 +1,9 @@
+use std::io;
+
+use serde::{de::DeserializeOwned, Serialize};
+
 use super::Connection;
-use crate::server;
+use crate::{server, unary_request};
 
 /// The client API.
 impl Connection {
@@ -10,18 +14,28 @@ impl Connection {
     /// # Errors
     ///
     /// Returns an error if the request fails or the response is invalid.
-    pub async fn get_config(&self) -> std::io::Result<String> {
-        let (mut send, mut recv) = self.connection.open_bi().await?;
-        let mut buf = Vec::new();
-        oinq::message::send_request(
-            &mut send,
-            &mut buf,
-            u32::from(server::RequestCode::GetConfig),
-            (),
-        )
-        .await?;
-        oinq::frame::recv::<Result<String, String>>(&mut recv, &mut buf)
-            .await?
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+    pub async fn get_config(&self) -> io::Result<String> {
+        let res: Result<String, String> = request(self, server::RequestCode::GetConfig, ()).await?;
+        res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))
     }
+
+    /// Fetches the list of trusted domains from the server.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response is invalid.
+    pub async fn get_trusted_domain_list(&self) -> io::Result<Vec<String>> {
+        let res: Result<Vec<String>, String> =
+            request(self, server::RequestCode::GetTrustedDomainList, ()).await?;
+        res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+    }
+}
+
+async fn request<I, O>(conn: &Connection, code: server::RequestCode, input: I) -> io::Result<O>
+where
+    I: Serialize,
+    O: DeserializeOwned,
+{
+    let (mut send, mut recv) = conn.open_bi().await?;
+    unary_request(&mut send, &mut recv, u32::from(code), input).await
 }

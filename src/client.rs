@@ -1,6 +1,9 @@
 //! Client-specific protocol implementation.
 
 #[cfg(feature = "client")]
+mod api;
+
+#[cfg(feature = "client")]
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
 #[cfg(any(feature = "client", feature = "server"))]
@@ -11,7 +14,7 @@ use oinq::frame::{self};
 pub use oinq::message::{send_err, send_ok, send_request};
 
 #[cfg(feature = "client")]
-use crate::{server, AgentInfo, HandshakeError};
+use crate::{AgentInfo, HandshakeError};
 
 /// Numeric representation of the message types that a client should handle.
 #[cfg(any(feature = "client", feature = "server"))]
@@ -394,28 +397,6 @@ impl Connection {
     #[must_use]
     pub fn accept_bi(&self) -> quinn::AcceptBi {
         self.connection.accept_bi()
-    }
-
-    /// Fetches the configuration from the server.
-    ///
-    /// The format of the configuration is up to the caller to interpret.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the request fails or the response is invalid.
-    pub async fn get_config(&self) -> std::io::Result<String> {
-        let (mut send, mut recv) = self.connection.open_bi().await?;
-        let mut buf = Vec::new();
-        oinq::message::send_request(
-            &mut send,
-            &mut buf,
-            u32::from(server::RequestCode::GetConfig),
-            (),
-        )
-        .await?;
-        oinq::frame::recv::<Result<String, String>>(&mut recv, &mut buf)
-            .await?
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
     }
 }
 

@@ -9,8 +9,13 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Implemented `get_trusted_domain_list` method in the client API to fetch the
-  list of trusted domains from the server.
+- Implemented new client API methods:
+  - `get_allow_list`: Retrieves the list of allowed networks
+  - `get_block_list`: Retrieves the list of blocked networks
+  - `get_internal_network_list`: Retrieves the list of internal networks
+  - `get_tor_exit_node_list`: Retrieves the list of Tor exit nodes
+  - `get_trusted_domain_list`: Retrieves the list of trusted domains
+  - `get_trusted_user_agent_list`: Retrieves the list of trusted user agents
 
 ## [0.4.2] - 2024-07-31
 

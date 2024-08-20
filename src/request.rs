@@ -22,7 +22,6 @@ pub enum HandlerError {
 }
 
 /// A request handler that can handle a request to an agent.
-#[allow(clippy::diverging_sub_expression)]
 #[async_trait]
 pub trait Handler: Send {
     async fn dns_start(&mut self) -> Result<(), String> {

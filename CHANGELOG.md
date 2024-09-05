@@ -16,10 +16,15 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   - `get_tor_exit_node_list`: Retrieves the list of Tor exit nodes
   - `get_trusted_domain_list`: Retrieves the list of trusted domains
   - `get_trusted_user_agent_list`: Retrieves the list of trusted user agents
+- Implemented a new server API method:
+  - `notify_config_update`: Notifies the client that its configuration has been
+    updated
 
 ### Removed
 
-- `Handler::set_config` is removed.
+- `Handler::set_config` is removed. The server should no longer sends a message
+  that invokes this method. Instead, the server should sends a message that
+  invokes `Handler::update_config`.
 
 ## [0.4.2] - 2024-07-31
 

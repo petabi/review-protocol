@@ -26,6 +26,11 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   that invokes this method. Instead, the server should sends a message that
   invokes `Handler::update_config`.
 
+### Fixed
+
+- `send_trusted_tomain_list` no longer tries to receive a response twice,
+  causing the "unexpected end of file" error.
+
 ## [0.4.2] - 2024-07-31
 
 ### Added

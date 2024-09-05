@@ -51,8 +51,8 @@ pub(crate) enum RequestCode {
     /// Get configuration
     GetConfig = 11,
 
-    /// Set Configuration
-    SetConfig = 12,
+    /// Update Configuration
+    UpdateConfig = 12,
 
     /// Delete the list of sampling policies
     DeleteSamplingPolicy = 13,

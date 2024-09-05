@@ -154,7 +154,6 @@ pub async fn send_trusted_domain_list(
     frame::send_raw(&mut send, &msg).await?;
 
     let mut response = vec![];
-    frame::recv_raw(&mut recv, &mut response).await?;
     frame::recv::<Result<(), String>>(&mut recv, &mut response)
         .await?
         .map_err(|e| anyhow!(e))

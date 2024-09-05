@@ -17,6 +17,10 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   - `get_trusted_domain_list`: Retrieves the list of trusted domains
   - `get_trusted_user_agent_list`: Retrieves the list of trusted user agents
 
+### Removed
+
+- `Handler::set_config` is removed.
+
 ## [0.4.2] - 2024-07-31
 
 ### Added

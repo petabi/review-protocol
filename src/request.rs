@@ -83,10 +83,6 @@ pub trait Handler: Send {
         return Err("not supported".to_string());
     }
 
-    async fn set_config(&mut self, _config: Config) -> Result<(), String> {
-        return Err("not supported".to_string());
-    }
-
     async fn delete_sampling_policy(&mut self, _policies_id: &[u8]) -> Result<(), String> {
         return Err("not supported".to_string());
     }
@@ -260,9 +256,8 @@ pub async fn handle<H: Handler>(
                     .await
                     .map_err(HandlerError::SendError)?;
             }
-            RequestCode::SetConfig => {
-                let conf = parse_args::<Config>(body).map_err(HandlerError::RecvError)?;
-                let result = handler.set_config(conf).await;
+            RequestCode::UpdateConfig => {
+                let result = handler.update_config().await;
                 send_response(send, &mut buf, result)
                     .await
                     .map_err(HandlerError::SendError)?;

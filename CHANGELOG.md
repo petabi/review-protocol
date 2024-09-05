@@ -28,7 +28,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
-- `send_trusted_tomain_list` no longer tries to receive a response twice,
+- `send_trusted_domain_list` no longer tries to receive a response twice,
   causing the "unexpected end of file" error.
 
 ## [0.4.2] - 2024-07-31

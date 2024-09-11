@@ -6,6 +6,8 @@ upon the message exchange framework provided by [oinq], focusing on high-level
 operations, data manipulation, and protocol-specific features tailored to
 facilitate efficient and secure communication within the REview ecosystem.
 
+[![Coverage Status](https://codecov.io/gh/petabi/review-protocol/branch/main/graphs/badge.svg)](https://codecov.io/gh/petabi/review-protocol)
+
 [oinq]: https://github.com/petabi/oinq
 
 ## License

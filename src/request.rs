@@ -195,13 +195,8 @@ pub async fn handle<H: Handler>(
                     .map_err(HandlerError::SendError)?;
             }
             RequestCode::TrustedDomainList => {
-                let domains = parse_args::<Result<Vec<&str>, String>>(body)
-                    .map_err(HandlerError::RecvError)?;
-                let result = if let Ok(domains) = domains {
-                    handler.trusted_domain_list(&domains).await
-                } else {
-                    Err("invalid request".to_string())
-                };
+                let domains = parse_args::<Vec<&str>>(body).map_err(HandlerError::RecvError)?;
+                let result = handler.trusted_domain_list(&domains).await;
                 send_response(send, &mut buf, result)
                     .await
                     .map_err(HandlerError::SendError)?;

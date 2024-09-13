@@ -14,7 +14,7 @@ use oinq::frame::{self};
 pub use oinq::message::{send_err, send_ok, send_request};
 
 #[cfg(feature = "client")]
-use crate::{AgentInfo, HandshakeError};
+use crate::AgentInfo;
 
 /// Numeric representation of the message types that a client should handle.
 #[cfg(any(feature = "client", feature = "server"))]
@@ -405,17 +405,14 @@ impl Connection {
 /// # Errors
 ///
 /// Returns `HandshakeError` if the handshake failed.
-#[cfg(feature = "client")]
-#[deprecated(
-    since = "0.4.1",
-    note = "Use `ConnectionBuilder::connect` instead, which provides more flexibility."
-)]
-pub async fn handshake(
+#[cfg(test)]
+#[cfg(feature = "server")]
+pub(crate) async fn handshake(
     conn: &quinn::Connection,
     app_name: &str,
     app_version: &str,
     protocol_version: &str,
-) -> Result<(), HandshakeError> {
+) -> Result<(), super::HandshakeError> {
     // A placeholder for the address of this agent. Will be replaced by the
     // server.
     //
@@ -444,7 +441,7 @@ pub async fn handshake(
 
     match frame::recv::<Result<&str, &str>>(&mut recv, &mut buf).await {
         Ok(Ok(_)) => Ok(()),
-        Ok(Err(e)) => Err(HandshakeError::IncompatibleProtocol(
+        Ok(Err(e)) => Err(super::HandshakeError::IncompatibleProtocol(
             protocol_version.to_string(),
             e.to_string(),
         )),

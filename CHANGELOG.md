@@ -7,6 +7,12 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Removed
+
+- `client::handshake` was deprecated in version 0.4.1 and has been removed in
+  this version. Applications using review-protocol should now create a
+  `Connection` instance using `ConnectionBuilder` instead.
+
 ### Fixed
 
 - Fixed the `request::Handler::trusted_domain_list` function to correctly parse

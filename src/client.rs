@@ -3,17 +3,17 @@
 #[cfg(feature = "client")]
 mod api;
 
-#[cfg(feature = "client")]
+#[cfg(any(feature = "client", all(test, feature = "server")))]
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
 #[cfg(any(feature = "client", feature = "server"))]
 use num_enum::{FromPrimitive, IntoPrimitive};
-#[cfg(feature = "client")]
+#[cfg(any(feature = "client", all(test, feature = "server")))]
 use oinq::frame::{self};
 #[cfg(feature = "client")]
 pub use oinq::message::{send_err, send_ok, send_request};
 
-#[cfg(feature = "client")]
+#[cfg(any(feature = "client", all(test, feature = "server")))]
 use crate::AgentInfo;
 
 /// Numeric representation of the message types that a client should handle.

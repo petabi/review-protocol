@@ -186,93 +186,11 @@ mod tests {
     #[cfg(all(feature = "client", feature = "server"))]
     #[tokio::test]
     async fn trusted_domain_list() {
-        use std::{
-            io,
-            net::{IpAddr, Ipv6Addr, SocketAddr},
-        };
+        use crate::test::TEST_ENV;
 
-        use rustls::pki_types::{CertificateDer, PrivatePkcs8KeyDer};
-
-        // server configuration
-        const SERVER_NAME: &str = "test-server";
-        const SERVER_PORT: u16 = 60191;
-        const SERVER_ADDR: SocketAddr =
-            SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), SERVER_PORT);
-
-        // client configuration
-        const CLIENT_NAME: &str = "test-client";
-        const APP_NAME: &str = "review-protocol";
-        const APP_VERSION: &str = "1.0.0";
-        const PROTOCOL_VERSION: &str = env!("CARGO_PKG_VERSION");
-
-        let server_certified_key =
-            rcgen::generate_simple_self_signed([SERVER_NAME.to_string()]).expect("infallible");
-        let server_cert_pem = server_certified_key.cert.pem();
-        let server_certs_der = vec![CertificateDer::from(server_certified_key.cert)];
-        let server_key_der =
-            PrivatePkcs8KeyDer::from(server_certified_key.key_pair.serialize_der());
-        let server_config =
-            quinn::ServerConfig::with_single_cert(server_certs_der.clone(), server_key_der.into())
-                .expect("infallible");
-
-        let server_endpoint = {
-            // The loop is only useful when multiple tests are run in parallel
-            loop {
-                break match quinn::Endpoint::server(server_config.clone(), SERVER_ADDR) {
-                    Ok(e) => e,
-                    Err(e) => {
-                        if e.kind() == io::ErrorKind::AddrInUse {
-                            std::thread::sleep(std::time::Duration::from_millis(1000));
-                            continue;
-                        } else {
-                            panic!("{}", e);
-                        }
-                    }
-                };
-            }
-        };
-        let server_handle = tokio::spawn(async move {
-            let server_conn = match server_endpoint.accept().await {
-                Some(conn) => match conn.await {
-                    Ok(conn) => conn,
-                    Err(e) => panic!("{}", e),
-                },
-                None => panic!("no connection"),
-            };
-            let client_addr = server_conn.remote_address();
-            let agent_info = crate::server::handshake(
-                &server_conn,
-                client_addr,
-                PROTOCOL_VERSION,
-                PROTOCOL_VERSION,
-            )
-            .await
-            .unwrap();
-            (server_conn, agent_info)
-        });
-
-        let client_certified_key =
-            rcgen::generate_simple_self_signed([CLIENT_NAME.to_string()]).expect("infallible");
-        let client_cert_pem = client_certified_key.cert.pem();
-        let client_key_pem = client_certified_key.key_pair.serialize_pem();
-        let mut builder = crate::client::ConnectionBuilder::new(
-            SERVER_NAME,
-            SERVER_ADDR,
-            APP_NAME,
-            APP_VERSION,
-            PROTOCOL_VERSION,
-            client_cert_pem.as_bytes(),
-            client_key_pem.as_bytes(),
-        )
-        .unwrap();
-        let mut server_cert_pem_buf = io::Cursor::new(server_cert_pem.as_bytes());
-        builder.add_root_certs(&mut server_cert_pem_buf).unwrap();
-
-        // Connect to the server
-        let client_conn = builder.connect().await.unwrap();
-        let (server_conn, agent_info) = server_handle.await.unwrap();
-        assert_eq!(agent_info.app_name, APP_NAME);
-        assert_eq!(agent_info.version, APP_VERSION);
+        TEST_ENV.setup().await;
+        let server_conn = TEST_ENV.server().await;
+        let client_conn = TEST_ENV.client().await;
 
         // Test `server::send_trusted_domain_list`
         const TRUSTED_DOMAIN_LIST: &[&str] = &["example.com", "example.org"];

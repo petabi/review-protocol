@@ -1,9 +1,15 @@
 //! Shared test code
 
-use std::sync::LazyLock;
+use std::{
+    net::{IpAddr, Ipv6Addr, SocketAddr},
+    sync::LazyLock,
+};
 
 use quinn::{Connection, RecvStream, SendStream};
+use rustls::pki_types::{CertificateDer, PrivatePkcs8KeyDer};
 use tokio::sync::Mutex;
+#[cfg(all(feature = "client", feature = "server"))]
+use tokio::sync::RwLock;
 
 pub(crate) struct Channel {
     pub(crate) server: Endpoint,
@@ -21,12 +27,7 @@ pub(crate) static TOKEN: LazyLock<Mutex<u32>> = LazyLock::new(|| Mutex::new(0));
 /// Creates a bidirectional channel, returning server's send and receive and
 /// client's send and receive streams.
 pub(crate) async fn channel() -> Channel {
-    use std::{
-        net::{IpAddr, Ipv6Addr, SocketAddr},
-        sync::Arc,
-    };
-
-    use rustls::pki_types::{CertificateDer, PrivatePkcs8KeyDer};
+    use std::sync::Arc;
 
     const TEST_SERVER_NAME: &str = "test-server";
     const TEST_PORT: u16 = 60190;
@@ -98,3 +99,117 @@ pub(crate) async fn channel() -> Channel {
         },
     }
 }
+
+#[cfg(all(feature = "client", feature = "server"))]
+pub(crate) struct TestEnvironment {
+    server_cert_pem: String,
+    server_endpoint: quinn::Endpoint,
+    server_conn: RwLock<Option<quinn::Connection>>,
+    client_conn: RwLock<Option<crate::client::Connection>>,
+}
+
+#[cfg(all(feature = "client", feature = "server"))]
+impl TestEnvironment {
+    // server configuration
+    const SERVER_NAME: &str = "test-server";
+    const SERVER_PORT: u16 = 60192;
+    const SERVER_ADDR: SocketAddr =
+        SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), Self::SERVER_PORT);
+
+    fn new() -> Self {
+        let server_certified_key =
+            rcgen::generate_simple_self_signed([Self::SERVER_NAME.to_string()])
+                .expect("infallible");
+        let server_cert_pem = server_certified_key.cert.pem();
+        let server_certs_der = vec![CertificateDer::from(server_certified_key.cert)];
+        let server_key_der =
+            PrivatePkcs8KeyDer::from(server_certified_key.key_pair.serialize_der());
+        let server_config =
+            quinn::ServerConfig::with_single_cert(server_certs_der.clone(), server_key_der.into())
+                .expect("valid certificate");
+
+        let server_endpoint =
+            match quinn::Endpoint::server(server_config.clone(), Self::SERVER_ADDR) {
+                Ok(endpoint) => endpoint,
+                Err(e) => panic!("cannot create the test server: {}", e),
+            };
+
+        Self {
+            server_cert_pem,
+            server_endpoint,
+            server_conn: RwLock::new(None),
+            client_conn: RwLock::new(None),
+        }
+    }
+
+    pub(crate) async fn setup(&self) {
+        // client configuration
+        const CLIENT_NAME: &str = "test-client";
+        const APP_NAME: &str = "review-protocol";
+        const APP_VERSION: &str = "1.0.0";
+        const PROTOCOL_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+        if self.server_conn.read().await.is_some() {
+            // already set up
+            return;
+        }
+
+        let server_endpoint = self.server_endpoint.clone();
+        let server_handle = tokio::spawn(async move {
+            let server_conn = match server_endpoint.accept().await {
+                Some(conn) => match conn.await {
+                    Ok(conn) => conn,
+                    Err(e) => panic!("{}", e),
+                },
+                None => panic!("no connection"),
+            };
+            let client_addr = server_conn.remote_address();
+            let agent_info = crate::server::handshake(
+                &server_conn,
+                client_addr,
+                PROTOCOL_VERSION,
+                PROTOCOL_VERSION,
+            )
+            .await
+            .unwrap();
+            (server_conn, agent_info)
+        });
+
+        let client_certified_key =
+            rcgen::generate_simple_self_signed([CLIENT_NAME.to_string()]).expect("infallible");
+        let client_cert_pem = client_certified_key.cert.pem();
+        let client_key_pem = client_certified_key.key_pair.serialize_pem();
+        let mut builder = crate::client::ConnectionBuilder::new(
+            Self::SERVER_NAME,
+            Self::SERVER_ADDR,
+            APP_NAME,
+            APP_VERSION,
+            PROTOCOL_VERSION,
+            client_cert_pem.as_bytes(),
+            client_key_pem.as_bytes(),
+        )
+        .unwrap();
+        let mut server_cert_pem_buf = std::io::Cursor::new(self.server_cert_pem.as_bytes());
+        builder.add_root_certs(&mut server_cert_pem_buf).unwrap();
+
+        // Connect to the server
+        let client_conn = builder.connect().await.unwrap();
+        let (server_conn, agent_info) = server_handle.await.unwrap();
+        assert_eq!(agent_info.app_name, APP_NAME);
+        assert_eq!(agent_info.version, APP_VERSION);
+
+        *self.server_conn.write().await = Some(server_conn);
+        *self.client_conn.write().await = Some(client_conn);
+    }
+
+    pub(crate) async fn server(&self) -> quinn::Connection {
+        self.server_conn.read().await.as_ref().unwrap().clone()
+    }
+
+    pub(crate) async fn client(&self) -> crate::client::Connection {
+        self.client_conn.read().await.as_ref().unwrap().clone()
+    }
+}
+
+#[cfg(all(feature = "client", feature = "server"))]
+pub(crate) static TEST_ENV: LazyLock<TestEnvironment> = LazyLock::new(|| TestEnvironment::new());

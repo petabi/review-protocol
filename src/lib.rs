@@ -4,7 +4,7 @@ pub mod frame;
 #[cfg(feature = "client")]
 pub mod request;
 pub mod server;
-#[cfg(test)]
+#[cfg(all(test, any(feature = "client", feature = "server")))]
 mod test;
 pub mod types;
 
@@ -86,6 +86,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "server")]
     use crate::test::{channel, TOKEN};
 
     #[cfg(feature = "server")]

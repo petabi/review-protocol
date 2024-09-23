@@ -9,7 +9,7 @@ use thiserror::Error;
 
 use crate::{
     client::RequestCode,
-    types::{Config, HostNetworkGroup, Process, ResourceUsage, TrafficFilterRule},
+    types::{HostNetworkGroup, Process, ResourceUsage, TrafficFilterRule},
 };
 
 /// The error type for handling a request.
@@ -76,10 +76,6 @@ pub trait Handler: Send {
         &mut self,
         _rules: &[TrafficFilterRule],
     ) -> Result<(), String> {
-        return Err("not supported".to_string());
-    }
-
-    async fn get_config(&mut self) -> Result<Config, String> {
         return Err("not supported".to_string());
     }
 
@@ -243,11 +239,6 @@ pub async fn handle<H: Handler>(
                     parse_args::<Vec<TrafficFilterRule>>(body).map_err(HandlerError::RecvError)?;
                 let result = handler.update_traffic_filter_rules(&rules).await;
                 send_response(send, &mut buf, result)
-                    .await
-                    .map_err(HandlerError::SendError)?;
-            }
-            RequestCode::GetConfig => {
-                send_response(send, &mut buf, handler.get_config().await)
                     .await
                     .map_err(HandlerError::SendError)?;
             }

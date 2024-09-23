@@ -48,9 +48,6 @@ pub(crate) enum RequestCode {
     /// Update traffic filter rules
     ReloadFilterRule = 10,
 
-    /// Get configuration
-    GetConfig = 11,
-
     /// Update Configuration
     UpdateConfig = 12,
 

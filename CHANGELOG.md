@@ -5,6 +5,14 @@ file is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and
 this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Removed
+
+- Removed the following config-related items:
+  - `Config`, `HogConfig`, `PigletConfig` and `CrusherConfig`
+  - `Handler::get_config` and `RequestCode::GetConfig`
+
 ## [0.6.0] - 2024-09-18
 
 ### Removed
@@ -65,9 +73,10 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   - `ConnectionBuilder::cert` sets the client certificate for the connection.
   - `ConnectionBuilder::key` sets the client's private key for the connection.
   - `root_certs` sets the root certificates for the connection.
-  
+
   These additions provide more flexibility in managing secure connections by
   allowing certificates and keys to be updated dynamically.
+
 - The `update_config` is added to the `request::Handler` trait. This function
   allows the server to notify agents to take actions to update their
   configuration.

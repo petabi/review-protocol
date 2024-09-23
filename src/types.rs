@@ -1,9 +1,6 @@
 //! Data types used by the protocol.
 
-use std::{
-    net::{IpAddr, SocketAddr},
-    ops::RangeInclusive,
-};
+use std::{net::IpAddr, ops::RangeInclusive};
 
 use ipnet::IpNet;
 use serde::{Deserialize, Serialize};
@@ -34,33 +31,6 @@ pub struct Process {
     pub mem_usage: f64,
     pub start_time: i64,
     pub command: String,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub enum Config {
-    Hog(HogConfig),
-    Piglet(PigletConfig),
-    Crusher(CrusherConfig),
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct HogConfig {
-    pub giganto_address: Option<SocketAddr>,
-    pub active_protocols: Option<Vec<String>>,
-    pub active_sources: Option<Vec<String>>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct PigletConfig {
-    pub giganto_address: Option<SocketAddr>,
-    pub log_options: Option<Vec<String>>,
-    pub http_file_types: Option<Vec<String>>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct CrusherConfig {
-    pub giganto_ingest_address: Option<SocketAddr>,
-    pub giganto_publish_address: Option<SocketAddr>,
 }
 
 #[derive(Clone, Default, Deserialize, Eq, PartialEq, Serialize)]

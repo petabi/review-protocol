@@ -52,6 +52,20 @@ impl Connection {
         res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))
     }
 
+    /// Fetches the patterns from the threat-intelligence database.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response is invalid.
+    pub async fn get_tidb_patterns(
+        &self,
+        tidbs: &[(String, String)],
+    ) -> io::Result<Vec<(String, Option<crate::types::Tidb>)>> {
+        let res: Result<Vec<(String, Option<crate::types::Tidb>)>, String> =
+            request(self, server::RequestCode::GetTidbPatterns, tidbs).await?;
+        res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+    }
+
     /// Fetches the list of Tor exit nodes from the server.
     ///
     /// # Errors

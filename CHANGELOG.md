@@ -7,6 +7,11 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `GetTidbPatterns` is handled by `client::get_tidb_patterns` at the client side
+  and `server::respond_with_tidb_patterns` at the server side.
+
 ### Removed
 
 - Removed the following config-related items:
@@ -229,6 +234,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - `client::handshake` implements the application-level handshake process for the
   client after a QUIC connection is established.
 
+[Unreleased]: https://github.com/petabi/review-protocol/compare/0.6.0...main
 [0.6.0]: https://github.com/petabi/review-protocol/compare/0.5.0...0.6.0
 [0.5.0]: https://github.com/petabi/review-protocol/compare/0.4.2...0.5.0
 [0.4.2]: https://github.com/petabi/review-protocol/compare/0.4.1...0.4.2

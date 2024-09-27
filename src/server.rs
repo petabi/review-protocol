@@ -15,7 +15,7 @@ use semver::{Version, VersionReq};
 
 #[cfg(feature = "server")]
 use crate::{
-    client, handle_handshake_recv_io_error, handle_handshake_send_io_error, AgentInfo,
+    client, handle_handshake_recv_io_error, handle_handshake_send_io_error, types::Tidb, AgentInfo,
     HandshakeError,
 };
 
@@ -128,6 +128,24 @@ pub async fn handshake(
             version_req.to_string(),
         ))
     }
+}
+
+#[cfg(feature = "server")]
+/// Sends patterns from a threat-intelligence database.
+///
+/// # Errors
+///
+/// Returns an error if serialization failed or communication with the client failed.
+pub async fn respond_with_tidb_patterns(
+    send: &mut quinn::SendStream,
+    patterns: &[(String, Option<Tidb>)],
+) -> anyhow::Result<()> {
+    use anyhow::Context;
+
+    let mut buf = Vec::new();
+    oinq::frame::send(send, &mut buf, Ok(patterns) as Result<_, &str>)
+        .await
+        .context("failed to send response")
 }
 
 #[cfg(feature = "server")]

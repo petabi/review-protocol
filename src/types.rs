@@ -4,6 +4,7 @@ use std::{net::IpAddr, ops::RangeInclusive};
 
 use ipnet::IpNet;
 use serde::{Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 
 /// CPU, memory, and disk usage.
 #[derive(Debug, Deserialize, Serialize)]
@@ -43,16 +44,48 @@ pub struct HostNetworkGroup {
 // IP address, port numbers, and protocols.
 pub type TrafficFilterRule = (IpNet, Option<Vec<u16>>, Option<Vec<u16>>);
 
-#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq, PartialOrd, Ord, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize_repr, Eq, PartialEq, Serialize_repr)]
+#[repr(u8)]
 pub enum EventCategory {
     Unknown = 0,
     Reconnaissance = 1,
-    InitialAccess,
-    Execution,
-    CredentialAccess,
-    Discovery,
-    LateralMovement,
-    CommandAndControl,
-    Exfiltration,
-    Impact,
+    InitialAccess = 2,
+    Execution = 3,
+    CredentialAccess = 4,
+    Discovery = 5,
+    LateralMovement = 6,
+    CommandAndControl = 7,
+    Exfiltration = 8,
+    Impact = 9,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize_repr, Eq, PartialEq, Serialize_repr)]
+#[repr(u8)]
+pub enum TiKind {
+    Ip = 0,
+    Url = 1,
+    Token = 2,
+    Regex = 3,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct TiRule {
+    pub rule_id: u32,
+    pub category: EventCategory,
+    pub name: String,
+    pub description: Option<String>,
+    pub references: Option<Vec<String>>,
+    pub samples: Option<Vec<String>>,
+    pub signatures: Option<Vec<String>>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Tidb {
+    pub id: u32,
+    pub name: String,
+    pub description: Option<String>,
+    pub kind: TiKind,
+    pub category: EventCategory,
+    pub version: String,
+    pub patterns: Vec<TiRule>,
 }

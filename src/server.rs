@@ -206,9 +206,7 @@ mod tests {
     async fn trusted_domain_list() {
         use crate::test::TEST_ENV;
 
-        TEST_ENV.setup().await;
-        let server_conn = TEST_ENV.server().await;
-        let client_conn = TEST_ENV.client().await;
+        let (server_conn, client_conn) = TEST_ENV.setup().await;
 
         // Test `server::send_trusted_domain_list`
         const TRUSTED_DOMAIN_LIST: &[&str] = &["example.com", "example.org"];

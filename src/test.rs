@@ -104,8 +104,7 @@ pub(crate) async fn channel() -> Channel {
 pub(crate) struct TestEnvironment {
     server_cert_pem: String,
     server_endpoint: quinn::Endpoint,
-    server_conn: RwLock<Option<quinn::Connection>>,
-    client_conn: RwLock<Option<crate::client::Connection>>,
+    connections: RwLock<Option<(quinn::Connection, crate::client::Connection)>>,
 }
 
 #[cfg(all(feature = "client", feature = "server"))]
@@ -137,21 +136,25 @@ impl TestEnvironment {
         Self {
             server_cert_pem,
             server_endpoint,
-            server_conn: RwLock::new(None),
-            client_conn: RwLock::new(None),
+            connections: RwLock::new(None),
         }
     }
 
-    pub(crate) async fn setup(&self) {
+    pub(crate) async fn setup(&self) -> (quinn::Connection, crate::client::Connection) {
         // client configuration
         const CLIENT_NAME: &str = "test-client";
         const APP_NAME: &str = "review-protocol";
         const APP_VERSION: &str = "1.0.0";
         const PROTOCOL_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-        if self.server_conn.read().await.is_some() {
+        if let Some(connections) = self.connections.read().await.as_ref() {
             // already set up
-            return;
+            return connections.clone();
+        }
+
+        let mut connections = self.connections.write().await;
+        if connections.is_some() {
+            return connections.as_ref().unwrap().clone();
         }
 
         let server_endpoint = self.server_endpoint.clone();
@@ -198,16 +201,9 @@ impl TestEnvironment {
         assert_eq!(agent_info.app_name, APP_NAME);
         assert_eq!(agent_info.version, APP_VERSION);
 
-        *self.server_conn.write().await = Some(server_conn);
-        *self.client_conn.write().await = Some(client_conn);
-    }
+        *connections = Some((server_conn.clone(), client_conn.clone()));
 
-    pub(crate) async fn server(&self) -> quinn::Connection {
-        self.server_conn.read().await.as_ref().unwrap().clone()
-    }
-
-    pub(crate) async fn client(&self) -> crate::client::Connection {
-        self.client_conn.read().await.as_ref().unwrap().clone()
+        (server_conn, client_conn)
     }
 }
 

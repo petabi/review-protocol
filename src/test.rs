@@ -8,8 +8,6 @@ use std::{
 use quinn::{Connection, RecvStream, SendStream};
 use rustls::pki_types::{CertificateDer, PrivatePkcs8KeyDer};
 use tokio::sync::Mutex;
-#[cfg(all(feature = "client", feature = "server"))]
-use tokio::sync::RwLock;
 
 pub(crate) struct Channel {
     pub(crate) server: Endpoint,
@@ -103,8 +101,7 @@ pub(crate) async fn channel() -> Channel {
 #[cfg(all(feature = "client", feature = "server"))]
 pub(crate) struct TestEnvironment {
     server_cert_pem: String,
-    server_endpoint: quinn::Endpoint,
-    connections: RwLock<Option<(quinn::Connection, crate::client::Connection)>>,
+    server_config: quinn::ServerConfig,
 }
 
 #[cfg(all(feature = "client", feature = "server"))]
@@ -127,39 +124,36 @@ impl TestEnvironment {
             quinn::ServerConfig::with_single_cert(server_certs_der.clone(), server_key_der.into())
                 .expect("valid certificate");
 
-        let server_endpoint =
-            match quinn::Endpoint::server(server_config.clone(), Self::SERVER_ADDR) {
-                Ok(endpoint) => endpoint,
-                Err(e) => panic!("cannot create the test server: {}", e),
-            };
-
         Self {
             server_cert_pem,
-            server_endpoint,
-            connections: RwLock::new(None),
+            server_config,
         }
     }
 
-    pub(crate) async fn setup(&self) -> (quinn::Connection, crate::client::Connection) {
+    pub(crate) async fn setup(&self) -> (crate::server::Connection, crate::client::Connection) {
         // client configuration
         const CLIENT_NAME: &str = "test-client";
         const APP_NAME: &str = "review-protocol";
         const APP_VERSION: &str = "1.0.0";
         const PROTOCOL_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-        if let Some(connections) = self.connections.read().await.as_ref() {
-            // already set up
-            return connections.clone();
-        }
+        let server_endpoint = loop {
+            break match quinn::Endpoint::server(self.server_config.clone(), Self::SERVER_ADDR) {
+                Ok(e) => e,
+                Err(e) => {
+                    if e.kind() == tokio::io::ErrorKind::AddrInUse {
+                        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                        continue;
+                    } else {
+                        panic!("cannot create the test server: {}", e);
+                    }
+                }
+            };
+        };
 
-        let mut connections = self.connections.write().await;
-        if connections.is_some() {
-            return connections.as_ref().unwrap().clone();
-        }
-
-        let server_endpoint = self.server_endpoint.clone();
+        let handler_endpoint = server_endpoint.clone();
         let server_handle = tokio::spawn(async move {
-            let server_conn = match server_endpoint.accept().await {
+            let server_conn = match handler_endpoint.accept().await {
                 Some(conn) => match conn.await {
                     Ok(conn) => conn,
                     Err(e) => panic!("{}", e),
@@ -201,11 +195,15 @@ impl TestEnvironment {
         assert_eq!(agent_info.app_name, APP_NAME);
         assert_eq!(agent_info.version, APP_VERSION);
 
-        *connections = Some((server_conn.clone(), client_conn.clone()));
-
+        let server_conn = crate::server::Connection::new(server_endpoint, server_conn.clone());
         (server_conn, client_conn)
+    }
+
+    pub(crate) fn teardown(&self, server_conn: crate::server::Connection) {
+        server_conn.close();
     }
 }
 
 #[cfg(all(feature = "client", feature = "server"))]
-pub(crate) static TEST_ENV: LazyLock<TestEnvironment> = LazyLock::new(|| TestEnvironment::new());
+pub(crate) static TEST_ENV: LazyLock<Mutex<TestEnvironment>> =
+    LazyLock::new(|| Mutex::new(TestEnvironment::new()));

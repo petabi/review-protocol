@@ -68,6 +68,28 @@ pub(crate) enum RequestCode {
     Unknown = u32::MAX,
 }
 
+#[cfg(all(test, feature = "server"))]
+#[derive(Clone, Debug)]
+pub(crate) struct Connection {
+    endpoint: quinn::Endpoint,
+    conn: quinn::Connection,
+}
+
+#[cfg(all(test, feature = "server"))]
+impl Connection {
+    pub(crate) fn new(endpoint: quinn::Endpoint, conn: quinn::Connection) -> Self {
+        Self { endpoint, conn }
+    }
+
+    pub(crate) fn connection(&self) -> &quinn::Connection {
+        &self.conn
+    }
+
+    pub(crate) fn close(&self) {
+        self.endpoint.close(0u32.into(), b"");
+    }
+}
+
 #[cfg(feature = "server")]
 /// Processes a handshake message and sends a response.
 ///
@@ -206,7 +228,8 @@ mod tests {
     async fn trusted_domain_list() {
         use crate::test::TEST_ENV;
 
-        let (server_conn, client_conn) = TEST_ENV.setup().await;
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
 
         // Test `server::send_trusted_domain_list`
         const TRUSTED_DOMAIN_LIST: &[&str] = &["example.com", "example.org"];
@@ -236,9 +259,44 @@ mod tests {
             crate::request::handle(&mut handler, &mut send, &mut recv).await
         });
         let server_res =
-            crate::server::send_trusted_domain_list(&server_conn, &domains_to_send).await;
+            crate::server::send_trusted_domain_list(server_conn.connection(), &domains_to_send)
+                .await;
         assert!(server_res.is_ok());
         let client_res = client_handle.await.unwrap();
         assert!(client_res.is_ok());
+
+        test_env.teardown(server_conn);
+    }
+
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn notify_config_update() {
+        use crate::test::TEST_ENV;
+
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        struct Handler {}
+
+        #[async_trait::async_trait]
+        impl crate::request::Handler for Handler {
+            async fn update_config(&mut self) -> Result<(), String> {
+                Ok(())
+            }
+        }
+
+        let mut handler = Handler {};
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+
+            crate::request::handle(&mut handler, &mut send, &mut recv).await
+        });
+        let server_res = crate::server::notify_config_update(server_conn.connection()).await;
+        assert!(server_res.is_ok());
+        let client_res = client_handle.await.unwrap();
+        assert!(client_res.is_ok());
+
+        test_env.teardown(server_conn);
     }
 }

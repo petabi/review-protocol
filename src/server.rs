@@ -71,14 +71,13 @@ pub(crate) enum RequestCode {
 #[cfg(all(test, feature = "server"))]
 #[derive(Clone, Debug)]
 pub(crate) struct Connection {
-    endpoint: quinn::Endpoint,
     conn: quinn::Connection,
 }
 
 #[cfg(all(test, feature = "server"))]
 impl Connection {
-    pub(crate) fn new(endpoint: quinn::Endpoint, conn: quinn::Connection) -> Self {
-        Self { endpoint, conn }
+    pub(crate) fn new(conn: quinn::Connection) -> Self {
+        Self { conn }
     }
 
     pub(crate) fn connection(&self) -> &quinn::Connection {
@@ -86,7 +85,7 @@ impl Connection {
     }
 
     pub(crate) fn close(&self) {
-        self.endpoint.close(0u32.into(), b"");
+        self.conn.close(0u32.into(), b"");
     }
 }
 

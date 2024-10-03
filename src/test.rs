@@ -195,7 +195,7 @@ impl TestEnvironment {
         assert_eq!(agent_info.app_name, APP_NAME);
         assert_eq!(agent_info.version, APP_VERSION);
 
-        let server_conn = crate::server::Connection::new(server_endpoint, server_conn.clone());
+        let server_conn = crate::server::Connection::new(server_conn.clone());
         (server_conn, client_conn)
     }
 

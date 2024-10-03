@@ -195,8 +195,10 @@ impl TestEnvironment {
         assert_eq!(agent_info.app_name, APP_NAME);
         assert_eq!(agent_info.version, APP_VERSION);
 
-        let server_conn = crate::server::Connection::new(server_conn.clone());
-        (server_conn, client_conn)
+        (
+            crate::server::Connection::from_quinn(server_conn),
+            client_conn,
+        )
     }
 
     pub(crate) fn teardown(&self, server_conn: crate::server::Connection) {

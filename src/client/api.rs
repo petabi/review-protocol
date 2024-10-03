@@ -158,7 +158,7 @@ mod tests {
             use bincode::Options;
             use num_enum::FromPrimitive;
 
-            let (mut send, mut recv) = handler_conn.connection().accept_bi().await.unwrap();
+            let (mut send, mut recv) = handler_conn.as_quinn().accept_bi().await.unwrap();
             let mut buf = Vec::with_capacity(size_of::<u32>());
             let codec = bincode::DefaultOptions::new();
             let (code, body) = oinq::message::recv_request_raw(&mut recv, &mut buf)

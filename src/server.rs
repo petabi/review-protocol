@@ -1,6 +1,10 @@
 //! Server-specific protocol implementation.
 
 #[cfg(feature = "server")]
+mod api;
+
+use std::any::Any;
+#[cfg(feature = "server")]
 use std::net::SocketAddr;
 
 #[cfg(feature = "client")]
@@ -68,22 +72,51 @@ pub(crate) enum RequestCode {
     Unknown = u32::MAX,
 }
 
-#[cfg(all(test, feature = "server"))]
+#[cfg(feature = "server")]
+/// A connection from a client.
 #[derive(Clone, Debug)]
-pub(crate) struct Connection {
+pub struct Connection {
     conn: quinn::Connection,
 }
 
-#[cfg(all(test, feature = "server"))]
+#[cfg(feature = "server")]
 impl Connection {
-    pub(crate) fn new(conn: quinn::Connection) -> Self {
+    /// Creates a new connection from a QUIC connection from the `quinn` crate.
+    #[must_use]
+    pub fn from_quinn(conn: quinn::Connection) -> Self {
         Self { conn }
     }
 
-    pub(crate) fn connection(&self) -> &quinn::Connection {
+    /// Returns the QUIC connection compatible with the `quinn` crate.
+    ///
+    /// This is for backward compatibility only and will be removed in a future
+    /// release.
+    #[must_use]
+    pub fn as_quinn(&self) -> &quinn::Connection {
         &self.conn
     }
 
+    /// Returns the cryptographic identity of the peer.
+    ///
+    /// This directly corresponds to the `peer_identity` method of the underlying
+    /// `quinn::Connection`. In the future, this method may be removed in favor
+    /// of this crate's own implementation to provide additional features.
+    #[must_use]
+    pub fn peer_identity(&self) -> Option<Box<dyn Any>> {
+        self.conn.peer_identity()
+    }
+
+    /// Initiates an outgoing bidirectional stream.
+    ///
+    /// This directly corresponds to the `open_bi` method of the underlying
+    /// `quinn::Connection`. In the future, this method may be removed in favor
+    /// of this crate's own implementation to provide additional features.
+    #[must_use]
+    pub fn open_bi(&self) -> quinn::OpenBi {
+        self.conn.open_bi()
+    }
+
+    #[cfg(test)]
     pub(crate) fn close(&self) {
         self.conn.close(0u32.into(), b"");
     }
@@ -179,23 +212,9 @@ pub async fn send_trusted_domain_list(
     conn: &quinn::Connection,
     list: &[String],
 ) -> anyhow::Result<()> {
-    use anyhow::anyhow;
-    use bincode::Options;
-
-    let Ok(mut msg) = bincode::serialize::<u32>(&client::RequestCode::TrustedDomainList.into())
-    else {
-        unreachable!("serialization of u32 into memory buffer should not fail")
-    };
-    let ser = bincode::DefaultOptions::new();
-    msg.extend(ser.serialize(list)?);
-
-    let (mut send, mut recv) = conn.open_bi().await?;
-    frame::send_raw(&mut send, &msg).await?;
-
-    let mut response = vec![];
-    frame::recv::<Result<(), String>>(&mut recv, &mut response)
-        .await?
-        .map_err(|e| anyhow!(e))
+    Connection::from_quinn(conn.clone())
+        .send_trusted_domain_list(list)
+        .await
 }
 
 #[cfg(feature = "server")]
@@ -258,8 +277,7 @@ mod tests {
             crate::request::handle(&mut handler, &mut send, &mut recv).await
         });
         let server_res =
-            crate::server::send_trusted_domain_list(server_conn.connection(), &domains_to_send)
-                .await;
+            crate::server::send_trusted_domain_list(server_conn.as_quinn(), &domains_to_send).await;
         assert!(server_res.is_ok());
         let client_res = client_handle.await.unwrap();
         assert!(client_res.is_ok());
@@ -291,7 +309,7 @@ mod tests {
 
             crate::request::handle(&mut handler, &mut send, &mut recv).await
         });
-        let server_res = crate::server::notify_config_update(server_conn.connection()).await;
+        let server_res = crate::server::notify_config_update(server_conn.as_quinn()).await;
         assert!(server_res.is_ok());
         let client_res = client_handle.await.unwrap();
         assert!(client_res.is_ok());

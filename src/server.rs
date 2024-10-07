@@ -3,7 +3,6 @@
 #[cfg(feature = "server")]
 mod api;
 
-use std::any::Any;
 #[cfg(feature = "server")]
 use std::net::SocketAddr;
 
@@ -102,7 +101,7 @@ impl Connection {
     /// `quinn::Connection`. In the future, this method may be removed in favor
     /// of this crate's own implementation to provide additional features.
     #[must_use]
-    pub fn peer_identity(&self) -> Option<Box<dyn Any>> {
+    pub fn peer_identity(&self) -> Option<Box<dyn std::any::Any>> {
         self.conn.peer_identity()
     }
 

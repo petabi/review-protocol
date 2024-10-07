@@ -103,13 +103,11 @@ pub struct ConnectionBuilder {
 
 #[cfg(feature = "client")]
 impl ConnectionBuilder {
-    /// Creates a new builder with the given address, certificate, and key.
-    ///
-    /// Note that `addr` is the *local* address to bind to.
+    /// Creates a new builder with the remote address, certificate, and key.
     ///
     /// # Errors
     ///
-    /// Returns an error if the key is invalid.
+    /// Returns an error if the certificate or key is invalid.
     pub fn new(
         remote_name: &str,
         remote_addr: SocketAddr,

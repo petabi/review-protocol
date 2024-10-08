@@ -12,7 +12,8 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - `server::Connection` encapsulates the QUIC connection from a client and
   provides a protocol-specific connection. This change improves encapsulation
   and makes the API more idiomatic to review-protocol. Currently it provides the
-  following API:
+  following APIs:
+  - `send_allowlist`
   - `send_trusted_domain_list`
 
 ## [0.7.0] - 2024-09-28

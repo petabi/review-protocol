@@ -34,7 +34,7 @@ pub struct Process {
     pub command: String,
 }
 
-#[derive(Clone, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct HostNetworkGroup {
     pub hosts: Vec<IpAddr>,
     pub networks: Vec<IpNet>,

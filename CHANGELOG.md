@@ -16,6 +16,12 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   - `send_allowlist`
   - `send_trusted_domain_list`
 
+### Changed
+
+- Modified the derive macro of EventCategory to match the EventCategory in REview.
+  The previous derive macro `Serialize_repr, Deserialize_repr` caused
+  the deserialize operation for event to fail in REview.
+
 ## [0.7.0] - 2024-09-28
 
 ### Added

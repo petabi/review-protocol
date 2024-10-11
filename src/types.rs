@@ -44,7 +44,7 @@ pub struct HostNetworkGroup {
 // IP address, port numbers, and protocols.
 pub type TrafficFilterRule = (IpNet, Option<Vec<u16>>, Option<Vec<u16>>);
 
-#[derive(Clone, Copy, Debug, Deserialize_repr, Eq, PartialEq, Serialize_repr)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[repr(u8)]
 pub enum EventCategory {
     Unknown = 0,

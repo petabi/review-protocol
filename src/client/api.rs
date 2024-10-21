@@ -139,7 +139,7 @@ mod tests {
                     version: "1.0.0".to_string(),
                     patterns: vec![TiRule {
                         rule_id: 9,
-                        category: EventCategory::Unknown,
+                        category: EventCategory::Unspecified,
                         name: "rule1".to_string(),
                         description: Some("description1".to_string()),
                         references: Some(vec!["ref1".to_string()]),

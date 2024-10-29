@@ -6,6 +6,13 @@ use ipnet::IpNet;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
+/// The data source key, either a numeric ID or a name.
+#[derive(Debug, Deserialize, Serialize)]
+pub enum DataSourceKey<'a> {
+    Id(u32),
+    Name(&'a str),
+}
+
 /// CPU, memory, and disk usage.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ResourceUsage {

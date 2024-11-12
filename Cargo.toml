@@ -14,7 +14,15 @@ client = [
     "semver",
     "thiserror",
 ]
-server = ["anyhow", "bincode", "oinq", "quinn", "semver", "thiserror"]
+server = [
+    "async-trait",
+    "anyhow",
+    "bincode",
+    "oinq",
+    "quinn",
+    "semver",
+    "thiserror",
+]
 
 [dependencies]
 anyhow = { version = "1", optional = true }

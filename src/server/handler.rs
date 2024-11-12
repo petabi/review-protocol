@@ -32,15 +32,15 @@ pub trait Handler {
 /// - The arguments to the request were invalid.
 pub async fn handle<H>(
     handler: &mut H,
-    mut send: quinn::SendStream,
-    mut recv: quinn::RecvStream,
-) -> io::Result<Option<(u32, quinn::SendStream, quinn::RecvStream)>>
+    send: &mut quinn::SendStream,
+    recv: &mut quinn::RecvStream,
+) -> io::Result<Option<(u32, Vec<u8>)>>
 where
     H: Handler + Sync,
 {
     let mut buf = Vec::new();
     loop {
-        let (code, body) = match oinq::message::recv_request_raw(&mut recv, &mut buf).await {
+        let (code, body) = match oinq::message::recv_request_raw(recv, &mut buf).await {
             Ok(res) => res,
             Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => break,
             Err(e) => return Err(e),
@@ -50,11 +50,11 @@ where
             RequestCode::GetDataSource => {
                 let data_source_key = parse_args::<DataSourceKey>(body)?;
                 let result = handler.get_data_source(&data_source_key).await;
-                oinq::request::send_response(&mut send, &mut buf, result).await?;
+                oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::Unknown => {
                 oinq::frame::send(
-                    &mut send,
+                    send,
                     &mut buf,
                     Err("unknown request code") as Result<(), &str>,
                 )
@@ -65,7 +65,7 @@ where
                 ));
             }
             _ => {
-                return Ok(Some((code, send, recv)));
+                return Ok(Some((code, body.into())));
             }
         }
     }

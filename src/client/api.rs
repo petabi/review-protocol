@@ -141,8 +141,8 @@ mod tests {
         let handler_conn = server_conn.clone();
         let server_handle = tokio::spawn(async move {
             let mut handler = TestServerHandler;
-            let (send, recv) = handler_conn.as_quinn().accept_bi().await.unwrap();
-            handle(&mut handler, send, recv).await?;
+            let (mut send, mut recv) = handler_conn.as_quinn().accept_bi().await.unwrap();
+            handle(&mut handler, &mut send, &mut recv).await?;
             Ok(()) as std::io::Result<()>
         });
 

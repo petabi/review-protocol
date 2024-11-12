@@ -3,7 +3,11 @@ use std::io;
 use serde::{de::DeserializeOwned, Serialize};
 
 use super::Connection;
-use crate::{server, types::HostNetworkGroup, unary_request};
+use crate::{
+    server,
+    types::{DataSource, DataSourceKey, HostNetworkGroup},
+    unary_request,
+};
 
 /// The client API.
 impl Connection {
@@ -39,6 +43,18 @@ impl Connection {
         let res: Result<HostNetworkGroup, String> =
             request(self, server::RequestCode::GetBlockList, ()).await?;
         res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+    }
+
+    /// Fetches a data source from the server.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response is invalid.
+    pub async fn get_data_source(&self, key: &DataSourceKey<'_>) -> io::Result<DataSource> {
+        let res: Result<Option<DataSource>, String> =
+            request(self, server::RequestCode::GetDataSource, key).await?;
+        res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+            .and_then(|res| res.ok_or_else(|| io::Error::from(io::ErrorKind::NotFound)))
     }
 
     /// Fetches the list of internal networks from the server.
@@ -112,9 +128,34 @@ where
 #[cfg(all(test, feature = "server"))]
 mod tests {
     use crate::{
-        test::TEST_ENV,
-        types::{EventCategory, TiKind, TiRule, Tidb},
+        server::handle,
+        test::{TestServerHandler, TEST_ENV},
+        types::{DataSourceKey, EventCategory, TiKind, TiRule, Tidb},
     };
+
+    #[tokio::test]
+    async fn get_data_source() {
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let handler_conn = server_conn.clone();
+        let server_handle = tokio::spawn(async move {
+            let mut handler = TestServerHandler;
+            let (send, recv) = handler_conn.as_quinn().accept_bi().await.unwrap();
+            handle(&mut handler, send, recv).await?;
+            Ok(()) as std::io::Result<()>
+        });
+
+        let client_res = client_conn.get_data_source(&DataSourceKey::Id(5)).await;
+        assert!(client_res.is_ok());
+        let received_data_source = client_res.unwrap();
+        assert_eq!(received_data_source.name, "name5");
+
+        let server_res = server_handle.await.unwrap();
+        assert!(server_res.is_ok());
+
+        test_env.teardown(server_conn);
+    }
 
     #[tokio::test]
     async fn get_tidb_patterns() {

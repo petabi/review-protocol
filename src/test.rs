@@ -9,6 +9,8 @@ use quinn::{Connection, RecvStream, SendStream};
 use rustls::pki_types::{CertificateDer, PrivatePkcs8KeyDer};
 use tokio::sync::Mutex;
 
+use crate::types::{DataSource, DataSourceKey, DataType};
+
 pub(crate) struct Channel {
     pub(crate) server: Endpoint,
     pub(crate) client: Endpoint,
@@ -209,3 +211,29 @@ impl TestEnvironment {
 #[cfg(all(feature = "client", feature = "server"))]
 pub(crate) static TEST_ENV: LazyLock<Mutex<TestEnvironment>> =
     LazyLock::new(|| Mutex::new(TestEnvironment::new()));
+
+#[cfg(feature = "server")]
+pub(crate) struct TestServerHandler;
+
+#[cfg(feature = "server")]
+#[async_trait::async_trait]
+impl crate::server::Handler for TestServerHandler {
+    // Returns `Some` for `id` 5 and `name` "name5" only.
+    async fn get_data_source(&self, key: &DataSourceKey<'_>) -> Result<Option<DataSource>, String> {
+        let ds = DataSource {
+            id: 5,
+            name: "name5".to_string(),
+            server_name: "test-server".to_string(),
+            address: SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), 0),
+            data_type: DataType::Log,
+            source: "source5".to_string(),
+            kind: Some("kind5".to_string()),
+            description: "description5".to_string(),
+        };
+
+        match key {
+            DataSourceKey::Id(5) | DataSourceKey::Name("test5") => Ok(Some(ds)),
+            _ => Ok(None),
+        }
+    }
+}

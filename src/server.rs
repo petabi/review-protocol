@@ -2,6 +2,8 @@
 
 #[cfg(feature = "server")]
 mod api;
+#[cfg(feature = "server")]
+mod handler;
 
 #[cfg(feature = "server")]
 use std::net::SocketAddr;
@@ -17,13 +19,15 @@ use oinq::{
 use semver::{Version, VersionReq};
 
 #[cfg(feature = "server")]
+pub use self::handler::{handle, Handler};
+#[cfg(feature = "server")]
 use crate::{
     client, handle_handshake_recv_io_error, handle_handshake_send_io_error, types::Tidb, AgentInfo,
     HandshakeError,
 };
 
 /// Numeric representation of the message types that a server should handle.
-#[cfg(feature = "client")]
+#[cfg(any(feature = "client", feature = "server"))]
 #[derive(Clone, Copy, Debug, Eq, FromPrimitive, IntoPrimitive, PartialEq)]
 #[repr(u32)]
 pub(crate) enum RequestCode {

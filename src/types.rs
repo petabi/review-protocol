@@ -1,8 +1,12 @@
 //! Data types used by the protocol.
 
-use std::{net::IpAddr, ops::RangeInclusive};
+use std::{
+    net::{IpAddr, SocketAddr},
+    ops::RangeInclusive,
+};
 
 use ipnet::IpNet;
+use num_enum::{IntoPrimitive, TryFromPrimitive};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
@@ -11,6 +15,34 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 pub enum DataSourceKey<'a> {
     Id(u32),
     Name(&'a str),
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct DataSource {
+    pub id: u32,
+    pub name: String,
+
+    pub server_name: String,
+    pub address: SocketAddr,
+
+    pub data_type: DataType,
+    pub source: String,
+    pub kind: Option<String>,
+
+    pub description: String,
+}
+
+/// The type of data that a data source provides.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, IntoPrimitive, TryFromPrimitive)]
+#[serde(into = "u16", try_from = "u16")]
+#[repr(u16)]
+pub enum DataType {
+    /// comma-separated values
+    Csv = 0,
+    /// line-based text data
+    Log = 1,
+    /// time series data
+    TimeSeries = 2,
 }
 
 /// CPU, memory, and disk usage.

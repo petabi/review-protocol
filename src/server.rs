@@ -8,7 +8,7 @@ mod handler;
 #[cfg(feature = "server")]
 use std::net::SocketAddr;
 
-#[cfg(feature = "client")]
+#[cfg(any(feature = "client", feature = "server"))]
 use num_enum::{FromPrimitive, IntoPrimitive};
 #[cfg(feature = "server")]
 use oinq::{

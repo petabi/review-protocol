@@ -283,8 +283,7 @@ mod tests {
 
             crate::request::handle(&mut handler, &mut send, &mut recv).await
         });
-        let server_res =
-            crate::server::send_trusted_domain_list(server_conn.as_quinn(), &domains_to_send).await;
+        let server_res = server_conn.send_trusted_domain_list(&domains_to_send).await;
         assert!(server_res.is_ok());
         let client_res = client_handle.await.unwrap();
         assert!(client_res.is_ok());

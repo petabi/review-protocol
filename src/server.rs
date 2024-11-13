@@ -211,6 +211,10 @@ pub async fn respond_with_tidb_patterns(
 /// # Errors
 ///
 /// Returns an error if serialization failed or communication with the client failed.
+#[deprecated(
+    since = "0.8.1",
+    note = "Use Connection::send_trusted_domain_list directly"
+)]
 pub async fn send_trusted_domain_list(
     conn: &quinn::Connection,
     list: &[String],

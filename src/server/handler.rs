@@ -6,7 +6,7 @@ use num_enum::FromPrimitive;
 use oinq::request::parse_args;
 
 use super::RequestCode;
-use crate::types::{DataSource, DataSourceKey};
+use crate::types::{DataSource, DataSourceKey, Tidb};
 
 /// A request handler that can handle a request to the server.
 #[async_trait::async_trait]
@@ -15,6 +15,13 @@ pub trait Handler {
         &self,
         _key: &DataSourceKey<'_>,
     ) -> Result<Option<DataSource>, String> {
+        Err("not supported".to_string())
+    }
+
+    async fn get_tidb_patterns(
+        &self,
+        _db_names: &[(&str, &str)],
+    ) -> Result<Vec<(String, Option<Tidb>)>, String> {
         Err("not supported".to_string())
     }
 }
@@ -50,6 +57,11 @@ where
             RequestCode::GetDataSource => {
                 let data_source_key = parse_args::<DataSourceKey>(body)?;
                 let result = handler.get_data_source(&data_source_key).await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::GetTidbPatterns => {
+                let db_names = parse_args::<Vec<(&str, &str)>>(body)?;
+                let result = handler.get_tidb_patterns(&db_names).await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::Unknown => {

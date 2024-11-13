@@ -9,7 +9,7 @@ use quinn::{Connection, RecvStream, SendStream};
 use rustls::pki_types::{CertificateDer, PrivatePkcs8KeyDer};
 use tokio::sync::Mutex;
 
-use crate::types::{DataSource, DataSourceKey, DataType};
+use crate::types::{DataSource, DataSourceKey, DataType, EventCategory, TiKind, TiRule, Tidb};
 
 pub(crate) struct Channel {
     pub(crate) server: Endpoint,
@@ -235,5 +235,44 @@ impl crate::server::Handler for TestServerHandler {
             DataSourceKey::Id(5) | DataSourceKey::Name("test5") => Ok(Some(ds)),
             _ => Ok(None),
         }
+    }
+
+    // Returns `Some` for `db1` with version "1.0.0" only.
+    async fn get_tidb_patterns(
+        &self,
+        db_names: &[(&str, &str)],
+    ) -> Result<Vec<(String, Option<Tidb>)>, String> {
+        let db = vec![(
+            "db1".to_string(),
+            Tidb {
+                id: 1,
+                name: "name1".to_string(),
+                description: Some("description1".to_string()),
+                kind: TiKind::Token,
+                category: EventCategory::Execution,
+                version: "1.0.0".to_string(),
+                patterns: vec![TiRule {
+                    rule_id: 9,
+                    category: EventCategory::Unknown,
+                    name: "rule1".to_string(),
+                    description: Some("description1".to_string()),
+                    references: Some(vec!["ref1".to_string()]),
+                    samples: Some(vec!["sample1".to_string()]),
+                    signatures: Some(vec!["sig1".to_string()]),
+                }],
+            },
+        )];
+
+        Ok(db_names
+            .into_iter()
+            .map(|&(name, ver)| {
+                let patterns = if name == "db1" && ver == "1.0.0" {
+                    Some(db[0].1.clone())
+                } else {
+                    None
+                };
+                (name.to_string(), patterns)
+            })
+            .collect())
     }
 }

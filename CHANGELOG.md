@@ -13,6 +13,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   a client. This function takes a handler, which should implement the `Handler`
   trait. The handler currently handles the following request:
   - `GetDataSource`
+  - `GetTidbPatterns`
 - Types required in the requests handled by `Handler`:
   - `DataSourceKey`, `DataType`, `DataSource`
 - The `client` module provides the following functions to send requests to the

@@ -130,7 +130,7 @@ mod tests {
     use crate::{
         server::handle,
         test::{TestServerHandler, TEST_ENV},
-        types::{DataSourceKey, EventCategory, TiKind, TiRule, Tidb},
+        types::DataSourceKey,
     };
 
     #[tokio::test]
@@ -159,73 +159,29 @@ mod tests {
 
     #[tokio::test]
     async fn get_tidb_patterns() {
-        use crate::server::RequestCode;
-
         let test_env = TEST_ENV.lock().await;
         let (server_conn, client_conn) = test_env.setup().await;
 
-        let db_names = vec![
-            ("db1".to_string(), "table1".to_string()),
-            ("db2".to_string(), "table2".to_string()),
-        ];
-        let patterns = vec![
-            (
-                "db1".to_string(),
-                Some(Tidb {
-                    id: 1,
-                    name: "name1".to_string(),
-                    description: Some("description1".to_string()),
-                    kind: TiKind::Token,
-                    category: EventCategory::Execution,
-                    version: "1.0.0".to_string(),
-                    patterns: vec![TiRule {
-                        rule_id: 9,
-                        category: EventCategory::Unknown,
-                        name: "rule1".to_string(),
-                        description: Some("description1".to_string()),
-                        references: Some(vec!["ref1".to_string()]),
-                        samples: Some(vec!["sample1".to_string()]),
-                        signatures: Some(vec!["sig1".to_string()]),
-                    }],
-                }),
-            ),
-            ("db2".to_string(), None),
-        ];
-
         let handler_conn = server_conn.clone();
-        let server_patterns = patterns.clone();
         let server_handle = tokio::spawn(async move {
-            use anyhow::{anyhow, Context};
-            use bincode::Options;
-            use num_enum::FromPrimitive;
-
+            let mut handler = TestServerHandler;
             let (mut send, mut recv) = handler_conn.as_quinn().accept_bi().await.unwrap();
-            let mut buf = Vec::with_capacity(size_of::<u32>());
-            let codec = bincode::DefaultOptions::new();
-            let (code, body) = oinq::message::recv_request_raw(&mut recv, &mut buf)
-                .await
-                .unwrap();
-            if RequestCode::from_primitive(code) != RequestCode::GetTidbPatterns {
-                return Err(anyhow!("unexpected request code"));
-            }
-            let db_names = codec
-                .deserialize::<Vec<(&str, &str)>>(body)
-                .context("invalid argument")?;
-            if db_names != db_names {
-                return Err(anyhow!("unexpected database names"));
-            }
-            crate::server::respond_with_tidb_patterns(&mut send, &server_patterns).await?;
-
-            Ok(())
+            handle(&mut handler, &mut send, &mut recv).await?;
+            Ok(()) as std::io::Result<()>
         });
 
+        let db_names = vec![
+            ("db1".to_string(), "1.0.0".to_string()),
+            ("db2".to_string(), "2.0.0".to_string()),
+        ];
         let client_res = client_conn.get_tidb_patterns(&db_names).await;
         assert!(client_res.is_ok());
         let received_patterns = client_res.unwrap();
-        assert_eq!(received_patterns.len(), patterns.len());
-        for (i, (name, _)) in received_patterns.iter().enumerate() {
-            assert_eq!(name, &patterns[i].0);
-        }
+        assert_eq!(received_patterns.len(), db_names.len());
+        assert_eq!(received_patterns[0].0, "db1");
+        assert!(received_patterns[0].1.is_some());
+        assert_eq!(received_patterns[1].0, "db2");
+        assert!(received_patterns[1].1.is_none());
         let server_res = server_handle.await.unwrap();
         assert!(server_res.is_ok());
 

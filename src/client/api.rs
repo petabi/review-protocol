@@ -114,6 +114,28 @@ impl Connection {
             request(self, server::RequestCode::GetTrustedUserAgentList, ()).await?;
         res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))
     }
+
+    /// Fetches the pretrained model from the server.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response is invalid.
+    pub async fn get_pretrained_model(&self, name: &str) -> io::Result<Vec<u8>> {
+        let res: Result<Vec<u8>, String> =
+            request(self, server::RequestCode::GetPretrainedModel, name).await?;
+        res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+    }
+
+    /// Fetches the renew certificate from the server.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response is invalid.
+    pub async fn renew_certificate(&self, cert: &[u8]) -> io::Result<(String, String)> {
+        let res: Result<(String, String), String> =
+            request(self, server::RequestCode::RenewCertificate, cert).await?;
+        res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+    }
 }
 
 async fn request<I, O>(conn: &Connection, code: server::RequestCode, input: I) -> io::Result<O>

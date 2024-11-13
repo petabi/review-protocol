@@ -19,6 +19,9 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - The `client` module provides the following functions to send requests to the
   server:
   - `Connection::get_data_source`
+- Implemented new client API methods:
+  - `get_pretrained_model`: Retrieves the pretrained model.
+  - `renew_certificate`: Retrieves the renew certificate.
 
 ### Deprecated
 

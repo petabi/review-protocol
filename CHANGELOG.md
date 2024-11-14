@@ -25,6 +25,8 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - `server::send_trusted_domain_list` is deprecated. The server should now call
   `server::Connection::send_trusted_domain_list` to send the list of trusted
   domains to the client.
+- `server::respond_with_tidb_patters` is deprecated. `server::handle` should be
+  used to handle incoming requests from the client.
 
 ## [0.8.0] - 2024-10-11
 

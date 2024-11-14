@@ -193,6 +193,7 @@ pub async fn handshake(
 /// # Errors
 ///
 /// Returns an error if serialization failed or communication with the client failed.
+#[deprecated(since = "0.8.1", note = "`handle` sends the response")]
 pub async fn respond_with_tidb_patterns(
     send: &mut quinn::SendStream,
     patterns: &[(String, Option<Tidb>)],

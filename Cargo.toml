@@ -1,27 +1,27 @@
 [package]
 name = "review-protocol"
-version = "0.8.0"
+version = "0.8.1"
 edition = "2021"
 
 [features]
 client = [
-    "async-trait",
-    "bincode",
-    "oinq",
-    "quinn",
-    "rustls",
-    "rustls-pemfile",
-    "semver",
-    "thiserror",
+  "async-trait",
+  "bincode",
+  "oinq",
+  "quinn",
+  "rustls",
+  "rustls-pemfile",
+  "semver",
+  "thiserror",
 ]
 server = [
-    "async-trait",
-    "anyhow",
-    "bincode",
-    "oinq",
-    "quinn",
-    "semver",
-    "thiserror",
+  "async-trait",
+  "anyhow",
+  "bincode",
+  "oinq",
+  "quinn",
+  "semver",
+  "thiserror",
 ]
 
 [dependencies]
@@ -43,7 +43,7 @@ thiserror = { version = "1", optional = true }
 quinn = { version = "0.11", features = ["ring"] }
 rcgen = "0.13"
 rustls = { version = "0.23", default-features = false, features = [
-    "ring",
-    "std",
+  "ring",
+  "std",
 ] }
 tokio = { version = "1", features = ["macros", "rt"] }

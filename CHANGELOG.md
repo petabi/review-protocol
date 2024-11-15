@@ -11,17 +11,16 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 - The server side should call `server::handle` to handle incoming requests from
   a client. This function takes a handler, which should implement the `Handler`
-  trait. The handler currently handles the following request:
+  trait. The handler currently handles the following requests:
   - `GetDataSource`
   - `GetTidbPatterns`
 - Types required in the requests handled by `Handler`:
   - `DataSourceKey`, `DataType`, `DataSource`
-- The `client` module provides the following functions to send requests to the
+- `client::Connection` provides the following functions to send requests to the
   server:
-  - `Connection::get_data_source`
-- Implemented new client API methods:
-  - `get_pretrained_model`: Retrieves the pretrained model.
-  - `renew_certificate`: Retrieves the renew certificate.
+  - `get_data_source`
+  - `get_pretrained_model`
+  - `renew_certificate`
 
 ### Deprecated
 

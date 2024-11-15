@@ -126,7 +126,7 @@ impl Connection {
         res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))
     }
 
-    /// Fetches the renew certificate from the server.
+    /// Obtain a new certificate from the server.
     ///
     /// # Errors
     ///

@@ -41,18 +41,18 @@ mod tests {
 
         #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
         struct Msg {
-            str_data: String,
-            int_data: i32,
-            float_data: f32,
+            string: String,
+            integer: i32,
+            floating_point: f32,
         }
 
         let _lock = TOKEN.lock().await;
         let mut channel = channel().await;
 
         let msg_one = Msg {
-            str_data: "hello".to_string(),
-            int_data: 10,
-            float_data: 10.0,
+            string: "hello".to_string(),
+            integer: 10,
+            floating_point: 10.0,
         };
 
         super::send_msg(&mut channel.server.send, msg_one.clone())
@@ -64,9 +64,9 @@ mod tests {
         assert_eq!(received, msg_one);
 
         let msg_two = Msg {
-            str_data: "world".to_string(),
-            int_data: 20,
-            float_data: 20.0,
+            string: "world".to_string(),
+            integer: 20,
+            floating_point: 20.0,
         };
 
         super::send_msg(&mut channel.server.send, msg_two.clone())

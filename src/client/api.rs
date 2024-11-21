@@ -176,7 +176,7 @@ mod tests {
         let server_res = server_handle.await.unwrap();
         assert!(server_res.is_ok());
 
-        test_env.teardown(server_conn);
+        test_env.teardown(&server_conn);
     }
 
     #[tokio::test]
@@ -207,6 +207,6 @@ mod tests {
         let server_res = server_handle.await.unwrap();
         assert!(server_res.is_ok());
 
-        test_env.teardown(server_conn);
+        test_env.teardown(&server_conn);
     }
 }

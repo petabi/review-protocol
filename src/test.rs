@@ -48,9 +48,8 @@ pub(crate) async fn channel() -> Channel {
                     if e.kind() == tokio::io::ErrorKind::AddrInUse {
                         tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
                         continue;
-                    } else {
-                        panic!("{}", e);
                     }
+                    panic!("{}", e);
                 }
             };
         }
@@ -146,9 +145,8 @@ impl TestEnvironment {
                     if e.kind() == tokio::io::ErrorKind::AddrInUse {
                         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                         continue;
-                    } else {
-                        panic!("cannot create the test server: {}", e);
                     }
+                    panic!("cannot create the test server: {e}");
                 }
             };
         };
@@ -158,7 +156,7 @@ impl TestEnvironment {
             let server_conn = match handler_endpoint.accept().await {
                 Some(conn) => match conn.await {
                     Ok(conn) => conn,
-                    Err(e) => panic!("{}", e),
+                    Err(e) => panic!("{e}"),
                 },
                 None => panic!("no connection"),
             };
@@ -203,7 +201,8 @@ impl TestEnvironment {
         )
     }
 
-    pub(crate) fn teardown(&self, server_conn: crate::server::Connection) {
+    pub(crate) fn teardown(&self, server_conn: &crate::server::Connection) {
+        let _ = self; // Silence unused warning for `self`
         server_conn.close();
     }
 }
@@ -242,7 +241,7 @@ impl crate::server::Handler for TestServerHandler {
         &self,
         db_names: &[(&str, &str)],
     ) -> Result<Vec<(String, Option<Tidb>)>, String> {
-        let db = vec![(
+        let db = [(
             "db1".to_string(),
             Tidb {
                 id: 1,
@@ -264,7 +263,7 @@ impl crate::server::Handler for TestServerHandler {
         )];
 
         Ok(db_names
-            .into_iter()
+            .iter()
             .map(|&(name, ver)| {
                 let patterns = if name == "db1" && ver == "1.0.0" {
                     Some(db[0].1.clone())

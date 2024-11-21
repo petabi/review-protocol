@@ -60,16 +60,6 @@ mod tests {
 
         use crate::{test::TEST_ENV, types::HostNetworkGroup};
 
-        let test_env = TEST_ENV.lock().await;
-        let (server_conn, client_conn) = test_env.setup().await;
-
-        const IP_ADDR_1: IpAddr = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
-        let allowlist_to_send = HostNetworkGroup {
-            hosts: vec![IP_ADDR_1],
-            networks: vec![],
-            ip_ranges: vec![],
-        };
-
         struct Handler {}
 
         #[async_trait::async_trait]
@@ -83,6 +73,17 @@ mod tests {
             }
         }
 
+        const IP_ADDR_1: IpAddr = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
+
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let allowlist_to_send = HostNetworkGroup {
+            hosts: vec![IP_ADDR_1],
+            networks: vec![],
+            ip_ranges: vec![],
+        };
+
         let mut handler = Handler {};
         let handler_conn = client_conn.clone();
         let client_handle = tokio::spawn(async move {
@@ -95,6 +96,6 @@ mod tests {
         let client_res = client_handle.await.unwrap();
         assert!(client_res.is_ok());
 
-        test_env.teardown(server_conn);
+        test_env.teardown(&server_conn);
     }
 }

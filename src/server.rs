@@ -254,16 +254,6 @@ mod tests {
     async fn trusted_domain_list() {
         use crate::test::TEST_ENV;
 
-        let test_env = TEST_ENV.lock().await;
-        let (server_conn, client_conn) = test_env.setup().await;
-
-        // Test `server::send_trusted_domain_list`
-        const TRUSTED_DOMAIN_LIST: &[&str] = &["example.com", "example.org"];
-        let domains_to_send = TRUSTED_DOMAIN_LIST
-            .iter()
-            .map(|&domain| domain.to_string())
-            .collect::<Vec<_>>();
-
         struct Handler {}
 
         #[async_trait::async_trait]
@@ -277,6 +267,17 @@ mod tests {
             }
         }
 
+        const TRUSTED_DOMAIN_LIST: &[&str] = &["example.com", "example.org"];
+
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        // Test `server::send_trusted_domain_list`
+        let domains_to_send = TRUSTED_DOMAIN_LIST
+            .iter()
+            .map(|&domain| domain.to_string())
+            .collect::<Vec<_>>();
+
         let mut handler = Handler {};
         let handler_conn = client_conn.clone();
         let client_handle = tokio::spawn(async move {
@@ -289,16 +290,13 @@ mod tests {
         let client_res = client_handle.await.unwrap();
         assert!(client_res.is_ok());
 
-        test_env.teardown(server_conn);
+        test_env.teardown(&server_conn);
     }
 
     #[cfg(all(feature = "client", feature = "server"))]
     #[tokio::test]
     async fn notify_config_update() {
         use crate::test::TEST_ENV;
-
-        let test_env = TEST_ENV.lock().await;
-        let (server_conn, client_conn) = test_env.setup().await;
 
         struct Handler {}
 
@@ -308,6 +306,9 @@ mod tests {
                 Ok(())
             }
         }
+
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
 
         let mut handler = Handler {};
         let handler_conn = client_conn.clone();
@@ -321,6 +322,6 @@ mod tests {
         let client_res = client_handle.await.unwrap();
         assert!(client_res.is_ok());
 
-        test_env.teardown(server_conn);
+        test_env.teardown(&server_conn);
     }
 }

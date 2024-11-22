@@ -1,5 +1,7 @@
 //! Shared test code
 
+#![allow(clippy::unwrap_used)]
+
 use std::{
     net::{IpAddr, Ipv6Addr, SocketAddr},
     sync::LazyLock,

@@ -75,7 +75,7 @@ impl Connection {
     /// Returns an error if the request fails or the response is invalid.
     pub async fn get_tidb_patterns(
         &self,
-        tidbs: &[(String, String)],
+        tidbs: &[(&str, &str)],
     ) -> io::Result<Vec<(String, Option<crate::types::Tidb>)>> {
         let res: Result<Vec<(String, Option<crate::types::Tidb>)>, String> =
             request(self, server::RequestCode::GetTidbPatterns, tidbs).await?;
@@ -192,10 +192,7 @@ mod tests {
             Ok(()) as std::io::Result<()>
         });
 
-        let db_names = vec![
-            ("db1".to_string(), "1.0.0".to_string()),
-            ("db2".to_string(), "2.0.0".to_string()),
-        ];
+        let db_names = vec![("db1", "1.0.0"), ("db2", "2.0.0")];
         let client_res = client_conn.get_tidb_patterns(&db_names).await;
         assert!(client_res.is_ok());
         let received_patterns = client_res.unwrap();

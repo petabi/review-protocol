@@ -13,19 +13,8 @@ impl Connection {
     ///
     /// Returns an error if serialization failed or communication with the client failed.
     pub async fn send_allowlist(&self, allowlist: &HostNetworkGroup) -> anyhow::Result<()> {
-        let Ok(mut msg) = bincode::serialize::<u32>(&client::RequestCode::AllowList.into()) else {
-            unreachable!("serialization of u32 into memory buffer should not fail")
-        };
-        let ser = bincode::DefaultOptions::new();
-        msg.extend(ser.serialize(allowlist)?);
-
-        let (mut send, mut recv) = self.conn.open_bi().await?;
-        frame::send_raw(&mut send, &msg).await?;
-
-        let mut response = vec![];
-        frame::recv::<Result<(), String>>(&mut recv, &mut response)
-            .await?
-            .map_err(|e| anyhow!(e))
+        self.send_list(client::RequestCode::AllowList, allowlist)
+            .await
     }
 
     /// Sends a list of Tor exit nodes to the client.
@@ -34,20 +23,8 @@ impl Connection {
     ///
     /// Returns an error if serialization failed or communication with the client failed.
     pub async fn send_tor_exit_node_list(&self, list: &[String]) -> anyhow::Result<()> {
-        let Ok(mut msg) = bincode::serialize::<u32>(&client::RequestCode::TorExitNodeList.into())
-        else {
-            unreachable!("serialization of u32 into memory buffer should not fail")
-        };
-        let ser = bincode::DefaultOptions::new();
-        msg.extend(ser.serialize(list)?);
-
-        let (mut send, mut recv) = self.conn.open_bi().await?;
-        frame::send_raw(&mut send, &msg).await?;
-
-        let mut response = vec![];
-        frame::recv::<Result<(), String>>(&mut recv, &mut response)
-            .await?
-            .map_err(|e| anyhow!(e))
+        self.send_list(client::RequestCode::TorExitNodeList, list)
+            .await
     }
 
     /// Sends a list of trusted domains to the client.
@@ -56,12 +33,21 @@ impl Connection {
     ///
     /// Returns an error if serialization failed or communication with the client failed.
     pub async fn send_trusted_domain_list(&self, list: &[String]) -> anyhow::Result<()> {
-        let Ok(mut msg) = bincode::serialize::<u32>(&client::RequestCode::TrustedDomainList.into())
-        else {
+        self.send_list(client::RequestCode::TrustedDomainList, list)
+            .await
+    }
+
+    /// Sends the given payload to the client.
+    async fn send_list<T: serde::Serialize + ?Sized>(
+        &self,
+        request_code: client::RequestCode,
+        payload: &T,
+    ) -> anyhow::Result<()> {
+        let Ok(mut msg) = bincode::serialize::<u32>(&request_code.into()) else {
             unreachable!("serialization of u32 into memory buffer should not fail")
         };
         let ser = bincode::DefaultOptions::new();
-        msg.extend(ser.serialize(list)?);
+        msg.extend(ser.serialize(payload)?);
 
         let (mut send, mut recv) = self.conn.open_bi().await?;
         frame::send_raw(&mut send, &msg).await?;

@@ -5,6 +5,13 @@ file is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and
 this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- The server-side API `Connection::send_tor_exit_node_list` to send the list of
+  Tor exit nodes to the client.
+
 ## [0.8.1] - 2024-11-15
 
 ### Added
@@ -275,6 +282,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - `client::handshake` implements the application-level handshake process for the
   client after a QUIC connection is established.
 
+[Unreleased]: https://github.com/petabi/review-protocol/compare/0.8.1...main
 [0.8.1]: https://github.com/petabi/review-protocol/compare/0.8.0...0.8.1
 [0.8.0]: https://github.com/petabi/review-protocol/compare/0.7.0...0.8.0
 [0.7.0]: https://github.com/petabi/review-protocol/compare/0.6.0...0.7.0

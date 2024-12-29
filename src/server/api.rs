@@ -28,6 +28,28 @@ impl Connection {
             .map_err(|e| anyhow!(e))
     }
 
+    /// Sends a list of Tor exit nodes to the client.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization failed or communication with the client failed.
+    pub async fn send_tor_exit_node_list(&self, list: &[String]) -> anyhow::Result<()> {
+        let Ok(mut msg) = bincode::serialize::<u32>(&client::RequestCode::TorExitNodeList.into())
+        else {
+            unreachable!("serialization of u32 into memory buffer should not fail")
+        };
+        let ser = bincode::DefaultOptions::new();
+        msg.extend(ser.serialize(list)?);
+
+        let (mut send, mut recv) = self.conn.open_bi().await?;
+        frame::send_raw(&mut send, &msg).await?;
+
+        let mut response = vec![];
+        frame::recv::<Result<(), String>>(&mut recv, &mut response)
+            .await?
+            .map_err(|e| anyhow!(e))
+    }
+
     /// Sends a list of trusted domains to the client.
     ///
     /// # Errors

@@ -17,6 +17,16 @@ impl Connection {
             .await
     }
 
+    /// Sends the blocklist for network addresses.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization failed or communication with the client failed.
+    pub async fn send_blocklist(&self, blocklist: &HostNetworkGroup) -> anyhow::Result<()> {
+        self.send_list(client::RequestCode::BlockList, blocklist)
+            .await
+    }
+
     /// Sends a list of Tor exit nodes to the client.
     ///
     /// # Errors

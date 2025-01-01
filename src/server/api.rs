@@ -27,6 +27,16 @@ impl Connection {
             .await
     }
 
+    /// Sends the internal network list.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization failed or communication with the client failed.
+    pub async fn send_internal_network_list(&self, list: &HostNetworkGroup) -> anyhow::Result<()> {
+        self.send_list(client::RequestCode::InternalNetworkList, list)
+            .await
+    }
+
     /// Sends a list of Tor exit nodes to the client.
     ///
     /// # Errors

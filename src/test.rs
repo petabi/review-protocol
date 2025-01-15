@@ -134,6 +134,8 @@ impl TestEnvironment {
     }
 
     pub(crate) async fn setup(&self) -> (crate::server::Connection, crate::client::Connection) {
+        use crate::Status;
+
         // client configuration
         const CLIENT_NAME: &str = "test-client";
         const APP_NAME: &str = "review-protocol";
@@ -184,6 +186,7 @@ impl TestEnvironment {
             APP_NAME,
             APP_VERSION,
             PROTOCOL_VERSION,
+            Status::Ready,
             client_cert_pem.as_bytes(),
             client_key_pem.as_bytes(),
         )

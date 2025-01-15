@@ -96,6 +96,7 @@ pub struct ConnectionBuilder {
     app_name: String,
     app_version: String,
     protocol_version: String,
+    status: crate::Status,
     roots: rustls::RootCertStore,
     cert: rustls::pki_types::CertificateDer<'static>,
     key: rustls::pki_types::PrivateKeyDer<'static>,
@@ -108,12 +109,14 @@ impl ConnectionBuilder {
     /// # Errors
     ///
     /// Returns an error if the certificate or key is invalid.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         remote_name: &str,
         remote_addr: SocketAddr,
         app_name: &str,
         app_version: &str,
         protocol_version: &str,
+        status: crate::Status,
         cert: &[u8],
         key: &[u8],
     ) -> std::io::Result<Self> {
@@ -139,6 +142,7 @@ impl ConnectionBuilder {
             app_name: app_name.to_string(),
             app_version: app_version.to_string(),
             protocol_version: protocol_version.to_string(),
+            status,
             roots: rustls::RootCertStore::empty(),
             cert,
             key,
@@ -285,6 +289,7 @@ impl ConnectionBuilder {
             app_name: self.app_name.clone(),
             version: self.app_version.clone(),
             protocol_version: self.protocol_version.clone(),
+            status: self.status,
             addr,
         };
 
@@ -407,6 +412,7 @@ pub(crate) async fn handshake(
     app_name: &str,
     app_version: &str,
     protocol_version: &str,
+    status: crate::Status,
 ) -> Result<(), super::HandshakeError> {
     // A placeholder for the address of this agent. Will be replaced by the
     // server.
@@ -425,6 +431,7 @@ pub(crate) async fn handshake(
         app_name: app_name.to_string(),
         version: app_version.to_string(),
         protocol_version: protocol_version.to_string(),
+        status,
         addr,
     };
 

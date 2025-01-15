@@ -152,3 +152,9 @@ pub struct Tidb {
     pub version: String,
     pub patterns: Vec<TiRule>,
 }
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+pub enum Status {
+    Ready,
+    Idle,
+}

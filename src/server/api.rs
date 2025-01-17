@@ -47,6 +47,16 @@ impl Connection {
             .await
     }
 
+    /// Sends the ping message.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization failed or communication with the client failed.
+    pub async fn send_ping(&self) -> anyhow::Result<()> {
+        self.send_request(client::RequestCode::EchoRequest, &())
+            .await
+    }
+
     /// Sends the reboot command.
     ///
     /// # Errors

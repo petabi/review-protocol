@@ -13,6 +13,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   - `Connection::send_blocklist`
   - `Connection::send_config_update_cmd`
   - `Connection::send_internal_network_list`
+  - `Connection::send_ping_cmd`
   - `Connection::send_reboot_cmd`
   - `Connection::send_shutdown_cmd`
   - `Connection::send_tor_exit_node_list`

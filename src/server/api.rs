@@ -27,6 +27,16 @@ impl Connection {
             .await
     }
 
+    /// Sends the config-update command.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization failed or communication with the client failed.
+    pub async fn send_config_update_cmd(&self) -> anyhow::Result<()> {
+        self.send_request(client::RequestCode::UpdateConfig, &())
+            .await
+    }
+
     /// Sends the internal network list.
     ///
     /// # Errors

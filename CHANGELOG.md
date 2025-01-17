@@ -13,6 +13,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   - `Connection::send_blocklist`
   - `Connection::send_internal_network_list`
   - `Connection::send_tor_exit_node_list`
+  - `Connection::send_trusted_user_agent_list`
 
 ## [0.8.1] - 2024-11-15
 

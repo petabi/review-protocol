@@ -57,6 +57,16 @@ impl Connection {
             .await
     }
 
+    /// Sends a list of trusted user-agents to the client.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization failed or communication with the client failed.
+    pub async fn send_trusted_user_agent_list(&self, list: &[String]) -> anyhow::Result<()> {
+        self.send_list(client::RequestCode::TrustedUserAgentList, list)
+            .await
+    }
+
     /// Sends the given payload to the client.
     async fn send_list<T: serde::Serialize + ?Sized>(
         &self,

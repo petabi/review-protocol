@@ -56,6 +56,15 @@ impl Connection {
         self.send_request(client::RequestCode::Reboot, &()).await
     }
 
+    /// Sends the shutdown command.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization failed or communication with the client failed.
+    pub async fn send_shutdown_cmd(&self) -> anyhow::Result<()> {
+        self.send_request(client::RequestCode::Shutdown, &()).await
+    }
+
     /// Sends a list of Tor exit nodes to the client.
     ///
     /// # Errors

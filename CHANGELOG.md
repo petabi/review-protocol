@@ -14,6 +14,11 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   - `Connection::send_internal_network_list`
   - `Connection::send_tor_exit_node_list`
 
+### Changed
+
+- Modified `get_internal_network_list` to request a list of internal networks
+  for a target Semi-supervised Engine.
+
 ## [0.8.1] - 2024-11-15
 
 ### Added

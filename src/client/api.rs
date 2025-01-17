@@ -62,9 +62,9 @@ impl Connection {
     /// # Errors
     ///
     /// Returns an error if the request fails or the response is invalid.
-    pub async fn get_internal_network_list(&self) -> io::Result<HostNetworkGroup> {
+    pub async fn get_internal_network_list(&self, key: &str) -> io::Result<HostNetworkGroup> {
         let res: Result<HostNetworkGroup, String> =
-            request(self, server::RequestCode::GetInternalNetworkList, ()).await?;
+            request(self, server::RequestCode::GetInternalNetworkList, key).await?;
         res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))
     }
 

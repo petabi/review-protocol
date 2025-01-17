@@ -13,7 +13,7 @@ impl Connection {
     ///
     /// Returns an error if serialization failed or communication with the client failed.
     pub async fn send_allowlist(&self, allowlist: &HostNetworkGroup) -> anyhow::Result<()> {
-        self.send_list(client::RequestCode::AllowList, allowlist)
+        self.send_request(client::RequestCode::AllowList, allowlist)
             .await
     }
 
@@ -23,7 +23,7 @@ impl Connection {
     ///
     /// Returns an error if serialization failed or communication with the client failed.
     pub async fn send_blocklist(&self, blocklist: &HostNetworkGroup) -> anyhow::Result<()> {
-        self.send_list(client::RequestCode::BlockList, blocklist)
+        self.send_request(client::RequestCode::BlockList, blocklist)
             .await
     }
 
@@ -33,8 +33,17 @@ impl Connection {
     ///
     /// Returns an error if serialization failed or communication with the client failed.
     pub async fn send_internal_network_list(&self, list: &HostNetworkGroup) -> anyhow::Result<()> {
-        self.send_list(client::RequestCode::InternalNetworkList, list)
+        self.send_request(client::RequestCode::InternalNetworkList, list)
             .await
+    }
+
+    /// Sends the reboot command.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization failed or communication with the client failed.
+    pub async fn send_reboot_cmd(&self) -> anyhow::Result<()> {
+        self.send_request(client::RequestCode::Reboot, &()).await
     }
 
     /// Sends a list of Tor exit nodes to the client.
@@ -43,7 +52,7 @@ impl Connection {
     ///
     /// Returns an error if serialization failed or communication with the client failed.
     pub async fn send_tor_exit_node_list(&self, list: &[String]) -> anyhow::Result<()> {
-        self.send_list(client::RequestCode::TorExitNodeList, list)
+        self.send_request(client::RequestCode::TorExitNodeList, list)
             .await
     }
 
@@ -53,7 +62,7 @@ impl Connection {
     ///
     /// Returns an error if serialization failed or communication with the client failed.
     pub async fn send_trusted_domain_list(&self, list: &[String]) -> anyhow::Result<()> {
-        self.send_list(client::RequestCode::TrustedDomainList, list)
+        self.send_request(client::RequestCode::TrustedDomainList, list)
             .await
     }
 
@@ -63,12 +72,12 @@ impl Connection {
     ///
     /// Returns an error if serialization failed or communication with the client failed.
     pub async fn send_trusted_user_agent_list(&self, list: &[String]) -> anyhow::Result<()> {
-        self.send_list(client::RequestCode::TrustedUserAgentList, list)
+        self.send_request(client::RequestCode::TrustedUserAgentList, list)
             .await
     }
 
     /// Sends the given payload to the client.
-    async fn send_list<T: serde::Serialize + ?Sized>(
+    async fn send_request<T: serde::Serialize + ?Sized>(
         &self,
         request_code: client::RequestCode,
         payload: &T,
@@ -130,6 +139,38 @@ mod tests {
             crate::request::handle(&mut handler, &mut send, &mut recv).await
         });
         let server_res = server_conn.send_allowlist(&allowlist_to_send).await;
+        assert!(server_res.is_ok());
+        let client_res = client_handle.await.unwrap();
+        assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn send_reboot_cmd() {
+        use crate::test::TEST_ENV;
+
+        struct Handler {}
+
+        #[async_trait::async_trait]
+        impl crate::request::Handler for Handler {
+            async fn reboot(&mut self) -> Result<(), String> {
+                Ok(())
+            }
+        }
+
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let mut handler = Handler {};
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+
+            crate::request::handle(&mut handler, &mut send, &mut recv).await
+        });
+        let server_res = server_conn.send_reboot_cmd().await;
         assert!(server_res.is_ok());
         let client_res = client_handle.await.unwrap();
         assert!(client_res.is_ok());

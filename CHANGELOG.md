@@ -14,6 +14,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   - `Connection::get_resource_usage`
   - `Connection::send_blocklist`
   - `Connection::send_config_update_cmd`
+  - `Connection::send_filtering_rules`
   - `Connection::send_internal_network_list`
   - `Connection::send_ping_cmd`
   - `Connection::send_reboot_cmd`

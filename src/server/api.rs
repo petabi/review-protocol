@@ -5,7 +5,7 @@ use oinq::frame;
 use super::Connection;
 use crate::{
     client,
-    types::{HostNetworkGroup, Process, ResourceUsage, SamplingPolicy},
+    types::{HostNetworkGroup, Process, ResourceUsage, SamplingPolicy, TrafficFilterRule},
 };
 
 /// The server API.
@@ -60,6 +60,16 @@ impl Connection {
     /// Returns an error if serialization failed or communication with the client failed.
     pub async fn send_config_update_cmd(&self) -> anyhow::Result<()> {
         self.send_request(client::RequestCode::UpdateConfig, &())
+            .await
+    }
+
+    /// Sends the traffic filtering rules.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization failed or communication with the client failed.
+    pub async fn send_filtering_rules(&self, list: &[TrafficFilterRule]) -> anyhow::Result<()> {
+        self.send_request(client::RequestCode::ReloadFilterRule, list)
             .await
     }
 

@@ -10,6 +10,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - The following server-side APIs to send data to the client:
+  - `Connection::get_process_list`
   - `Connection::get_resource_usage`
   - `Connection::send_blocklist`
   - `Connection::send_config_update_cmd`

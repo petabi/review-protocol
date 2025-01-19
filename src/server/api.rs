@@ -5,11 +5,22 @@ use oinq::frame;
 use super::Connection;
 use crate::{
     client,
-    types::{HostNetworkGroup, ResourceUsage},
+    types::{HostNetworkGroup, Process, ResourceUsage},
 };
 
 /// The server API.
 impl Connection {
+    /// Fetches the list of processes running on the agent.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization/deserialization failed or
+    /// communication with the client failed.
+    pub async fn get_process_list(&self) -> anyhow::Result<Vec<Process>> {
+        self.send_request(client::RequestCode::ProcessList, &())
+            .await
+    }
+
     /// Fetches the resource usage of an agent.
     ///
     /// # Errors

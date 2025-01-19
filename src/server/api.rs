@@ -3,10 +3,25 @@ use bincode::Options;
 use oinq::frame;
 
 use super::Connection;
-use crate::{client, types::HostNetworkGroup};
+use crate::{
+    client,
+    types::{HostNetworkGroup, ResourceUsage},
+};
 
 /// The server API.
 impl Connection {
+    /// Fetches the resource usage of an agent.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization/deserialization failed or
+    /// communication with the client failed.
+    pub async fn get_resource_usage(&self) -> anyhow::Result<ResourceUsage> {
+        self.send_request::<(), (String, ResourceUsage)>(client::RequestCode::ResourceUsage, &())
+            .await
+            .map(|(_, usage)| usage)
+    }
+
     /// Sends the allowlist for network addresses.
     ///
     /// # Errors
@@ -106,22 +121,21 @@ impl Connection {
     }
 
     /// Sends the given payload to the client.
-    async fn send_request<T: serde::Serialize + ?Sized>(
+    async fn send_request<T: serde::Serialize + ?Sized, S: serde::de::DeserializeOwned>(
         &self,
         request_code: client::RequestCode,
         payload: &T,
-    ) -> anyhow::Result<()> {
-        let Ok(mut msg) = bincode::serialize::<u32>(&request_code.into()) else {
+    ) -> anyhow::Result<S> {
+        let Ok(mut buf) = bincode::serialize::<u32>(&request_code.into()) else {
             unreachable!("serialization of u32 into memory buffer should not fail")
         };
         let ser = bincode::DefaultOptions::new();
-        msg.extend(ser.serialize(payload)?);
+        buf.extend(ser.serialize(payload)?);
 
         let (mut send, mut recv) = self.conn.open_bi().await?;
-        frame::send_raw(&mut send, &msg).await?;
+        frame::send_raw(&mut send, &buf).await?;
 
-        let mut response = vec![];
-        frame::recv::<Result<(), String>>(&mut recv, &mut response)
+        frame::recv::<Result<S, String>>(&mut recv, &mut buf)
             .await?
             .map_err(|e| anyhow!(e))
     }
@@ -129,6 +143,50 @@ impl Connection {
 
 #[cfg(test)]
 mod tests {
+
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn get_resource_usage() {
+        use crate::test::TEST_ENV;
+
+        struct Handler {}
+
+        #[async_trait::async_trait]
+        impl crate::request::Handler for Handler {
+            async fn resource_usage(&mut self) -> Result<(String, super::ResourceUsage), String> {
+                Ok((
+                    "test-host".to_string(),
+                    super::ResourceUsage {
+                        cpu_usage: 0.5,
+                        total_memory: 100,
+                        used_memory: 50,
+                        total_disk_space: 1000,
+                        used_disk_space: 500,
+                    },
+                ))
+            }
+        }
+
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let mut handler = Handler {};
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+
+            crate::request::handle(&mut handler, &mut send, &mut recv).await
+        });
+        let server_res = server_conn.get_resource_usage().await;
+        assert!(server_res.is_ok());
+        let usage = server_res.unwrap();
+        assert_eq!(usage.total_memory, 100);
+        let client_res = client_handle.await.unwrap();
+        assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
     #[cfg(all(feature = "client", feature = "server"))]
     #[tokio::test]
     async fn send_allowlist() {

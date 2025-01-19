@@ -18,6 +18,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   - `Connection::send_ping_cmd`
   - `Connection::send_reboot_cmd`
   - `Connection::send_shutdown_cmd`
+  - `Connection::send_sampling_policies`
   - `Connection::send_tor_exit_node_list`
   - `Connection::send_trusted_user_agent_list`
 

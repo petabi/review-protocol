@@ -5,7 +5,7 @@ use oinq::frame;
 use super::Connection;
 use crate::{
     client,
-    types::{HostNetworkGroup, Process, ResourceUsage},
+    types::{HostNetworkGroup, Process, ResourceUsage, SamplingPolicy},
 };
 
 /// The server API.
@@ -90,6 +90,16 @@ impl Connection {
     /// Returns an error if serialization failed or communication with the client failed.
     pub async fn send_reboot_cmd(&self) -> anyhow::Result<()> {
         self.send_request(client::RequestCode::Reboot, &()).await
+    }
+
+    /// Sends the sampling policies.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization failed or communication with the client failed.
+    pub async fn send_sampling_policies(&self, list: &[SamplingPolicy]) -> anyhow::Result<()> {
+        self.send_request(client::RequestCode::SamplingPolicyList, list)
+            .await
     }
 
     /// Sends the shutdown command.

@@ -9,7 +9,7 @@ use thiserror::Error;
 
 use crate::{
     client::RequestCode,
-    types::{HostNetworkGroup, Process, ResourceUsage, TrafficFilterRule},
+    types::{HostNetworkGroup, Process, ResourceUsage, SamplingPolicy, TrafficFilterRule},
 };
 
 /// The error type for handling a request.
@@ -68,7 +68,7 @@ pub trait Handler: Send {
     }
 
     /// Updates the list of sampling policies.
-    async fn sampling_policy_list(&mut self, _policies: &[u8]) -> Result<(), String> {
+    async fn sampling_policy_list(&mut self, _policies: &[SamplingPolicy]) -> Result<(), String> {
         return Err("not supported".to_string());
     }
 
@@ -79,7 +79,7 @@ pub trait Handler: Send {
         return Err("not supported".to_string());
     }
 
-    async fn delete_sampling_policy(&mut self, _policies_id: &[u8]) -> Result<(), String> {
+    async fn delete_sampling_policy(&mut self, _policies_ids: &[u32]) -> Result<(), String> {
         return Err("not supported".to_string());
     }
 
@@ -179,13 +179,16 @@ pub async fn handle<H: Handler>(
                     .map_err(HandlerError::SendError)?;
             }
             RequestCode::SamplingPolicyList => {
-                let result = handler.sampling_policy_list(body).await;
+                let list =
+                    parse_args::<Vec<SamplingPolicy>>(body).map_err(HandlerError::RecvError)?;
+                let result = handler.sampling_policy_list(&list).await;
                 send_response(send, &mut buf, result)
                     .await
                     .map_err(HandlerError::SendError)?;
             }
             RequestCode::DeleteSamplingPolicy => {
-                let result = handler.delete_sampling_policy(body).await;
+                let policy_ids = parse_args::<Vec<u32>>(body).map_err(HandlerError::RecvError)?;
+                let result = handler.delete_sampling_policy(&policy_ids).await;
                 send_response(send, &mut buf, result)
                     .await
                     .map_err(HandlerError::SendError)?;

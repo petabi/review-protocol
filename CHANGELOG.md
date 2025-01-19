@@ -21,6 +21,13 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   - `Connection::send_tor_exit_node_list`
   - `Connection::send_trusted_user_agent_list`
 
+### Changed
+
+- `Handler::sampling_policy_list` and `Handler::delete_sampling_policy` accept
+  `[SamplingPolicy]` and `&[u32]`, respectively, instead of raw bytes. This
+  makes the API more intuitive and moves serialization concerns from the agent
+  to this crate where they belong.
+
 ## [0.8.1] - 2024-11-15
 
 ### Added

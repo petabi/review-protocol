@@ -3,6 +3,7 @@
 use std::{
     net::{IpAddr, SocketAddr},
     ops::RangeInclusive,
+    time::Duration,
 };
 
 use ipnet::IpNet;
@@ -78,6 +79,29 @@ pub struct HostNetworkGroup {
     pub hosts: Vec<IpAddr>,
     pub networks: Vec<IpNet>,
     pub ip_ranges: Vec<RangeInclusive<IpAddr>>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[repr(u32)]
+pub enum SamplingKind {
+    Conn = 0,
+    Dns = 1,
+    Http = 2,
+    Rdp = 3,
+}
+
+// A policy for time series sampling.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct SamplingPolicy {
+    pub id: u32,
+    pub kind: SamplingKind,
+    pub interval: Duration,
+    pub period: Duration,
+    pub offset: i32,
+    pub src_ip: Option<IpAddr>,
+    pub dst_ip: Option<IpAddr>,
+    pub node: Option<String>,
+    pub column: Option<u32>,
 }
 
 // IP address, port numbers, and protocols.

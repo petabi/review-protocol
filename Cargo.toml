@@ -1,6 +1,6 @@
 [package]
 name = "review-protocol"
-version = "0.8.1"
+version = "0.9.0"
 edition = "2021"
 
 [features]
@@ -37,7 +37,7 @@ rustls-pemfile = { version = "2", optional = true }
 semver = { version = "1", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_repr = "0.1.19"
-thiserror = { version = "1", optional = true }
+thiserror = { version = "2", optional = true }
 
 [dev-dependencies]
 quinn = { version = "0.11", features = ["ring"] }

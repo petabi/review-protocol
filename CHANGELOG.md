@@ -29,6 +29,9 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   `[SamplingPolicy]` and `&[u32]`, respectively, instead of raw bytes. This
   makes the API more intuitive and moves serialization concerns from the agent
   to this crate where they belong.
+- Updated `client::ConnectionBuilder` and `AgentInfo` structs to accomodate the
+  new `status` field, to be used in the handshake process.
+  - Introduced `Status` enum to represent the status of agents.
 
 ## [0.8.1] - 2024-11-15
 

@@ -14,6 +14,8 @@ use serde::{Deserialize, Serialize};
 #[cfg(any(feature = "client", feature = "server"))]
 use thiserror::Error;
 
+use crate::types::Status;
+
 /// The error type for a handshake failure.
 #[cfg(any(feature = "client", feature = "server"))]
 #[derive(Debug, Error)]
@@ -59,6 +61,7 @@ pub struct AgentInfo {
     pub version: String,
     pub protocol_version: String,
     pub addr: SocketAddr,
+    pub status: Status,
 }
 
 /// Sends a unary request and returns the response.
@@ -94,6 +97,8 @@ mod tests {
     async fn handshake() {
         use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
+        use crate::Status;
+
         const APP_NAME: &str = "oinq";
         const APP_VERSION: &str = "1.0.0";
         const PROTOCOL_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -103,7 +108,14 @@ mod tests {
         let (server, client) = (channel.server, channel.client);
 
         let handle = tokio::spawn(async move {
-            super::client::handshake(&client.conn, APP_NAME, APP_VERSION, PROTOCOL_VERSION).await
+            super::client::handshake(
+                &client.conn,
+                APP_NAME,
+                APP_VERSION,
+                PROTOCOL_VERSION,
+                Status::Ready,
+            )
+            .await
         });
 
         let agent_info = super::server::handshake(
@@ -128,6 +140,8 @@ mod tests {
     async fn handshake_version_incompatible_err() {
         use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
+        use crate::Status;
+
         const APP_NAME: &str = "oinq";
         const APP_VERSION: &str = "1.0.0";
         const PROTOCOL_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -137,7 +151,14 @@ mod tests {
         let (server, client) = (channel.server, channel.client);
 
         let handle = tokio::spawn(async move {
-            super::client::handshake(&client.conn, APP_NAME, APP_VERSION, PROTOCOL_VERSION).await
+            super::client::handshake(
+                &client.conn,
+                APP_NAME,
+                APP_VERSION,
+                PROTOCOL_VERSION,
+                Status::Ready,
+            )
+            .await
         });
 
         let res = super::server::handshake(
@@ -159,6 +180,8 @@ mod tests {
     async fn handshake_incompatible_err() {
         use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
+        use crate::Status;
+
         const APP_NAME: &str = "oinq";
         const APP_VERSION: &str = "1.0.0";
         const PROTOCOL_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -179,6 +202,7 @@ mod tests {
                 APP_NAME,
                 APP_VERSION,
                 &protocol_version.to_string(),
+                Status::Ready,
             )
             .await
         });

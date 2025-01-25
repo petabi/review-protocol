@@ -11,6 +11,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 - `server::Handler` handles requests from the following client-side APIs:
   - `Connection::get_allow_list`
+  - `Connection::get_block_list`
 
 ## [0.9.0] - 2025-01-20
 

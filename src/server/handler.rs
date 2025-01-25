@@ -15,6 +15,10 @@ pub trait Handler {
         Err("not supported".to_string())
     }
 
+    async fn get_blocklist(&self) -> Result<HostNetworkGroup, String> {
+        Err("not supported".to_string())
+    }
+
     async fn get_data_source(
         &self,
         _key: &DataSourceKey<'_>,
@@ -61,6 +65,11 @@ where
             RequestCode::GetAllowList => {
                 parse_args::<()>(body)?;
                 let result = handler.get_allowlist().await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::GetBlockList => {
+                parse_args::<()>(body)?;
+                let result = handler.get_blocklist().await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::GetDataSource => {

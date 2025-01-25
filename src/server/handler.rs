@@ -6,11 +6,15 @@ use num_enum::FromPrimitive;
 use oinq::request::parse_args;
 
 use super::RequestCode;
-use crate::types::{DataSource, DataSourceKey, Tidb};
+use crate::types::{DataSource, DataSourceKey, HostNetworkGroup, Tidb};
 
 /// A request handler that can handle a request to the server.
 #[async_trait::async_trait]
 pub trait Handler {
+    async fn get_allowlist(&self) -> Result<HostNetworkGroup, String> {
+        Err("not supported".to_string())
+    }
+
     async fn get_data_source(
         &self,
         _key: &DataSourceKey<'_>,
@@ -54,6 +58,11 @@ where
         };
 
         match RequestCode::from_primitive(code) {
+            RequestCode::GetAllowList => {
+                parse_args::<()>(body)?;
+                let result = handler.get_allowlist().await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
             RequestCode::GetDataSource => {
                 let data_source_key = parse_args::<DataSourceKey>(body)?;
                 let result = handler.get_data_source(&data_source_key).await;

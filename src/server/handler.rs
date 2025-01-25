@@ -1,6 +1,6 @@
 //! Requset handler for the server.
 
-use std::io;
+use std::{collections::HashSet, io};
 
 use num_enum::FromPrimitive;
 use oinq::request::parse_args;
@@ -23,6 +23,10 @@ pub trait Handler {
         &self,
         _key: &DataSourceKey<'_>,
     ) -> Result<Option<DataSource>, String> {
+        Err("not supported".to_string())
+    }
+
+    async fn get_indicator(&self, _name: &str) -> Result<HashSet<Vec<String>>, String> {
         Err("not supported".to_string())
     }
 
@@ -75,6 +79,11 @@ where
             RequestCode::GetDataSource => {
                 let data_source_key = parse_args::<DataSourceKey>(body)?;
                 let result = handler.get_data_source(&data_source_key).await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::GetIndicator => {
+                let name = parse_args::<String>(body)?;
+                let result = handler.get_indicator(&name).await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::GetTidbPatterns => {

@@ -1,4 +1,4 @@
-use std::io;
+use std::{collections::HashSet, io};
 
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -55,6 +55,17 @@ impl Connection {
             request(self, server::RequestCode::GetDataSource, key).await?;
         res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))
             .and_then(|res| res.ok_or_else(|| io::Error::from(io::ErrorKind::NotFound)))
+    }
+
+    /// Fetches an indicator from the server.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response is invalid.
+    pub async fn get_indicator(&self, name: &str) -> io::Result<HashSet<Vec<String>>> {
+        let res: Result<HashSet<Vec<String>>, String> =
+            request(self, server::RequestCode::GetIndicator, name).await?;
+        res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))
     }
 
     /// Fetches the list of internal networks from the server.

@@ -7,11 +7,17 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- The following client-side API to send a request to the server:
+  - `Connection::get_indicator`
+
 ### Changed
 
 - `server::Handler` handles requests from the following client-side APIs:
   - `Connection::get_allow_list`
   - `Connection::get_block_list`
+  - `Connection::get_indicator`
 
 ## [0.9.0] - 2025-01-20
 

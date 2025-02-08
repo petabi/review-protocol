@@ -52,17 +52,10 @@ pub(crate) enum RequestCode {
     RemoveTidb = 18,
     UpdateTidb = 19,
     InsertDataSource = 20,
-    #[deprecated]
-    PasswordRecovery = 21,
     RenewCertificate = 23,
     GetTrustedDomainList = 24,
     GetOutliers = 25,
     GetTorExitNodeList = 26,
-    InsertIndicator = 27,
-    RemoveIndicator = 28,
-    GetIndicatorList = 29,
-    #[deprecated]
-    GetNodeSettings = 30,
     GetInternalNetworkList = 31,
     GetAllowList = 32,
     GetBlockList = 33,

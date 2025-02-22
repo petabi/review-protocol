@@ -90,7 +90,7 @@ where
 #[cfg(test)]
 mod tests {
     #[cfg(feature = "server")]
-    use crate::test::{channel, TOKEN};
+    use crate::test::{TOKEN, channel};
 
     #[cfg(feature = "server")]
     #[tokio::test]

@@ -1,6 +1,6 @@
 use std::{collections::HashSet, io};
 
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 
 use super::Connection;
 use crate::{
@@ -162,7 +162,7 @@ where
 mod tests {
     use crate::{
         server::handle,
-        test::{TestServerHandler, TEST_ENV},
+        test::{TEST_ENV, TestServerHandler},
         types::DataSourceKey,
     };
 

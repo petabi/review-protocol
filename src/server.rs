@@ -19,11 +19,11 @@ use oinq::{
 use semver::{Version, VersionReq};
 
 #[cfg(feature = "server")]
-pub use self::handler::{handle, Handler};
+pub use self::handler::{Handler, handle};
 #[cfg(feature = "server")]
 use crate::{
-    client, handle_handshake_recv_io_error, handle_handshake_send_io_error, types::Tidb, AgentInfo,
-    HandshakeError,
+    AgentInfo, HandshakeError, client, handle_handshake_recv_io_error,
+    handle_handshake_send_io_error, types::Tidb,
 };
 
 /// Numeric representation of the message types that a server should handle.

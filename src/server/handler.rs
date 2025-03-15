@@ -40,6 +40,10 @@ pub trait Handler {
     async fn get_trusted_domain_list(&self) -> Result<Vec<String>, String> {
         Err("not supported".to_string())
     }
+
+    async fn get_trusted_user_agent_list(&self) -> Result<Vec<String>, String> {
+        Err("not supported".to_string())
+    }
 }
 
 /// Handles requests to the server.
@@ -98,6 +102,11 @@ where
             RequestCode::GetTrustedDomainList => {
                 parse_args::<()>(body)?;
                 let result = handler.get_trusted_domain_list().await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::GetTrustedUserAgentList => {
+                parse_args::<()>(body)?;
+                let result = handler.get_trusted_user_agent_list().await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::Unknown => {

@@ -10,6 +10,8 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - Migrated to Rust 2024 edition. It requires a minimum of Rust 1.85.0.
+- `server::Handler` handles requests from the following client-side API:
+  - `Connection::get_trusted_domain_list`
 
 ## [0.10.0] - 2025-02-01
 

@@ -37,6 +37,10 @@ pub trait Handler {
         Err("not supported".to_string())
     }
 
+    async fn get_tor_exit_node_list(&self) -> Result<Vec<String>, String> {
+        Err("not supported".to_string())
+    }
+
     async fn get_trusted_domain_list(&self) -> Result<Vec<String>, String> {
         Err("not supported".to_string())
     }
@@ -97,6 +101,11 @@ where
             RequestCode::GetTidbPatterns => {
                 let db_names = parse_args::<Vec<(&str, &str)>>(body)?;
                 let result = handler.get_tidb_patterns(&db_names).await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::GetTorExitNodeList => {
+                parse_args::<()>(body)?;
+                let result = handler.get_tor_exit_node_list().await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::GetTrustedDomainList => {

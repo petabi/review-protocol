@@ -11,6 +11,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Migrated to Rust 2024 edition. It requires a minimum of Rust 1.85.0.
 - `server::Handler` handles requests from the following client-side APIs:
+  - `Connection::get_tor_exit_node_list`
   - `Connection::get_trusted_domain_list`
   - `Connection::get_trusted_user_agent_list`
 

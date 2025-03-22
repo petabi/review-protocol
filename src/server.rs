@@ -83,8 +83,9 @@ impl Connection {
     ///
     /// This is for backward compatibility only and will be removed in a future
     /// release.
+    #[cfg(test)]
     #[must_use]
-    pub fn as_quinn(&self) -> &quinn::Connection {
+    pub(crate) fn as_quinn(&self) -> &quinn::Connection {
         &self.conn
     }
 

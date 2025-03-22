@@ -15,6 +15,12 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   - `Connection::get_trusted_domain_list`
   - `Connection::get_trusted_user_agent_list`
 
+### Removed
+
+- `server::Connection::as_quinn` was provided for backward-compatibility and has
+  been removed. Server applications using review-protocol should now use the
+  `server::Connection` struct directly.
+
 ## [0.10.0] - 2025-02-01
 
 ### Added

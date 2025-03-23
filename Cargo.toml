@@ -48,6 +48,13 @@ rustls = { version = "0.23", default-features = false, features = [
 ] }
 tokio = { version = "1", features = ["macros", "rt"] }
 
+# Not directly used by review-protocol, but added to avoid rcgen using time-0.3.40.
+# time-0.3.40 causes the following clippy error:
+# https://github.com/petabi/review-protocol/actions/runs/14022787817/job/39256916777
+[dev-dependencies.time]
+version = "=0.3.39"
+default-features = false
+
 [lints.clippy]
 pedantic = "warn"
 unwrap_used = "warn"

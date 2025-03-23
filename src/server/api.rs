@@ -174,34 +174,56 @@ impl Connection {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(all(feature = "client", feature = "server"))]
+    use {
+        crate::{test::TEST_ENV, types::HostNetworkGroup},
+        std::net::{IpAddr, Ipv4Addr},
+    };
+
+    #[cfg(all(feature = "client", feature = "server"))]
+    // Define a constant IP address for tests
+    const IP_ADDR_1: IpAddr = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
+
+    #[cfg(all(feature = "client", feature = "server"))]
+    // Shared handler for all tests
+    struct TestHandler;
+
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[async_trait::async_trait]
+    impl crate::request::Handler for TestHandler {
+        async fn allow_list(&mut self, list: HostNetworkGroup) -> Result<(), String> {
+            if list.hosts == [IP_ADDR_1] {
+                Ok(())
+            } else {
+                Err("unexpected domain list".to_string())
+            }
+        }
+
+        async fn resource_usage(&mut self) -> Result<(String, super::ResourceUsage), String> {
+            Ok((
+                "test-host".to_string(),
+                super::ResourceUsage {
+                    cpu_usage: 0.5,
+                    total_memory: 100,
+                    used_memory: 50,
+                    total_disk_space: 1000,
+                    used_disk_space: 500,
+                },
+            ))
+        }
+
+        async fn reboot(&mut self) -> Result<(), String> {
+            Ok(())
+        }
+    }
 
     #[cfg(all(feature = "client", feature = "server"))]
     #[tokio::test]
     async fn get_resource_usage() {
-        use crate::test::TEST_ENV;
-
-        struct Handler {}
-
-        #[async_trait::async_trait]
-        impl crate::request::Handler for Handler {
-            async fn resource_usage(&mut self) -> Result<(String, super::ResourceUsage), String> {
-                Ok((
-                    "test-host".to_string(),
-                    super::ResourceUsage {
-                        cpu_usage: 0.5,
-                        total_memory: 100,
-                        used_memory: 50,
-                        total_disk_space: 1000,
-                        used_disk_space: 500,
-                    },
-                ))
-            }
-        }
-
         let test_env = TEST_ENV.lock().await;
         let (server_conn, client_conn) = test_env.setup().await;
 
-        let mut handler = Handler {};
+        let mut handler = TestHandler;
         let handler_conn = client_conn.clone();
         let client_handle = tokio::spawn(async move {
             let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
@@ -221,25 +243,6 @@ mod tests {
     #[cfg(all(feature = "client", feature = "server"))]
     #[tokio::test]
     async fn send_allowlist() {
-        use std::net::{IpAddr, Ipv4Addr};
-
-        use crate::{test::TEST_ENV, types::HostNetworkGroup};
-
-        struct Handler {}
-
-        #[async_trait::async_trait]
-        impl crate::request::Handler for Handler {
-            async fn allow_list(&mut self, list: HostNetworkGroup) -> Result<(), String> {
-                if list.hosts == [IP_ADDR_1] {
-                    Ok(())
-                } else {
-                    Err("unexpected domain list".to_string())
-                }
-            }
-        }
-
-        const IP_ADDR_1: IpAddr = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
-
         let test_env = TEST_ENV.lock().await;
         let (server_conn, client_conn) = test_env.setup().await;
 
@@ -249,7 +252,7 @@ mod tests {
             ip_ranges: vec![],
         };
 
-        let mut handler = Handler {};
+        let mut handler = TestHandler;
         let handler_conn = client_conn.clone();
         let client_handle = tokio::spawn(async move {
             let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
@@ -267,21 +270,10 @@ mod tests {
     #[cfg(all(feature = "client", feature = "server"))]
     #[tokio::test]
     async fn send_reboot_cmd() {
-        use crate::test::TEST_ENV;
-
-        struct Handler {}
-
-        #[async_trait::async_trait]
-        impl crate::request::Handler for Handler {
-            async fn reboot(&mut self) -> Result<(), String> {
-                Ok(())
-            }
-        }
-
         let test_env = TEST_ENV.lock().await;
         let (server_conn, client_conn) = test_env.setup().await;
 
-        let mut handler = Handler {};
+        let mut handler = TestHandler;
         let handler_conn = client_conn.clone();
         let client_handle = tokio::spawn(async move {
             let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();

@@ -78,12 +78,12 @@ where
         };
 
         match RequestCode::from_primitive(code) {
-            RequestCode::GetAllowList => {
+            RequestCode::GetAllowlist => {
                 parse_args::<()>(body)?;
                 let result = handler.get_allowlist().await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
-            RequestCode::GetBlockList => {
+            RequestCode::GetBlocklist => {
                 parse_args::<()>(body)?;
                 let result = handler.get_blocklist().await;
                 oinq::request::send_response(send, &mut buf, result).await?;

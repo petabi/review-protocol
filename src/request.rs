@@ -208,7 +208,7 @@ pub async fn handle<H: Handler>(
                     .await
                     .map_err(HandlerError::SendError)?;
             }
-            RequestCode::AllowList => {
+            RequestCode::Allowlist => {
                 let allow_list =
                     parse_args::<HostNetworkGroup>(body).map_err(HandlerError::RecvError)?;
                 let result = handler.allow_list(allow_list).await;
@@ -216,7 +216,7 @@ pub async fn handle<H: Handler>(
                     .await
                     .map_err(HandlerError::SendError)?;
             }
-            RequestCode::BlockList => {
+            RequestCode::Blocklist => {
                 let block_list =
                     parse_args::<HostNetworkGroup>(body).map_err(HandlerError::RecvError)?;
                 let result = handler.block_list(block_list).await;

@@ -39,7 +39,7 @@ impl Connection {
     ///
     /// Returns an error if serialization failed or communication with the client failed.
     pub async fn send_allowlist(&self, allowlist: &HostNetworkGroup) -> anyhow::Result<()> {
-        self.send_request(client::RequestCode::AllowList, allowlist)
+        self.send_request(client::RequestCode::Allowlist, allowlist)
             .await
     }
 
@@ -49,7 +49,7 @@ impl Connection {
     ///
     /// Returns an error if serialization failed or communication with the client failed.
     pub async fn send_blocklist(&self, blocklist: &HostNetworkGroup) -> anyhow::Result<()> {
-        self.send_request(client::RequestCode::BlockList, blocklist)
+        self.send_request(client::RequestCode::Blocklist, blocklist)
             .await
     }
 

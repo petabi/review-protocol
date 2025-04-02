@@ -58,10 +58,10 @@ pub(crate) enum RequestCode {
     InternalNetworkList = 14,
 
     /// Update the list of allow
-    AllowList = 15,
+    Allowlist = 15,
 
     /// Update the list of block
-    BlockList = 16,
+    Blocklist = 16,
 
     /// Request Echo (for ping)
     EchoRequest = 17,

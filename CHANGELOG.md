@@ -14,6 +14,12 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   - `Connection::get_tor_exit_node_list`
   - `Connection::get_trusted_domain_list`
   - `Connection::get_trusted_user_agent_list`
+- Updated the naming conventions for "allowlist" and "blocklist" to use a single
+  word instead of separate words. This change affects the following:
+  - `AllowList` renamed to `Allowlist`
+  - `BlockList` renamed to `Blocklist`
+  - `*_allow_list` renamed to `*_allowlist`
+  - `*_block_list` renamed to `*_blocklist`
 
 ### Removed
 

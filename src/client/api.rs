@@ -28,7 +28,7 @@ impl Connection {
     /// # Errors
     ///
     /// Returns an error if the request fails or the response is invalid.
-    pub async fn get_allow_list(&self) -> io::Result<HostNetworkGroup> {
+    pub async fn get_allowlist(&self) -> io::Result<HostNetworkGroup> {
         let res: Result<HostNetworkGroup, String> =
             request(self, server::RequestCode::GetAllowlist, ()).await?;
         res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))
@@ -39,7 +39,7 @@ impl Connection {
     /// # Errors
     ///
     /// Returns an error if the request fails or the response is invalid.
-    pub async fn get_block_list(&self) -> io::Result<HostNetworkGroup> {
+    pub async fn get_blocklist(&self) -> io::Result<HostNetworkGroup> {
         let res: Result<HostNetworkGroup, String> =
             request(self, server::RequestCode::GetBlocklist, ()).await?;
         res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))

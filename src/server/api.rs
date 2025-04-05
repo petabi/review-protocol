@@ -191,7 +191,7 @@ mod tests {
     #[cfg(all(feature = "client", feature = "server"))]
     #[async_trait::async_trait]
     impl crate::request::Handler for TestHandler {
-        async fn allow_list(&mut self, list: HostNetworkGroup) -> Result<(), String> {
+        async fn allowlist(&mut self, list: HostNetworkGroup) -> Result<(), String> {
             if list.hosts == [IP_ADDR_1] {
                 Ok(())
             } else {

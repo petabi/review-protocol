@@ -87,11 +87,11 @@ pub trait Handler: Send {
         return Err("not supported".to_string());
     }
 
-    async fn allow_list(&mut self, _list: HostNetworkGroup) -> Result<(), String> {
+    async fn allowlist(&mut self, _list: HostNetworkGroup) -> Result<(), String> {
         return Err("not supported".to_string());
     }
 
-    async fn block_list(&mut self, _list: HostNetworkGroup) -> Result<(), String> {
+    async fn blocklist(&mut self, _list: HostNetworkGroup) -> Result<(), String> {
         return Err("not supported".to_string());
     }
 
@@ -209,17 +209,17 @@ pub async fn handle<H: Handler>(
                     .map_err(HandlerError::SendError)?;
             }
             RequestCode::Allowlist => {
-                let allow_list =
+                let allowlist =
                     parse_args::<HostNetworkGroup>(body).map_err(HandlerError::RecvError)?;
-                let result = handler.allow_list(allow_list).await;
+                let result = handler.allowlist(allowlist).await;
                 send_response(send, &mut buf, result)
                     .await
                     .map_err(HandlerError::SendError)?;
             }
             RequestCode::Blocklist => {
-                let block_list =
+                let blocklist =
                     parse_args::<HostNetworkGroup>(body).map_err(HandlerError::RecvError)?;
-                let result = handler.block_list(block_list).await;
+                let result = handler.blocklist(blocklist).await;
                 send_response(send, &mut buf, result)
                     .await
                     .map_err(HandlerError::SendError)?;

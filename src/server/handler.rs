@@ -30,6 +30,10 @@ pub trait Handler {
         Err("not supported".to_string())
     }
 
+    async fn get_model_names(&self) -> Result<Vec<String>, String> {
+        Err("not supported".to_string())
+    }
+
     async fn get_tidb_patterns(
         &self,
         _db_names: &[(&str, &str)],
@@ -96,6 +100,11 @@ where
             RequestCode::GetIndicator => {
                 let name = parse_args::<String>(body)?;
                 let result = handler.get_indicator(&name).await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::GetModelNames => {
+                parse_args::<()>(body)?;
+                let result = handler.get_model_names().await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::GetTidbPatterns => {

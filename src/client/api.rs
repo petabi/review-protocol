@@ -137,7 +137,7 @@ impl Connection {
         res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))
     }
 
-    /// Obtain a new certificate from the server.
+    /// Obtains a new certificate from the server.
     ///
     /// # Errors
     ///

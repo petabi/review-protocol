@@ -20,7 +20,7 @@ impl Connection {
     /// Returns an error if the request fails or the response is invalid.
     pub async fn get_config(&self) -> io::Result<String> {
         let res: Result<String, String> = request(self, server::RequestCode::GetConfig, ()).await?;
-        res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+        res.map_err(io::Error::other)
     }
 
     /// Fetches the list of allowed networks from the server.
@@ -31,7 +31,7 @@ impl Connection {
     pub async fn get_allowlist(&self) -> io::Result<HostNetworkGroup> {
         let res: Result<HostNetworkGroup, String> =
             request(self, server::RequestCode::GetAllowlist, ()).await?;
-        res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+        res.map_err(io::Error::other)
     }
 
     /// Fetches the list of blocked networks from the server.
@@ -42,7 +42,7 @@ impl Connection {
     pub async fn get_blocklist(&self) -> io::Result<HostNetworkGroup> {
         let res: Result<HostNetworkGroup, String> =
             request(self, server::RequestCode::GetBlocklist, ()).await?;
-        res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+        res.map_err(io::Error::other)
     }
 
     /// Fetches a data source from the server.
@@ -53,7 +53,7 @@ impl Connection {
     pub async fn get_data_source(&self, key: &DataSourceKey<'_>) -> io::Result<DataSource> {
         let res: Result<Option<DataSource>, String> =
             request(self, server::RequestCode::GetDataSource, key).await?;
-        res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+        res.map_err(io::Error::other)
             .and_then(|res| res.ok_or_else(|| io::Error::from(io::ErrorKind::NotFound)))
     }
 
@@ -65,7 +65,7 @@ impl Connection {
     pub async fn get_indicator(&self, name: &str) -> io::Result<HashSet<Vec<String>>> {
         let res: Result<HashSet<Vec<String>>, String> =
             request(self, server::RequestCode::GetIndicator, name).await?;
-        res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+        res.map_err(io::Error::other)
     }
 
     /// Fetches the list of internal networks from the server.
@@ -76,7 +76,7 @@ impl Connection {
     pub async fn get_internal_network_list(&self) -> io::Result<HostNetworkGroup> {
         let res: Result<HostNetworkGroup, String> =
             request(self, server::RequestCode::GetInternalNetworkList, ()).await?;
-        res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+        res.map_err(io::Error::other)
     }
 
     /// Fetches the patterns from the threat-intelligence database.
@@ -90,7 +90,7 @@ impl Connection {
     ) -> io::Result<Vec<(String, Option<crate::types::Tidb>)>> {
         let res: Result<Vec<(String, Option<crate::types::Tidb>)>, String> =
             request(self, server::RequestCode::GetTidbPatterns, tidbs).await?;
-        res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+        res.map_err(io::Error::other)
     }
 
     /// Fetches the list of Tor exit nodes from the server.
@@ -101,7 +101,7 @@ impl Connection {
     pub async fn get_tor_exit_node_list(&self) -> io::Result<Vec<String>> {
         let res: Result<Vec<String>, String> =
             request(self, server::RequestCode::GetTorExitNodeList, ()).await?;
-        res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+        res.map_err(io::Error::other)
     }
 
     /// Fetches the list of trusted domains from the server.
@@ -112,7 +112,7 @@ impl Connection {
     pub async fn get_trusted_domain_list(&self) -> io::Result<Vec<String>> {
         let res: Result<Vec<String>, String> =
             request(self, server::RequestCode::GetTrustedDomainList, ()).await?;
-        res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+        res.map_err(io::Error::other)
     }
 
     /// Fetches the list of trusted user agents from the server.
@@ -123,7 +123,7 @@ impl Connection {
     pub async fn get_trusted_user_agent_list(&self) -> io::Result<Vec<String>> {
         let res: Result<Vec<String>, String> =
             request(self, server::RequestCode::GetTrustedUserAgentList, ()).await?;
-        res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+        res.map_err(io::Error::other)
     }
 
     /// Fetches the pretrained model from the server.
@@ -134,7 +134,7 @@ impl Connection {
     pub async fn get_pretrained_model(&self, name: &str) -> io::Result<Vec<u8>> {
         let res: Result<Vec<u8>, String> =
             request(self, server::RequestCode::GetPretrainedModel, name).await?;
-        res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+        res.map_err(io::Error::other)
     }
 
     /// Obtains a new certificate from the server.
@@ -145,7 +145,7 @@ impl Connection {
     pub async fn renew_certificate(&self, cert: &[u8]) -> io::Result<(String, String)> {
         let res: Result<(String, String), String> =
             request(self, server::RequestCode::RenewCertificate, cert).await?;
-        res.map_err(|e| io::Error::new(io::ErrorKind::Other, e))
+        res.map_err(io::Error::other)
     }
 }
 

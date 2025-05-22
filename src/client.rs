@@ -254,9 +254,7 @@ impl ConnectionBuilder {
                 ConnectionError::ApplicationClosed(e) => {
                     std::io::Error::new(io::ErrorKind::ConnectionAborted, e.to_string())
                 }
-                ConnectionError::CidsExhausted => {
-                    io::Error::new(io::ErrorKind::Other, "connection IDs exhausted")
-                }
+                ConnectionError::CidsExhausted => io::Error::other("connection IDs exhausted"),
                 ConnectionError::ConnectionClosed(e) => {
                     std::io::Error::new(io::ErrorKind::ConnectionAborted, e.to_string())
                 }

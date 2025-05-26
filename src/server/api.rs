@@ -176,8 +176,15 @@ impl Connection {
 mod tests {
     #[cfg(all(feature = "client", feature = "server"))]
     use {
-        crate::{test::TEST_ENV, types::HostNetworkGroup},
-        std::net::{IpAddr, Ipv4Addr},
+        crate::{
+            test::TEST_ENV,
+            types::{HostNetworkGroup, SamplingKind, SamplingPolicy},
+        },
+        ipnet::IpNet,
+        std::{
+            net::{IpAddr, Ipv4Addr},
+            time::Duration,
+        },
     };
 
     #[cfg(all(feature = "client", feature = "server"))]
@@ -199,6 +206,47 @@ mod tests {
             }
         }
 
+        async fn blocklist(&mut self, list: HostNetworkGroup) -> Result<(), String> {
+            if list.hosts == [IP_ADDR_1] {
+                Ok(())
+            } else {
+                Err("unexpected blocklist".to_string())
+            }
+        }
+
+        async fn update_config(&mut self) -> Result<(), String> {
+            Ok(())
+        }
+
+        async fn update_traffic_filter_rules(
+            &mut self,
+            rules: &[super::TrafficFilterRule],
+        ) -> Result<(), String> {
+            if rules.len() == 1 {
+                Ok(())
+            } else {
+                Err("unexpected filtering rules".to_string())
+            }
+        }
+
+        async fn internal_network_list(&mut self, list: HostNetworkGroup) -> Result<(), String> {
+            if list.hosts == [IP_ADDR_1] {
+                Ok(())
+            } else {
+                Err("unexpected internal network list".to_string())
+            }
+        }
+
+        async fn process_list(&mut self) -> Result<Vec<super::Process>, String> {
+            Ok(vec![super::Process {
+                user: "test-user".to_string(),
+                cpu_usage: 10.0,
+                mem_usage: 20.0,
+                start_time: 1_234_567_890,
+                command: "test-command".to_string(),
+            }])
+        }
+
         async fn resource_usage(&mut self) -> Result<(String, super::ResourceUsage), String> {
             Ok((
                 "test-host".to_string(),
@@ -214,6 +262,45 @@ mod tests {
 
         async fn reboot(&mut self) -> Result<(), String> {
             Ok(())
+        }
+
+        async fn sampling_policy_list(
+            &mut self,
+            policies: &[super::SamplingPolicy],
+        ) -> Result<(), String> {
+            if policies.len() == 1 && policies[0].id == 42 {
+                Ok(())
+            } else {
+                Err("unexpected sampling policies".to_string())
+            }
+        }
+
+        async fn shutdown(&mut self) -> Result<(), String> {
+            Ok(())
+        }
+
+        async fn tor_exit_node_list(&mut self, nodes: &[&str]) -> Result<(), String> {
+            if nodes == ["192.168.1.1", "10.0.0.1"] {
+                Ok(())
+            } else {
+                Err("unexpected tor exit node list".to_string())
+            }
+        }
+
+        async fn trusted_domain_list(&mut self, domains: &[&str]) -> Result<(), String> {
+            if domains == ["example.com", "test.org"] {
+                Ok(())
+            } else {
+                Err("unexpected trusted domain list".to_string())
+            }
+        }
+
+        async fn trusted_user_agent_list(&mut self, agents: &[&str]) -> Result<(), String> {
+            if agents == ["Mozilla/5.0", "Chrome/91.0"] {
+                Ok(())
+            } else {
+                Err("unexpected trusted user agent list".to_string())
+            }
         }
     }
 
@@ -234,6 +321,30 @@ mod tests {
         assert!(server_res.is_ok());
         let usage = server_res.unwrap();
         assert_eq!(usage.total_memory, 100);
+        let client_res = client_handle.await.unwrap();
+        assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn get_process_list() {
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let mut handler = TestHandler;
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+
+            crate::request::handle(&mut handler, &mut send, &mut recv).await
+        });
+        let server_res = server_conn.get_process_list().await;
+        assert!(server_res.is_ok());
+        let processes = server_res.unwrap();
+        assert_eq!(processes.len(), 1);
+        assert_eq!(processes[0].user, "test-user");
         let client_res = client_handle.await.unwrap();
         assert!(client_res.is_ok());
 
@@ -281,6 +392,265 @@ mod tests {
             crate::request::handle(&mut handler, &mut send, &mut recv).await
         });
         let server_res = server_conn.send_reboot_cmd().await;
+        assert!(server_res.is_ok());
+        let client_res = client_handle.await.unwrap();
+        assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn send_blocklist() {
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let blocklist_to_send = HostNetworkGroup {
+            hosts: vec![IP_ADDR_1],
+            networks: vec![],
+            ip_ranges: vec![],
+        };
+
+        let mut handler = TestHandler;
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+
+            crate::request::handle(&mut handler, &mut send, &mut recv).await
+        });
+        let server_res = server_conn.send_blocklist(&blocklist_to_send).await;
+        assert!(server_res.is_ok());
+        let client_res = client_handle.await.unwrap();
+        assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn send_config_update_cmd() {
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let mut handler = TestHandler;
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+
+            crate::request::handle(&mut handler, &mut send, &mut recv).await
+        });
+        let server_res = server_conn.send_config_update_cmd().await;
+        assert!(server_res.is_ok());
+        let client_res = client_handle.await.unwrap();
+        assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn send_filtering_rules() {
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let filtering_rules_to_send = vec![(
+            "0.0.0.0/0".parse::<IpNet>().unwrap(),
+            Some(vec![80]),
+            Some(vec![6]),
+        )];
+
+        let mut handler = TestHandler;
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+
+            crate::request::handle(&mut handler, &mut send, &mut recv).await
+        });
+        let server_res = server_conn
+            .send_filtering_rules(&filtering_rules_to_send)
+            .await;
+        assert!(server_res.is_ok());
+        let client_res = client_handle.await.unwrap();
+        assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn send_internal_network_list() {
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let internal_network_list_to_send = HostNetworkGroup {
+            hosts: vec![IP_ADDR_1],
+            networks: vec![],
+            ip_ranges: vec![],
+        };
+
+        let mut handler = TestHandler;
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+
+            crate::request::handle(&mut handler, &mut send, &mut recv).await
+        });
+        let server_res = server_conn
+            .send_internal_network_list(&internal_network_list_to_send)
+            .await;
+        assert!(server_res.is_ok());
+        let client_res = client_handle.await.unwrap();
+        assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn send_sampling_policies() {
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let sampling_policies_to_send = vec![SamplingPolicy {
+            id: 42,
+            kind: SamplingKind::Conn,
+            interval: Duration::from_secs(60),
+            period: Duration::from_secs(3600),
+            offset: 0,
+            src_ip: None,
+            dst_ip: None,
+            node: None,
+            column: None,
+        }];
+
+        let mut handler = TestHandler;
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+
+            crate::request::handle(&mut handler, &mut send, &mut recv).await
+        });
+        let server_res = server_conn
+            .send_sampling_policies(&sampling_policies_to_send)
+            .await;
+        assert!(server_res.is_ok());
+        let client_res = client_handle.await.unwrap();
+        assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn send_tor_exit_node_list() {
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let tor_exit_node_list_to_send = vec!["192.168.1.1".to_string(), "10.0.0.1".to_string()];
+
+        let mut handler = TestHandler;
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+
+            crate::request::handle(&mut handler, &mut send, &mut recv).await
+        });
+        let server_res = server_conn
+            .send_tor_exit_node_list(&tor_exit_node_list_to_send)
+            .await;
+        assert!(server_res.is_ok());
+        let client_res = client_handle.await.unwrap();
+        assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn send_trusted_domain_list() {
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let trusted_domain_list_to_send = vec!["example.com".to_string(), "test.org".to_string()];
+
+        let mut handler = TestHandler;
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+
+            crate::request::handle(&mut handler, &mut send, &mut recv).await
+        });
+        let server_res = server_conn
+            .send_trusted_domain_list(&trusted_domain_list_to_send)
+            .await;
+        assert!(server_res.is_ok());
+        let client_res = client_handle.await.unwrap();
+        assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn send_trusted_user_agent_list() {
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let trusted_user_agent_list_to_send =
+            vec!["Mozilla/5.0".to_string(), "Chrome/91.0".to_string()];
+
+        let mut handler = TestHandler;
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+
+            crate::request::handle(&mut handler, &mut send, &mut recv).await
+        });
+        let server_res = server_conn
+            .send_trusted_user_agent_list(&trusted_user_agent_list_to_send)
+            .await;
+        assert!(server_res.is_ok());
+        let client_res = client_handle.await.unwrap();
+        assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn send_ping() {
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let mut handler = TestHandler;
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+
+            crate::request::handle(&mut handler, &mut send, &mut recv).await
+        });
+        let server_res = server_conn.send_ping().await;
+        assert!(server_res.is_ok());
+        let client_res = client_handle.await.unwrap();
+        assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn send_shutdown_cmd() {
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let mut handler = TestHandler;
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+
+            crate::request::handle(&mut handler, &mut send, &mut recv).await
+        });
+        let server_res = server_conn.send_shutdown_cmd().await;
         assert!(server_res.is_ok());
         let client_res = client_handle.await.unwrap();
         assert!(client_res.is_ok());

@@ -120,6 +120,11 @@ pub enum EventCategory {
     CommandAndControl = 7,
     Exfiltration = 8,
     Impact = 9,
+    Collection = 10,
+    DefenseEvasion = 11,
+    Persistence = 12,
+    PrivilegeEscalation = 13,
+    ResourceDevelopment = 14,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize_repr, Eq, PartialEq, Serialize_repr)]

@@ -21,6 +21,9 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   - `BlockList` renamed to `Blocklist`
   - `*_allow_list` renamed to `*_allowlist`
   - `*_block_list` renamed to `*_blocklist`
+- Modified `EventCategory` to include all MITRE categories - `Collection`,
+  `DefenseEvasion`, `Persistence`, `PrivilegeEscalation`, `ResourceDevelopment`
+  are added.
 
 ### Removed
 

@@ -343,7 +343,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - `client::handshake` implements the application-level handshake process for the
   client after a QUIC connection is established.
 
-[0.11.0]: https://github.com/petabi/review-protocol/compare/v0.10.0...v0.11.0
+[0.11.0]: https://github.com/petabi/review-protocol/compare/0.10.0...0.11.0
 [0.10.0]: https://github.com/petabi/review-protocol/compare/0.9.0...0.10.0
 [0.9.0]: https://github.com/petabi/review-protocol/compare/0.8.1...0.9.0
 [0.8.1]: https://github.com/petabi/review-protocol/compare/0.8.0...0.8.1

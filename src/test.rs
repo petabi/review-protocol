@@ -263,6 +263,7 @@ impl crate::server::Handler for TestServerHandler {
                     references: Some(vec!["ref1".to_string()]),
                     samples: Some(vec!["sample1".to_string()]),
                     signatures: Some(vec!["sig1".to_string()]),
+                    confidence: None,
                 }],
             },
         )];

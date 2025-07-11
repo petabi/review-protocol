@@ -145,6 +145,7 @@ pub struct TiRule {
     pub references: Option<Vec<String>>,
     pub samples: Option<Vec<String>>,
     pub signatures: Option<Vec<String>>,
+    pub confidence: Option<f32>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

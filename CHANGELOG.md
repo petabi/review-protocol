@@ -11,6 +11,11 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Added `confidence` field of type `Option<f32>` to `TiRule` structure
 
+### Changed
+
+- Removed `Unknown` variant from `EventCategory` enum for MITRE compatibility
+- Changed `category` fields in `TiRule` and `Tidb` structs to `Option<EventCategory>`
+
 ## [0.11.0] - 2025-06-21
 
 ### Changed

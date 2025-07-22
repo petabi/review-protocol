@@ -3,6 +3,7 @@
 #![allow(clippy::unwrap_used)]
 
 use std::{
+    collections::HashSet,
     net::{IpAddr, Ipv6Addr, SocketAddr},
     sync::LazyLock,
 };
@@ -11,7 +12,9 @@ use quinn::{Connection, RecvStream, SendStream};
 use rustls::pki_types::{CertificateDer, PrivatePkcs8KeyDer};
 use tokio::sync::Mutex;
 
-use crate::types::{DataSource, DataSourceKey, DataType, EventCategory, TiKind, TiRule, Tidb};
+use crate::types::{
+    DataSource, DataSourceKey, DataType, EventCategory, HostNetworkGroup, TiKind, TiRule, Tidb,
+};
 
 pub(crate) struct Channel {
     pub(crate) server: Endpoint,
@@ -279,5 +282,78 @@ impl crate::server::Handler for TestServerHandler {
                 (name.to_string(), patterns)
             })
             .collect())
+    }
+
+    async fn get_config(&self) -> Result<String, String> {
+        Ok("test-config".to_string())
+    }
+
+    async fn get_allowlist(&self) -> Result<HostNetworkGroup, String> {
+        use std::net::{IpAddr, Ipv6Addr};
+        Ok(HostNetworkGroup {
+            hosts: vec![IpAddr::V6(Ipv6Addr::LOCALHOST)],
+            networks: vec![],
+            ip_ranges: vec![],
+        })
+    }
+
+    async fn get_blocklist(&self) -> Result<HostNetworkGroup, String> {
+        use std::net::{IpAddr, Ipv4Addr};
+        Ok(HostNetworkGroup {
+            hosts: vec![IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1))],
+            networks: vec![],
+            ip_ranges: vec![],
+        })
+    }
+
+    async fn get_indicator(&self, name: &str) -> Result<HashSet<Vec<String>>, String> {
+        if name == "test-indicator" {
+            let mut set = HashSet::new();
+            set.insert(vec!["indicator1".to_string(), "value1".to_string()]);
+            set.insert(vec!["indicator2".to_string(), "value2".to_string()]);
+            Ok(set)
+        } else {
+            Ok(HashSet::new())
+        }
+    }
+
+    async fn get_internal_network_list(&self) -> Result<HostNetworkGroup, String> {
+        use std::net::{IpAddr, Ipv4Addr};
+        Ok(HostNetworkGroup {
+            hosts: vec![IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1))],
+            networks: vec![],
+            ip_ranges: vec![],
+        })
+    }
+
+    async fn get_tor_exit_node_list(&self) -> Result<Vec<String>, String> {
+        Ok(vec!["192.168.1.10".to_string(), "192.168.1.11".to_string()])
+    }
+
+    async fn get_trusted_domain_list(&self) -> Result<Vec<String>, String> {
+        Ok(vec!["trusted1.com".to_string(), "trusted2.com".to_string()])
+    }
+
+    async fn get_trusted_user_agent_list(&self) -> Result<Vec<String>, String> {
+        Ok(vec![
+            "Mozilla/5.0 (trusted)".to_string(),
+            "Chrome/test".to_string(),
+        ])
+    }
+
+    async fn get_pretrained_model(&self, name: &str) -> Result<Vec<u8>, String> {
+        if name == "test-model" {
+            Ok(vec![0x01, 0x02, 0x03, 0x04])
+        } else {
+            Err("model not found".to_string())
+        }
+    }
+
+    async fn renew_certificate(&self, cert: &[u8]) -> Result<(String, String), String> {
+        if cert == b"test-cert" {
+            Ok(("new-cert".to_string(), "new-key".to_string()))
+        } else {
+            Err("invalid certificate".to_string())
+        }
     }
 }

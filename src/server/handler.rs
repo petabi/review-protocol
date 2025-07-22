@@ -52,6 +52,22 @@ pub trait Handler {
     async fn get_trusted_user_agent_list(&self) -> Result<Vec<String>, String> {
         Err("not supported".to_string())
     }
+
+    async fn get_config(&self) -> Result<String, String> {
+        Err("not supported".to_string())
+    }
+
+    async fn get_internal_network_list(&self) -> Result<HostNetworkGroup, String> {
+        Err("not supported".to_string())
+    }
+
+    async fn get_pretrained_model(&self, _name: &str) -> Result<Vec<u8>, String> {
+        Err("not supported".to_string())
+    }
+
+    async fn renew_certificate(&self, _cert: &[u8]) -> Result<(String, String), String> {
+        Err("not supported".to_string())
+    }
 }
 
 /// Handles requests to the server.
@@ -125,6 +141,26 @@ where
             RequestCode::GetTrustedUserAgentList => {
                 parse_args::<()>(body)?;
                 let result = handler.get_trusted_user_agent_list().await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::GetConfig => {
+                parse_args::<()>(body)?;
+                let result = handler.get_config().await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::GetInternalNetworkList => {
+                parse_args::<()>(body)?;
+                let result = handler.get_internal_network_list().await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::GetPretrainedModel => {
+                let name = parse_args::<String>(body)?;
+                let result = handler.get_pretrained_model(&name).await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::RenewCertificate => {
+                let cert = parse_args::<Vec<u8>>(body)?;
+                let result = handler.renew_certificate(&cert).await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::Unknown => {

@@ -13,6 +13,10 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- `ResourceUsage` struct updated for Roxy 0.5.0 compatibility:
+  - Memory fields now use bytes instead of KB
+  - Replaced `total_disk_space`/`used_disk_space` with
+    `disk_used_bytes`/`disk_available_bytes`
 - Removed `Unknown` variant from `EventCategory` enum for MITRE compatibility
 - Changed `category` fields in `TiRule` and `Tidb` structs to `Option<EventCategory>`
 

@@ -254,8 +254,8 @@ mod tests {
                     cpu_usage: 0.5,
                     total_memory: 100,
                     used_memory: 50,
-                    total_disk_space: 1000,
-                    used_disk_space: 500,
+                    disk_used_bytes: 500,
+                    disk_available_bytes: 500,
                 },
             ))
         }

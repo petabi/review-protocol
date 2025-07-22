@@ -52,17 +52,17 @@ pub struct ResourceUsage {
     /// The average CPU usage in percent.
     pub cpu_usage: f32,
 
-    /// The RAM size in KB.
+    /// The RAM size in bytes.
     pub total_memory: u64,
 
-    /// The amount of used RAM in KB.
+    /// The amount of used RAM in bytes.
     pub used_memory: u64,
 
-    /// The total disk space in bytes.
-    pub total_disk_space: u64,
+    /// The disk space in bytes that is currently used.
+    pub disk_used_bytes: u64,
 
-    /// The total disk space in bytes that is currently used.
-    pub used_disk_space: u64,
+    /// The disk space in bytes that is available to non-root users.
+    pub disk_available_bytes: u64,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

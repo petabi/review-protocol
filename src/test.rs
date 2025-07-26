@@ -262,6 +262,7 @@ impl crate::server::Handler for TestServerHandler {
                     rule_id: 9,
                     category: None,
                     name: "rule1".to_string(),
+                    kind: None,
                     description: Some("description1".to_string()),
                     references: Some(vec!["ref1".to_string()]),
                     samples: Some(vec!["sample1".to_string()]),

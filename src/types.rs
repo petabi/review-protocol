@@ -135,11 +135,18 @@ pub enum TiKind {
     Regex = 3,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+pub enum RuleKind {
+    Os,
+    AgentSoftware,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct TiRule {
     pub rule_id: u32,
     pub category: Option<EventCategory>,
     pub name: String,
+    pub kind: Option<RuleKind>,
     pub description: Option<String>,
     pub references: Option<Vec<String>>,
     pub samples: Option<Vec<String>>,

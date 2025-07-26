@@ -10,6 +10,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - Added `confidence` field of type `Option<f32>` to `TiRule` structure
+- Added `kind` field to `TiRule` structure
 
 ### Changed
 

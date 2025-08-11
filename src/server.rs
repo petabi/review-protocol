@@ -105,7 +105,7 @@ impl Connection {
     /// `quinn::Connection`. In the future, this method may be removed in favor
     /// of this crate's own implementation to provide additional features.
     #[must_use]
-    pub fn open_bi(&self) -> quinn::OpenBi {
+    pub fn open_bi(&self) -> quinn::OpenBi<'_> {
         self.conn.open_bi()
     }
 

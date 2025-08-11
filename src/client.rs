@@ -373,7 +373,7 @@ impl Connection {
     /// `quinn::Connection`. In the future, this method may be removed in favor
     /// of this crate's own implementation to provide additional features.
     #[must_use]
-    pub fn open_bi(&self) -> quinn::OpenBi {
+    pub fn open_bi(&self) -> quinn::OpenBi<'_> {
         self.connection.open_bi()
     }
 
@@ -383,7 +383,7 @@ impl Connection {
     /// `quinn::Connection`. In the future, this method may be removed in favor
     /// of this crate's own implementation to provide additional features.
     #[must_use]
-    pub fn open_uni(&self) -> quinn::OpenUni {
+    pub fn open_uni(&self) -> quinn::OpenUni<'_> {
         self.connection.open_uni()
     }
 
@@ -393,7 +393,7 @@ impl Connection {
     /// `quinn::Connection`. In the future, this method may be removed in favor
     /// of this crate's own implementation to provide additional features.
     #[must_use]
-    pub fn accept_bi(&self) -> quinn::AcceptBi {
+    pub fn accept_bi(&self) -> quinn::AcceptBi<'_> {
         self.connection.accept_bi()
     }
 }

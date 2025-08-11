@@ -189,7 +189,7 @@ mod tests {
 
     #[cfg(all(feature = "client", feature = "server"))]
     // Define a constant IP address for tests
-    const IP_ADDR_1: IpAddr = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
+    const IP_ADDR_1: IpAddr = IpAddr::V4(Ipv4Addr::LOCALHOST);
 
     #[cfg(all(feature = "client", feature = "server"))]
     // Shared handler for all tests

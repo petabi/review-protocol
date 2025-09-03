@@ -9,6 +9,8 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- `server::Handler::handle` requires the `peer` argument, which uniquely
+  identifies the client within the application.
 - `server::Handler::renew_certificate` and
   `client::Connection::renew_certificate` now take no arguments. The server
   should use the identity from the connection.

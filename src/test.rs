@@ -285,7 +285,7 @@ impl crate::server::Handler for TestServerHandler {
             .collect())
     }
 
-    async fn get_config(&self) -> Result<String, String> {
+    async fn get_config(&self, _peer: &str) -> Result<String, String> {
         Ok("test-config".to_string())
     }
 
@@ -318,7 +318,7 @@ impl crate::server::Handler for TestServerHandler {
         }
     }
 
-    async fn get_internal_network_list(&self) -> Result<HostNetworkGroup, String> {
+    async fn get_internal_network_list(&self, _peer: &str) -> Result<HostNetworkGroup, String> {
         use std::net::{IpAddr, Ipv4Addr};
         Ok(HostNetworkGroup {
             hosts: vec![IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1))],
@@ -350,7 +350,7 @@ impl crate::server::Handler for TestServerHandler {
         }
     }
 
-    async fn renew_certificate(&self) -> Result<(String, String), String> {
+    async fn renew_certificate(&self, _peer: &str) -> Result<(String, String), String> {
         Ok(("new-cert".to_string(), "new-key".to_string()))
     }
 }

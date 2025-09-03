@@ -175,7 +175,7 @@ mod tests {
         let server_handle = tokio::spawn(async move {
             let mut handler = TestServerHandler;
             let (mut send, mut recv) = handler_conn.as_quinn().accept_bi().await.unwrap();
-            handle(&mut handler, &mut send, &mut recv).await?;
+            handle(&mut handler, &mut send, &mut recv, "test-peer").await?;
             Ok(()) as std::io::Result<()>
         });
 
@@ -199,7 +199,7 @@ mod tests {
         let server_handle = tokio::spawn(async move {
             let mut handler = TestServerHandler;
             let (mut send, mut recv) = handler_conn.as_quinn().accept_bi().await.unwrap();
-            handle(&mut handler, &mut send, &mut recv).await?;
+            handle(&mut handler, &mut send, &mut recv, "test-peer").await?;
             Ok(()) as std::io::Result<()>
         });
 
@@ -227,7 +227,7 @@ mod tests {
         let server_handle = tokio::spawn(async move {
             let mut handler = TestServerHandler;
             let (mut send, mut recv) = handler_conn.as_quinn().accept_bi().await.unwrap();
-            handle(&mut handler, &mut send, &mut recv).await?;
+            handle(&mut handler, &mut send, &mut recv, "test-peer").await?;
             Ok(()) as std::io::Result<()>
         });
 
@@ -251,7 +251,7 @@ mod tests {
         let server_handle = tokio::spawn(async move {
             let mut handler = TestServerHandler;
             let (mut send, mut recv) = handler_conn.as_quinn().accept_bi().await.unwrap();
-            handle(&mut handler, &mut send, &mut recv).await?;
+            handle(&mut handler, &mut send, &mut recv, "test-peer").await?;
             Ok(()) as std::io::Result<()>
         });
 
@@ -275,7 +275,7 @@ mod tests {
         let server_handle = tokio::spawn(async move {
             let mut handler = TestServerHandler;
             let (mut send, mut recv) = handler_conn.as_quinn().accept_bi().await.unwrap();
-            handle(&mut handler, &mut send, &mut recv).await?;
+            handle(&mut handler, &mut send, &mut recv, "test-peer").await?;
             Ok(()) as std::io::Result<()>
         });
 
@@ -299,7 +299,7 @@ mod tests {
         let server_handle = tokio::spawn(async move {
             let mut handler = TestServerHandler;
             let (mut send, mut recv) = handler_conn.as_quinn().accept_bi().await.unwrap();
-            handle(&mut handler, &mut send, &mut recv).await?;
+            handle(&mut handler, &mut send, &mut recv, "test-peer").await?;
             Ok(()) as std::io::Result<()>
         });
 
@@ -323,7 +323,7 @@ mod tests {
         let server_handle = tokio::spawn(async move {
             let mut handler = TestServerHandler;
             let (mut send, mut recv) = handler_conn.as_quinn().accept_bi().await.unwrap();
-            handle(&mut handler, &mut send, &mut recv).await?;
+            handle(&mut handler, &mut send, &mut recv, "test-peer").await?;
             Ok(()) as std::io::Result<()>
         });
 
@@ -347,7 +347,7 @@ mod tests {
         let server_handle = tokio::spawn(async move {
             let mut handler = TestServerHandler;
             let (mut send, mut recv) = handler_conn.as_quinn().accept_bi().await.unwrap();
-            handle(&mut handler, &mut send, &mut recv).await?;
+            handle(&mut handler, &mut send, &mut recv, "test-peer").await?;
             Ok(()) as std::io::Result<()>
         });
 
@@ -373,7 +373,7 @@ mod tests {
         let server_handle = tokio::spawn(async move {
             let mut handler = TestServerHandler;
             let (mut send, mut recv) = handler_conn.as_quinn().accept_bi().await.unwrap();
-            handle(&mut handler, &mut send, &mut recv).await?;
+            handle(&mut handler, &mut send, &mut recv, "test-peer").await?;
             Ok(()) as std::io::Result<()>
         });
 
@@ -399,7 +399,7 @@ mod tests {
         let server_handle = tokio::spawn(async move {
             let mut handler = TestServerHandler;
             let (mut send, mut recv) = handler_conn.as_quinn().accept_bi().await.unwrap();
-            handle(&mut handler, &mut send, &mut recv).await?;
+            handle(&mut handler, &mut send, &mut recv, "test-peer").await?;
             Ok(()) as std::io::Result<()>
         });
 
@@ -425,7 +425,7 @@ mod tests {
         let server_handle = tokio::spawn(async move {
             let mut handler = TestServerHandler;
             let (mut send, mut recv) = handler_conn.as_quinn().accept_bi().await.unwrap();
-            handle(&mut handler, &mut send, &mut recv).await?;
+            handle(&mut handler, &mut send, &mut recv, "test-peer").await?;
             Ok(()) as std::io::Result<()>
         });
 
@@ -449,7 +449,7 @@ mod tests {
         let server_handle = tokio::spawn(async move {
             let mut handler = TestServerHandler;
             let (mut send, mut recv) = handler_conn.as_quinn().accept_bi().await.unwrap();
-            handle(&mut handler, &mut send, &mut recv).await?;
+            handle(&mut handler, &mut send, &mut recv, "test-peer").await?;
             Ok(()) as std::io::Result<()>
         });
 

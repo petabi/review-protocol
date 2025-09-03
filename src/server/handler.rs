@@ -53,11 +53,11 @@ pub trait Handler {
         Err("not supported".to_string())
     }
 
-    async fn get_config(&self) -> Result<String, String> {
+    async fn get_config(&self, _peer: &str) -> Result<String, String> {
         Err("not supported".to_string())
     }
 
-    async fn get_internal_network_list(&self) -> Result<HostNetworkGroup, String> {
+    async fn get_internal_network_list(&self, _peer: &str) -> Result<HostNetworkGroup, String> {
         Err("not supported".to_string())
     }
 
@@ -65,7 +65,7 @@ pub trait Handler {
         Err("not supported".to_string())
     }
 
-    async fn renew_certificate(&self) -> Result<(String, String), String> {
+    async fn renew_certificate(&self, _peer: &str) -> Result<(String, String), String> {
         Err("not supported".to_string())
     }
 }
@@ -85,6 +85,7 @@ pub async fn handle<H>(
     handler: &mut H,
     send: &mut quinn::SendStream,
     recv: &mut quinn::RecvStream,
+    peer: &str,
 ) -> io::Result<Option<(u32, Vec<u8>)>>
 where
     H: Handler + Sync,
@@ -145,12 +146,12 @@ where
             }
             RequestCode::GetConfig => {
                 parse_args::<()>(body)?;
-                let result = handler.get_config().await;
+                let result = handler.get_config(peer).await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::GetInternalNetworkList => {
                 parse_args::<()>(body)?;
-                let result = handler.get_internal_network_list().await;
+                let result = handler.get_internal_network_list(peer).await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::GetPretrainedModel => {
@@ -159,7 +160,7 @@ where
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::RenewCertificate => {
-                let result = handler.renew_certificate().await;
+                let result = handler.renew_certificate(peer).await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::Unknown => {

@@ -350,11 +350,7 @@ impl crate::server::Handler for TestServerHandler {
         }
     }
 
-    async fn renew_certificate(&self, cert: &[u8]) -> Result<(String, String), String> {
-        if cert == b"test-cert" {
-            Ok(("new-cert".to_string(), "new-key".to_string()))
-        } else {
-            Err("invalid certificate".to_string())
-        }
+    async fn renew_certificate(&self) -> Result<(String, String), String> {
+        Ok(("new-cert".to_string(), "new-key".to_string()))
     }
 }

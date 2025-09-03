@@ -65,7 +65,7 @@ pub trait Handler {
         Err("not supported".to_string())
     }
 
-    async fn renew_certificate(&self, _cert: &[u8]) -> Result<(String, String), String> {
+    async fn renew_certificate(&self) -> Result<(String, String), String> {
         Err("not supported".to_string())
     }
 }
@@ -159,8 +159,7 @@ where
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::RenewCertificate => {
-                let cert = parse_args::<Vec<u8>>(body)?;
-                let result = handler.renew_certificate(&cert).await;
+                let result = handler.renew_certificate().await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::Unknown => {

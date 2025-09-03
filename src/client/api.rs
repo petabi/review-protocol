@@ -142,9 +142,9 @@ impl Connection {
     /// # Errors
     ///
     /// Returns an error if the request fails or the response is invalid.
-    pub async fn renew_certificate(&self, cert: &[u8]) -> io::Result<(String, String)> {
+    pub async fn renew_certificate(&self) -> io::Result<(String, String)> {
         let res: Result<(String, String), String> =
-            request(self, server::RequestCode::RenewCertificate, cert).await?;
+            request(self, server::RequestCode::RenewCertificate, ()).await?;
         res.map_err(io::Error::other)
     }
 }
@@ -453,7 +453,7 @@ mod tests {
             Ok(()) as std::io::Result<()>
         });
 
-        let client_res = client_conn.renew_certificate(b"test-cert").await;
+        let client_res = client_conn.renew_certificate().await;
         assert!(client_res.is_ok());
         let (new_cert, new_key) = client_res.unwrap();
         assert_eq!(new_cert, "new-cert");

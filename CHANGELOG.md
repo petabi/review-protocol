@@ -5,6 +5,14 @@ file is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and
 this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- `server::Handler::renew_certificate` and
+  `client::Connection::renew_certificate` now take no arguments. The server
+  should use the identity from the connection.
+
 ## [0.12.0] - 2025-08-28
 
 ### Added
@@ -359,6 +367,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - `client::handshake` implements the application-level handshake process for the
   client after a QUIC connection is established.
 
+[Unreleased]: https://github.com/petabi/review-protocol/compare/0.12.0...main
 [0.12.0]: https://github.com/petabi/review-protocol/compare/0.11.0...0.12.0
 [0.11.0]: https://github.com/petabi/review-protocol/compare/0.10.0...0.11.0
 [0.10.0]: https://github.com/petabi/review-protocol/compare/0.9.0...0.10.0

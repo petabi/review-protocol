@@ -19,6 +19,10 @@ pub trait Handler {
         Err("not supported".to_string())
     }
 
+    async fn get_config(&self, _peer: &str) -> Result<String, String> {
+        Err("not supported".to_string())
+    }
+
     async fn get_data_source(
         &self,
         _key: &DataSourceKey<'_>,
@@ -30,7 +34,15 @@ pub trait Handler {
         Err("not supported".to_string())
     }
 
+    async fn get_internal_network_list(&self, _peer: &str) -> Result<HostNetworkGroup, String> {
+        Err("not supported".to_string())
+    }
+
     async fn get_model_names(&self) -> Result<Vec<String>, String> {
+        Err("not supported".to_string())
+    }
+
+    async fn get_pretrained_model(&self, _name: &str) -> Result<Vec<u8>, String> {
         Err("not supported".to_string())
     }
 
@@ -50,18 +62,6 @@ pub trait Handler {
     }
 
     async fn get_trusted_user_agent_list(&self) -> Result<Vec<String>, String> {
-        Err("not supported".to_string())
-    }
-
-    async fn get_config(&self, _peer: &str) -> Result<String, String> {
-        Err("not supported".to_string())
-    }
-
-    async fn get_internal_network_list(&self, _peer: &str) -> Result<HostNetworkGroup, String> {
-        Err("not supported".to_string())
-    }
-
-    async fn get_pretrained_model(&self, _name: &str) -> Result<Vec<u8>, String> {
         Err("not supported".to_string())
     }
 

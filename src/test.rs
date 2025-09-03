@@ -327,6 +327,14 @@ impl crate::server::Handler for TestServerHandler {
         })
     }
 
+    async fn get_pretrained_model(&self, name: &str) -> Result<Vec<u8>, String> {
+        if name == "test-model" {
+            Ok(vec![0x01, 0x02, 0x03, 0x04])
+        } else {
+            Err("model not found".to_string())
+        }
+    }
+
     async fn get_tor_exit_node_list(&self) -> Result<Vec<String>, String> {
         Ok(vec!["192.168.1.10".to_string(), "192.168.1.11".to_string()])
     }
@@ -340,14 +348,6 @@ impl crate::server::Handler for TestServerHandler {
             "Mozilla/5.0 (trusted)".to_string(),
             "Chrome/test".to_string(),
         ])
-    }
-
-    async fn get_pretrained_model(&self, name: &str) -> Result<Vec<u8>, String> {
-        if name == "test-model" {
-            Ok(vec![0x01, 0x02, 0x03, 0x04])
-        } else {
-            Err("model not found".to_string())
-        }
     }
 
     async fn renew_certificate(&self, _peer: &str) -> Result<(String, String), String> {

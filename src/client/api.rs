@@ -147,6 +147,193 @@ impl Connection {
             request(self, server::RequestCode::RenewCertificate, ()).await?;
         res.map_err(io::Error::other)
     }
+
+    /// Fetches a model from the server.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response is invalid.
+    pub async fn get_model(&self, name: &str) -> io::Result<Vec<u8>> {
+        let res: Result<Vec<u8>, String> =
+            request(self, server::RequestCode::GetModel, name).await?;
+        res.map_err(io::Error::other)
+    }
+
+    /// Fetches the list of model names from the server.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response is invalid.
+    pub async fn get_model_names(&self) -> io::Result<Vec<String>> {
+        let res: Result<Vec<String>, String> =
+            request(self, server::RequestCode::GetModelNames, ()).await?;
+        res.map_err(io::Error::other)
+    }
+
+    /// Inserts column statistics into the server.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response is invalid.
+    pub async fn insert_column_statistics(
+        &self,
+        statistics: &[crate::types::ColumnStatisticsUpdate],
+        model_id: i32,
+        batch_ts: i64,
+    ) -> io::Result<()> {
+        let res: Result<(), String> = request(
+            self,
+            server::RequestCode::InsertColumnStatistics,
+            &(statistics, model_id, batch_ts),
+        )
+        .await?;
+        res.map_err(io::Error::other)
+    }
+
+    /// Inserts a model into the server.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response is invalid.
+    pub async fn insert_model(&self, model: &[u8]) -> io::Result<i32> {
+        let res: Result<i32, String> =
+            request(self, server::RequestCode::InsertModel, model).await?;
+        res.map_err(io::Error::other)
+    }
+
+    /// Inserts time series data into the server.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response is invalid.
+    pub async fn insert_time_series(
+        &self,
+        time_series: &[crate::types::TimeSeriesUpdate],
+        model_id: i32,
+        batch_ts: i64,
+    ) -> io::Result<()> {
+        let res: Result<(), String> = request(
+            self,
+            server::RequestCode::InsertTimeSeries,
+            &(time_series, model_id, batch_ts),
+        )
+        .await?;
+        res.map_err(io::Error::other)
+    }
+
+    /// Removes a model from the server.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response is invalid.
+    pub async fn remove_model(&self, name: &str) -> io::Result<i32> {
+        let res: Result<i32, String> =
+            request(self, server::RequestCode::RemoveModel, name).await?;
+        res.map_err(io::Error::other)
+    }
+
+    /// Updates clusters on the server.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response is invalid.
+    pub async fn update_clusters(
+        &self,
+        input: &[crate::types::UpdateClusterRequest],
+        model_id: i32,
+    ) -> io::Result<Vec<i32>> {
+        let res: Result<Vec<i32>, String> = request(
+            self,
+            server::RequestCode::UpdateClusters,
+            &(input, model_id),
+        )
+        .await?;
+        res.map_err(io::Error::other)
+    }
+
+    /// Updates a model on the server.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response is invalid.
+    pub async fn update_model(&self, model: &[u8]) -> io::Result<i32> {
+        let res: Result<i32, String> =
+            request(self, server::RequestCode::UpdateModel, model).await?;
+        res.map_err(io::Error::other)
+    }
+
+    /// Updates outliers on the server.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response is invalid.
+    pub async fn update_outliers(
+        &self,
+        outliers: &[crate::types::OutlierInfo],
+        model_id: i32,
+        timestamp: i64,
+    ) -> io::Result<()> {
+        let res: Result<(), String> = request(
+            self,
+            server::RequestCode::UpdateOutliers,
+            &(outliers, model_id, timestamp),
+        )
+        .await?;
+        res.map_err(io::Error::other)
+    }
+
+    /// Inserts event labels into the server.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response is invalid.
+    pub async fn insert_event_labels(
+        &self,
+        model_id: i32,
+        round: u32,
+        event_labels: &[crate::types::EventMessage],
+    ) -> io::Result<()> {
+        let res: Result<(), String> = request(
+            self,
+            server::RequestCode::InsertEventLabels,
+            &(model_id, round, event_labels),
+        )
+        .await?;
+        res.map_err(io::Error::other)
+    }
+
+    /// Inserts a data source into the server.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response is invalid.
+    pub async fn insert_data_source(
+        &self,
+        data_source: &crate::types::DataSource,
+    ) -> io::Result<u32> {
+        let res: Result<u32, String> =
+            request(self, server::RequestCode::InsertDataSource, data_source).await?;
+        res.map_err(io::Error::other)
+    }
+
+    /// Fetches outliers from the server.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response is invalid.
+    pub async fn get_outliers(
+        &self,
+        model_id: i32,
+        timestamp: i64,
+    ) -> io::Result<Vec<(String, Vec<i64>)>> {
+        let res: Result<Vec<(String, Vec<i64>)>, String> = request(
+            self,
+            server::RequestCode::GetOutliers,
+            &(model_id, timestamp),
+        )
+        .await?;
+        res.map_err(io::Error::other)
+    }
 }
 
 async fn request<I, O>(conn: &Connection, code: server::RequestCode, input: I) -> io::Result<O>
@@ -458,6 +645,326 @@ mod tests {
         let (new_cert, new_key) = client_res.unwrap();
         assert_eq!(new_cert, "new-cert");
         assert_eq!(new_key, "new-key");
+
+        let server_res = server_handle.await.unwrap();
+        assert!(server_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[tokio::test]
+    async fn get_model() {
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let handler_conn = server_conn.clone();
+        let server_handle = tokio::spawn(async move {
+            let mut handler = TestServerHandler;
+            let (mut send, mut recv) = handler_conn.as_quinn().accept_bi().await.unwrap();
+            handle(&mut handler, &mut send, &mut recv, "test-peer").await?;
+            Ok(()) as std::io::Result<()>
+        });
+
+        let client_res = client_conn.get_model("test-model").await;
+        assert!(client_res.is_ok());
+        let model = client_res.unwrap();
+        assert_eq!(model, vec![0x01, 0x02, 0x03, 0x04, 0x05]);
+
+        let server_res = server_handle.await.unwrap();
+        assert!(server_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[tokio::test]
+    async fn get_model_names() {
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let handler_conn = server_conn.clone();
+        let server_handle = tokio::spawn(async move {
+            let mut handler = TestServerHandler;
+            let (mut send, mut recv) = handler_conn.as_quinn().accept_bi().await.unwrap();
+            handle(&mut handler, &mut send, &mut recv, "test-peer").await?;
+            Ok(()) as std::io::Result<()>
+        });
+
+        let client_res = client_conn.get_model_names().await;
+        assert!(client_res.is_ok());
+        let names = client_res.unwrap();
+        assert_eq!(names, vec!["model1", "model2", "model3"]);
+
+        let server_res = server_handle.await.unwrap();
+        assert!(server_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[tokio::test]
+    async fn insert_column_statistics() {
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let handler_conn = server_conn.clone();
+        let server_handle = tokio::spawn(async move {
+            let mut handler = TestServerHandler;
+            let (mut send, mut recv) = handler_conn.as_quinn().accept_bi().await.unwrap();
+            handle(&mut handler, &mut send, &mut recv, "test-peer").await?;
+            Ok(()) as std::io::Result<()>
+        });
+
+        let data = vec![crate::types::ColumnStatisticsUpdate {
+            cluster_id: "test-cluster".to_string(),
+            column_statistics: vec![],
+        }];
+        let client_res = client_conn.insert_column_statistics(&data, 1, 1000).await;
+        assert!(client_res.is_ok());
+
+        let server_res = server_handle.await.unwrap();
+        assert!(server_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[tokio::test]
+    async fn insert_model() {
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let handler_conn = server_conn.clone();
+        let server_handle = tokio::spawn(async move {
+            let mut handler = TestServerHandler;
+            let (mut send, mut recv) = handler_conn.as_quinn().accept_bi().await.unwrap();
+            handle(&mut handler, &mut send, &mut recv, "test-peer").await?;
+            Ok(()) as std::io::Result<()>
+        });
+
+        let model_bytes = vec![0x01, 0x02, 0x03];
+        let client_res = client_conn.insert_model(&model_bytes).await;
+        assert!(client_res.is_ok());
+        assert_eq!(client_res.unwrap(), 42);
+
+        let server_res = server_handle.await.unwrap();
+        assert!(server_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[tokio::test]
+    async fn insert_time_series() {
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let handler_conn = server_conn.clone();
+        let server_handle = tokio::spawn(async move {
+            let mut handler = TestServerHandler;
+            let (mut send, mut recv) = handler_conn.as_quinn().accept_bi().await.unwrap();
+            handle(&mut handler, &mut send, &mut recv, "test-peer").await?;
+            Ok(()) as std::io::Result<()>
+        });
+
+        let data = vec![crate::types::TimeSeriesUpdate {
+            cluster_id: "test-cluster".to_string(),
+            time_series: vec![],
+        }];
+        let client_res = client_conn.insert_time_series(&data, 1, 1000).await;
+        assert!(client_res.is_ok());
+
+        let server_res = server_handle.await.unwrap();
+        assert!(server_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[tokio::test]
+    async fn remove_model() {
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let handler_conn = server_conn.clone();
+        let server_handle = tokio::spawn(async move {
+            let mut handler = TestServerHandler;
+            let (mut send, mut recv) = handler_conn.as_quinn().accept_bi().await.unwrap();
+            handle(&mut handler, &mut send, &mut recv, "test-peer").await?;
+            Ok(()) as std::io::Result<()>
+        });
+
+        let client_res = client_conn.remove_model("test-model").await;
+        assert!(client_res.is_ok());
+        assert_eq!(client_res.unwrap(), 99);
+
+        let server_res = server_handle.await.unwrap();
+        assert!(server_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[tokio::test]
+    async fn update_clusters() {
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let handler_conn = server_conn.clone();
+        let server_handle = tokio::spawn(async move {
+            let mut handler = TestServerHandler;
+            let (mut send, mut recv) = handler_conn.as_quinn().accept_bi().await.unwrap();
+            handle(&mut handler, &mut send, &mut recv, "test-peer").await?;
+            Ok(()) as std::io::Result<()>
+        });
+
+        let data = vec![crate::types::UpdateClusterRequest {
+            cluster_id: "test-cluster".to_string(),
+            detector_id: 1,
+            signature: "test-sig".to_string(),
+            score: Some(0.5),
+            size: 100,
+            event_ids: vec![],
+            status_id: 1,
+            labels: None,
+        }];
+        let client_res = client_conn.update_clusters(&data, 1).await;
+        assert!(client_res.is_ok());
+        assert_eq!(client_res.unwrap(), vec![1, 2, 3]);
+
+        let server_res = server_handle.await.unwrap();
+        assert!(server_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[tokio::test]
+    async fn update_model() {
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let handler_conn = server_conn.clone();
+        let server_handle = tokio::spawn(async move {
+            let mut handler = TestServerHandler;
+            let (mut send, mut recv) = handler_conn.as_quinn().accept_bi().await.unwrap();
+            handle(&mut handler, &mut send, &mut recv, "test-peer").await?;
+            Ok(()) as std::io::Result<()>
+        });
+
+        let model_bytes = vec![0x01, 0x02, 0x03];
+        let client_res = client_conn.update_model(&model_bytes).await;
+        assert!(client_res.is_ok());
+        assert_eq!(client_res.unwrap(), 55);
+
+        let server_res = server_handle.await.unwrap();
+        assert!(server_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[tokio::test]
+    async fn update_outliers() {
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let handler_conn = server_conn.clone();
+        let server_handle = tokio::spawn(async move {
+            let mut handler = TestServerHandler;
+            let (mut send, mut recv) = handler_conn.as_quinn().accept_bi().await.unwrap();
+            handle(&mut handler, &mut send, &mut recv, "test-peer").await?;
+            Ok(()) as std::io::Result<()>
+        });
+
+        let data = vec![crate::types::OutlierInfo {
+            id: 1,
+            rank: 1,
+            distance: 0.5,
+            sensor: "test-sensor".to_string(),
+        }];
+        let client_res = client_conn.update_outliers(&data, 1, 1000).await;
+        assert!(client_res.is_ok());
+
+        let server_res = server_handle.await.unwrap();
+        assert!(server_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[tokio::test]
+    async fn insert_event_labels() {
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let handler_conn = server_conn.clone();
+        let server_handle = tokio::spawn(async move {
+            let mut handler = TestServerHandler;
+            let (mut send, mut recv) = handler_conn.as_quinn().accept_bi().await.unwrap();
+            handle(&mut handler, &mut send, &mut recv, "test-peer").await?;
+            Ok(()) as std::io::Result<()>
+        });
+
+        let data = vec![crate::types::EventMessage {
+            time: 1000,
+            kind: "test-event".to_string(),
+            fields: vec![0x01, 0x02],
+        }];
+        let client_res = client_conn.insert_event_labels(1, 100, &data).await;
+        assert!(client_res.is_ok());
+
+        let server_res = server_handle.await.unwrap();
+        assert!(server_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[tokio::test]
+    async fn insert_data_source() {
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let handler_conn = server_conn.clone();
+        let server_handle = tokio::spawn(async move {
+            let mut handler = TestServerHandler;
+            let (mut send, mut recv) = handler_conn.as_quinn().accept_bi().await.unwrap();
+            handle(&mut handler, &mut send, &mut recv, "test-peer").await?;
+            Ok(()) as std::io::Result<()>
+        });
+
+        let data = crate::types::DataSource {
+            id: 0,
+            name: "test-source".to_string(),
+            server_name: "test-server".to_string(),
+            address: "127.0.0.1:8080".parse().unwrap(),
+            data_type: crate::types::DataType::Log,
+            source: "test".to_string(),
+            kind: None,
+            description: "test description".to_string(),
+        };
+        let client_res = client_conn.insert_data_source(&data).await;
+        assert!(client_res.is_ok());
+        assert_eq!(client_res.unwrap(), 123);
+
+        let server_res = server_handle.await.unwrap();
+        assert!(server_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[tokio::test]
+    async fn get_outliers() {
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let handler_conn = server_conn.clone();
+        let server_handle = tokio::spawn(async move {
+            let mut handler = TestServerHandler;
+            let (mut send, mut recv) = handler_conn.as_quinn().accept_bi().await.unwrap();
+            handle(&mut handler, &mut send, &mut recv, "test-peer").await?;
+            Ok(()) as std::io::Result<()>
+        });
+
+        let client_res = client_conn.get_outliers(10, 1000).await;
+        assert!(client_res.is_ok());
+        let outliers = client_res.unwrap();
+        assert_eq!(outliers.len(), 2);
+        assert_eq!(outliers[0].0, "sensor1");
+        assert_eq!(outliers[0].1, vec![1, 2, 3]);
+        assert_eq!(outliers[1].0, "sensor2");
+        assert_eq!(outliers[1].1, vec![4, 5, 6]);
 
         let server_res = server_handle.await.unwrap();
         assert!(server_res.is_ok());

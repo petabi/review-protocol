@@ -170,3 +170,63 @@ pub enum Status {
     Ready,
     Idle,
 }
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ColumnStatistics {
+    pub column_index: usize,
+    pub type_id: usize,
+    pub count: u64,
+    pub unique_count: u64,
+    pub mode: Option<Vec<u8>>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ColumnStatisticsUpdate {
+    pub cluster_id: String,
+    pub column_statistics: Vec<ColumnStatistics>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct TimeCount {
+    pub time: i64,
+    pub count: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct TimeSeries {
+    pub count_index: Option<usize>,
+    pub series: Vec<TimeCount>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct TimeSeriesUpdate {
+    pub cluster_id: String,
+    pub time_series: Vec<TimeSeries>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct UpdateClusterRequest {
+    pub cluster_id: String,
+    pub detector_id: i32,
+    pub signature: String,
+    pub score: Option<f64>,
+    pub size: i64,
+    pub event_ids: Vec<String>,
+    pub status_id: i32,
+    pub labels: Option<Vec<String>>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct OutlierInfo {
+    pub id: i64,
+    pub rank: i64,
+    pub distance: f64,
+    pub sensor: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct EventMessage {
+    pub time: i64,
+    pub kind: String,
+    pub fields: Vec<u8>,
+}

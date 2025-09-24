@@ -645,8 +645,8 @@ mod tests {
     async fn insert_event_labels() {
         run_test(|client_conn| async move {
             let data = vec![crate::types::EventMessage {
-                time: 1000,
-                kind: "test-event".to_string(),
+                time: chrono::Utc::now(),
+                kind: crate::types::EventKind::ExtraThreat,
                 fields: vec![0x01, 0x02],
             }];
             let client_res = client_conn.insert_event_labels(1, 100, &data).await;

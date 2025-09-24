@@ -392,16 +392,16 @@ impl crate::server::Handler for TestServerHandler {
         Ok(())
     }
 
-    async fn remove_model(&self, _name: &str) -> Result<i32, String> {
-        Ok(99)
+    async fn remove_model(&self, _name: &str) -> Result<(), String> {
+        Ok(())
     }
 
     async fn update_clusters(
         &self,
         _input: &[crate::types::UpdateClusterRequest],
         _model_id: i32,
-    ) -> Result<Vec<i32>, String> {
-        Ok(vec![1, 2, 3])
+    ) -> Result<(), String> {
+        Ok(())
     }
 
     async fn update_model(&self, _model: &[u8]) -> Result<i32, String> {

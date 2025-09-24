@@ -226,9 +226,8 @@ impl Connection {
     /// # Errors
     ///
     /// Returns an error if the request fails or the response is invalid.
-    pub async fn remove_model(&self, name: &str) -> io::Result<i32> {
-        let res: Result<i32, String> =
-            request(self, server::RequestCode::RemoveModel, name).await?;
+    pub async fn remove_model(&self, name: &str) -> io::Result<()> {
+        let res: Result<(), String> = request(self, server::RequestCode::RemoveModel, name).await?;
         res.map_err(io::Error::other)
     }
 
@@ -241,8 +240,8 @@ impl Connection {
         &self,
         input: &[crate::types::UpdateClusterRequest],
         model_id: i32,
-    ) -> io::Result<Vec<i32>> {
-        let res: Result<Vec<i32>, String> = request(
+    ) -> io::Result<()> {
+        let res: Result<(), String> = request(
             self,
             server::RequestCode::UpdateClusters,
             &(input, model_id),
@@ -593,7 +592,6 @@ mod tests {
         run_test(|client_conn| async move {
             let client_res = client_conn.remove_model("test-model").await;
             assert!(client_res.is_ok());
-            assert_eq!(client_res.unwrap(), 99);
         })
         .await;
     }
@@ -613,7 +611,6 @@ mod tests {
             }];
             let client_res = client_conn.update_clusters(&data, 1).await;
             assert!(client_res.is_ok());
-            assert_eq!(client_res.unwrap(), vec![1, 2, 3]);
         })
         .await;
     }

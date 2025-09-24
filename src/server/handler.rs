@@ -115,7 +115,7 @@ pub trait Handler {
         Err("not supported".to_string())
     }
 
-    async fn remove_model(&self, _name: &str) -> Result<i32, String> {
+    async fn remove_model(&self, _name: &str) -> Result<(), String> {
         Err("not supported".to_string())
     }
 
@@ -127,7 +127,7 @@ pub trait Handler {
         &self,
         _input: &[UpdateClusterRequest],
         _model_id: i32,
-    ) -> Result<Vec<i32>, String> {
+    ) -> Result<(), String> {
         Err("not supported".to_string())
     }
 

@@ -203,7 +203,7 @@ pub struct UpdateClusterRequest {
     pub signature: String,
     pub score: Option<f64>,
     pub size: i64,
-    pub event_ids: Vec<String>,
+    pub event_ids: Vec<(i64, String)>,
     pub status_id: i32,
     pub labels: Option<Vec<String>>,
 }

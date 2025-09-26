@@ -13,6 +13,10 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   unidirectional streams. This trait provides a standardized interface for
   processing `EventMessage` instances and includes methods for handling events,
   stream closure, and error conditions.
+- `process_event_stream()` function for low-level event stream processing.
+  This function reads raw unidirectional streams, handles protocol framing,
+  deserializes `EventMessage` objects, and calls `EventStreamHandler` trait
+  methods appropriately.
 
 ## [0.12.1] - 2025-09-25
 

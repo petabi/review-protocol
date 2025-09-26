@@ -4,6 +4,8 @@
 mod api;
 #[cfg(feature = "server")]
 mod handler;
+#[cfg(feature = "server")]
+pub mod stream;
 
 #[cfg(feature = "server")]
 use std::net::SocketAddr;
@@ -20,6 +22,8 @@ use semver::{Version, VersionReq};
 
 #[cfg(feature = "server")]
 pub use self::handler::{Handler, handle};
+#[cfg(feature = "server")]
+pub use self::stream::process_event_stream;
 #[cfg(feature = "server")]
 use crate::{
     AgentInfo, HandshakeError, client, handle_handshake_recv_io_error,

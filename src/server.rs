@@ -23,8 +23,74 @@ pub use self::handler::{Handler, handle};
 #[cfg(feature = "server")]
 use crate::{
     AgentInfo, HandshakeError, client, handle_handshake_recv_io_error,
-    handle_handshake_send_io_error, types::Tidb,
+    handle_handshake_send_io_error,
+    types::{EventMessage, Tidb},
 };
+
+/// Trait for handling incoming event messages from unidirectional streams
+///
+/// This trait provides a standardized interface for processing event messages
+/// received from unidirectional streams, abstracting away protocol-level details.
+#[cfg(feature = "server")]
+#[async_trait::async_trait]
+pub trait EventStreamHandler {
+    /// Handles a single event message
+    ///
+    /// Called for each successfully deserialized `EventMessage` received
+    /// from the unidirectional stream.
+    ///
+    /// # Arguments
+    /// * `event` - The deserialized `EventMessage`
+    ///
+    /// # Returns
+    /// * `Ok(())` - Continue processing messages
+    /// * `Err(msg)` - Stop processing and return error
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if:
+    /// * The event processing logic fails
+    /// * The handler determines the event is invalid or cannot be processed
+    /// * Any downstream processing of the event fails
+    async fn handle_event(&mut self, event: EventMessage) -> Result<(), String>;
+
+    /// Called when the stream ends normally
+    ///
+    /// This is called when the peer closes the stream gracefully
+    /// (EOF received). Default implementation does nothing.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if:
+    /// * Cleanup operations fail
+    /// * Final processing steps cannot be completed
+    async fn on_stream_end(&mut self) -> Result<(), String> {
+        Ok(())
+    }
+
+    /// Called when an error occurs during stream processing
+    ///
+    /// This includes deserialization errors, network errors, etc.
+    /// The handler can decide whether to treat the error as fatal.
+    /// Default implementation logs and continues.
+    ///
+    /// # Arguments
+    /// * `error` - Description of the error that occurred
+    ///
+    /// # Returns
+    /// * `Ok(())` - Continue processing (if possible)
+    /// * `Err(msg)` - Stop processing and return error
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if:
+    /// * The error should be treated as fatal
+    /// * Error recovery operations fail
+    async fn on_error(&mut self, error: &str) -> Result<(), String> {
+        eprintln!("Event stream error: {error}");
+        Ok(())
+    }
+}
 
 /// Numeric representation of the message types that a server should handle.
 #[cfg(any(feature = "client", feature = "server"))]
@@ -239,6 +305,123 @@ pub async fn notify_config_update(conn: &quinn::Connection) -> anyhow::Result<()
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    #[cfg(feature = "server")]
+    struct TestEventHandler {
+        events: Vec<EventMessage>,
+        errors: Vec<String>,
+        stream_ended: bool,
+    }
+
+    #[cfg(feature = "server")]
+    impl TestEventHandler {
+        fn new() -> Self {
+            Self {
+                events: Vec::new(),
+                errors: Vec::new(),
+                stream_ended: false,
+            }
+        }
+    }
+
+    #[cfg(feature = "server")]
+    #[async_trait::async_trait]
+    impl EventStreamHandler for TestEventHandler {
+        async fn handle_event(&mut self, event: EventMessage) -> Result<(), String> {
+            self.events.push(event);
+            Ok(())
+        }
+
+        async fn on_error(&mut self, error: &str) -> Result<(), String> {
+            self.errors.push(error.to_string());
+            Ok(())
+        }
+
+        async fn on_stream_end(&mut self) -> Result<(), String> {
+            self.stream_ended = true;
+            Ok(())
+        }
+    }
+
+    #[cfg(feature = "server")]
+    #[tokio::test]
+    async fn test_event_stream_handler_interface() {
+        use crate::types::EventKind;
+
+        let mut handler = TestEventHandler::new();
+
+        let event = EventMessage {
+            time: chrono::Utc::now(),
+            kind: EventKind::DnsCovertChannel,
+            fields: vec![1, 2, 3, 4],
+        };
+
+        assert!(handler.handle_event(event.clone()).await.is_ok());
+        assert_eq!(handler.events.len(), 1);
+        assert_eq!(handler.events[0].kind, EventKind::DnsCovertChannel);
+        assert_eq!(handler.events[0].fields, vec![1, 2, 3, 4]);
+
+        assert!(handler.on_error("test error").await.is_ok());
+        assert_eq!(handler.errors.len(), 1);
+        assert_eq!(handler.errors[0], "test error");
+
+        assert!(handler.on_stream_end().await.is_ok());
+        assert!(handler.stream_ended);
+    }
+
+    #[cfg(feature = "server")]
+    #[tokio::test]
+    async fn test_event_handler_error_handling() {
+        use crate::types::EventKind;
+
+        struct FailingHandler;
+
+        #[async_trait::async_trait]
+        impl EventStreamHandler for FailingHandler {
+            async fn handle_event(&mut self, _event: EventMessage) -> Result<(), String> {
+                Err("processing failed".to_string())
+            }
+
+            async fn on_error(&mut self, _error: &str) -> Result<(), String> {
+                Err("error handling failed".to_string())
+            }
+
+            async fn on_stream_end(&mut self) -> Result<(), String> {
+                Err("stream end failed".to_string())
+            }
+        }
+
+        let mut handler = FailingHandler;
+        let event = EventMessage {
+            time: chrono::Utc::now(),
+            kind: EventKind::HttpThreat,
+            fields: vec![],
+        };
+
+        assert!(handler.handle_event(event).await.is_err());
+        assert!(handler.on_error("test").await.is_err());
+        assert!(handler.on_stream_end().await.is_err());
+    }
+
+    #[cfg(feature = "server")]
+    #[tokio::test]
+    async fn test_default_implementations() {
+        struct MinimalHandler;
+
+        #[async_trait::async_trait]
+        impl EventStreamHandler for MinimalHandler {
+            async fn handle_event(&mut self, _event: EventMessage) -> Result<(), String> {
+                Ok(())
+            }
+        }
+
+        let mut handler = MinimalHandler;
+
+        assert!(handler.on_stream_end().await.is_ok());
+        assert!(handler.on_error("test error").await.is_ok());
+    }
+
     #[cfg(all(feature = "client", feature = "server"))]
     #[tokio::test]
     async fn trusted_domain_list() {

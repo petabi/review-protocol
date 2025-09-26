@@ -11,6 +11,8 @@ pub mod types;
 use std::net::SocketAddr;
 
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "server")]
+pub use server::EventStreamHandler;
 #[cfg(any(feature = "client", feature = "server"))]
 use thiserror::Error;
 

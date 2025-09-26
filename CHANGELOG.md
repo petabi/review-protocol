@@ -5,6 +5,15 @@ file is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and
 this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `EventStreamHandler` trait for handling incoming event messages from
+  unidirectional streams. This trait provides a standardized interface for
+  processing `EventMessage` instances and includes methods for handling events,
+  stream closure, and error conditions.
+
 ## [0.12.1] - 2025-09-25
 
 ### Added
@@ -404,6 +413,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - `client::handshake` implements the application-level handshake process for the
   client after a QUIC connection is established.
 
+[Unreleased]: https://github.com/petabi/review-protocol/compare/0.12.1...main
 [0.12.1]: https://github.com/petabi/review-protocol/compare/0.12.0...0.12.1
 [0.12.0]: https://github.com/petabi/review-protocol/compare/0.11.0...0.12.0
 [0.11.0]: https://github.com/petabi/review-protocol/compare/0.10.0...0.11.0

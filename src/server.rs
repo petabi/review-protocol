@@ -183,6 +183,198 @@ impl Connection {
     pub(crate) fn close(&self) {
         self.conn.close(0u32.into(), b"");
     }
+
+    /// Accepts and handles the next unidirectional event stream
+    ///
+    /// This method waits for the next unidirectional stream from the agent
+    /// and processes it using the provided event handler. The method returns
+    /// when the stream ends or an error occurs.
+    ///
+    /// # Arguments
+    /// * `handler` - Implementation of `EventStreamHandler` trait
+    ///
+    /// # Returns
+    /// * `Ok(())` - Stream processed successfully
+    /// * `Err(e)` - Connection error, protocol error, or handler error
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if:
+    /// * Failed to accept unidirectional stream (connection error)
+    /// * Stream processing failed (protocol error or handler error)
+    ///
+    /// # Example
+    /// ```rust,no_run
+    /// # use review_protocol::server::{Connection, EventStreamHandler};
+    /// # use review_protocol::types::EventMessage;
+    /// # struct MyEventHandler;
+    /// # #[async_trait::async_trait]
+    /// # impl EventStreamHandler for MyEventHandler {
+    /// #     async fn handle_event(&mut self, event: EventMessage) -> Result<(), String> {
+    /// #         Ok(())
+    /// #     }
+    /// # }
+    /// # async fn example(connection: Connection) -> anyhow::Result<()> {
+    /// let handler = MyEventHandler;
+    /// connection.accept_event_stream(handler).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn accept_event_stream<H>(&self, handler: H) -> anyhow::Result<()>
+    where
+        H: EventStreamHandler + Send + 'static,
+    {
+        use anyhow::Context;
+
+        let recv_stream = self
+            .conn
+            .accept_uni()
+            .await
+            .context("failed to accept unidirectional stream")?;
+
+        self::stream::process_event_stream(recv_stream, handler).await
+    }
+
+    /// Handles a specific unidirectional stream with the given handler
+    ///
+    /// This is a lower-level method that processes a specific `RecvStream`.
+    /// Useful for testing or when you already have a stream to process.
+    ///
+    /// # Arguments
+    /// * `recv_stream` - The unidirectional receive stream
+    /// * `handler` - Implementation of `EventStreamHandler` trait
+    ///
+    /// # Returns
+    /// * `Ok(())` - Stream processed successfully
+    /// * `Err(e)` - Protocol error or handler error
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if:
+    /// * Stream processing failed (protocol error or handler error)
+    ///
+    /// # Example
+    /// ```rust,no_run
+    /// # use review_protocol::server::{Connection, EventStreamHandler};
+    /// # use review_protocol::types::EventMessage;
+    /// # struct MyEventHandler;
+    /// # #[async_trait::async_trait]
+    /// # impl EventStreamHandler for MyEventHandler {
+    /// #     async fn handle_event(&mut self, event: EventMessage) -> Result<(), String> {
+    /// #         Ok(())
+    /// #     }
+    /// # }
+    /// # async fn example(recv_stream: quinn::RecvStream) -> anyhow::Result<()> {
+    /// let handler = MyEventHandler;
+    /// Connection::handle_event_stream(recv_stream, handler).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn handle_event_stream<H>(
+        recv_stream: quinn::RecvStream,
+        handler: H,
+    ) -> anyhow::Result<()>
+    where
+        H: EventStreamHandler + Send + 'static,
+    {
+        self::stream::process_event_stream(recv_stream, handler).await
+    }
+
+    /// Accepts multiple unidirectional streams concurrently
+    ///
+    /// This method continuously accepts unidirectional streams and spawns
+    /// tasks to handle them. It's useful for server applications that need
+    /// to handle multiple concurrent event streams.
+    ///
+    /// # Arguments
+    /// * `handler_factory` - Function that creates a new handler for each
+    ///   stream
+    /// * `max_concurrent` - Maximum number of concurrent streams (None =
+    ///   unlimited)
+    ///
+    /// # Returns
+    /// * `Ok(())` - All streams handled (connection closed)
+    /// * `Err(e)` - Connection error or too many concurrent streams
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if:
+    /// * Failed to accept unidirectional stream (connection error)
+    /// * Semaphore acquisition failed (concurrency limiting error)
+    ///
+    /// # Example
+    /// ```rust,no_run
+    /// # use review_protocol::server::{Connection, EventStreamHandler};
+    /// # use review_protocol::types::EventMessage;
+    /// # struct MyEventHandler;
+    /// # #[async_trait::async_trait]
+    /// # impl EventStreamHandler for MyEventHandler {
+    /// #     async fn handle_event(&mut self, event: EventMessage) -> Result<(), String> {
+    /// #         Ok(())
+    /// #     }
+    /// # }
+    /// # impl MyEventHandler {
+    /// #     fn new() -> Self { MyEventHandler }
+    /// # }
+    /// # async fn example(connection: Connection) -> anyhow::Result<()> {
+    /// connection.accept_event_streams(
+    ///     || MyEventHandler::new(),
+    ///     Some(10) // Max 10 concurrent streams
+    /// ).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn accept_event_streams<H, F>(
+        &self,
+        handler_factory: F,
+        max_concurrent: Option<usize>,
+    ) -> anyhow::Result<()>
+    where
+        H: EventStreamHandler + Send + 'static,
+        F: Fn() -> H + Send + Sync + 'static,
+    {
+        use std::sync::Arc;
+
+        use anyhow::Context;
+
+        let semaphore = max_concurrent.map(|n| Arc::new(tokio::sync::Semaphore::new(n)));
+
+        loop {
+            let recv_stream = match self.conn.accept_uni().await {
+                Ok(stream) => stream,
+                Err(quinn::ConnectionError::ApplicationClosed(_)) => {
+                    // Connection closed normally
+                    break;
+                }
+                Err(e) => {
+                    return Err(anyhow::anyhow!("failed to accept stream: {e}"));
+                }
+            };
+
+            // Acquire semaphore permit if limited concurrency
+            let permit = if let Some(ref sem) = semaphore {
+                Some(
+                    sem.clone()
+                        .acquire_owned()
+                        .await
+                        .context("semaphore closed")?,
+                )
+            } else {
+                None
+            };
+
+            let handler = handler_factory();
+            tokio::spawn(async move {
+                // Move permit into task so it's dropped when task completes
+                let _permit = permit;
+                if let Err(e) = self::stream::process_event_stream(recv_stream, handler).await {
+                    eprintln!("Event stream processing error: {e}");
+                }
+            });
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(feature = "server")]
@@ -501,6 +693,362 @@ mod tests {
         assert!(server_res.is_ok());
         let client_res = client_handle.await.unwrap();
         assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[cfg(feature = "server")]
+    #[tokio::test]
+    async fn test_accept_event_stream() {
+        use std::sync::{Arc, Mutex};
+
+        struct TestHandler {
+            events: Arc<Mutex<Vec<EventMessage>>>,
+        }
+
+        #[async_trait::async_trait]
+        impl EventStreamHandler for TestHandler {
+            async fn handle_event(&mut self, event: EventMessage) -> Result<(), String> {
+                self.events.lock().unwrap().push(event);
+                Ok(())
+            }
+        }
+
+        let test_env = crate::test::TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let events_clone = events.clone();
+
+        let handler = TestHandler {
+            events: events_clone,
+        };
+
+        // Clone server connection for teardown
+        let server_conn_for_teardown = server_conn.clone();
+
+        // Client opens unidirectional stream and sends events
+        let client_handle = tokio::spawn(async move {
+            use bincode::Options;
+
+            let mut send = client_conn.open_uni().await.unwrap();
+
+            // Write protocol header
+            send.write_all(&[0, 0]).await.unwrap();
+
+            // Send test event
+            let event = EventMessage {
+                time: jiff::Timestamp::now(),
+                kind: crate::types::EventKind::DnsCovertChannel,
+                fields: vec![1, 2, 3, 4],
+            };
+
+            let codec = bincode::DefaultOptions::new();
+            let serialized = codec.serialize(&event).unwrap();
+            #[allow(clippy::cast_possible_truncation)]
+            let len = serialized.len() as u32;
+
+            send.write_all(&len.to_be_bytes()).await.unwrap();
+            send.write_all(&serialized).await.unwrap();
+
+            // Close stream properly to signal EOF
+            send.finish().unwrap();
+
+            // Give server time to accept the stream
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        });
+
+        // Wait for client to send data
+        client_handle.await.unwrap();
+
+        // Now accept and process the stream
+        let server_res = server_conn.accept_event_stream(handler).await;
+
+        assert!(server_res.is_ok());
+
+        let received_events = events.lock().unwrap();
+        assert_eq!(received_events.len(), 1);
+        assert_eq!(
+            received_events[0].kind,
+            crate::types::EventKind::DnsCovertChannel
+        );
+        assert_eq!(received_events[0].fields, vec![1, 2, 3, 4]);
+
+        test_env.teardown(&server_conn_for_teardown);
+    }
+
+    #[cfg(feature = "server")]
+    #[tokio::test]
+    async fn test_handle_event_stream() {
+        use std::sync::{Arc, Mutex};
+
+        struct TestHandler {
+            events: Arc<Mutex<Vec<EventMessage>>>,
+        }
+
+        #[async_trait::async_trait]
+        impl EventStreamHandler for TestHandler {
+            async fn handle_event(&mut self, event: EventMessage) -> Result<(), String> {
+                self.events.lock().unwrap().push(event);
+                Ok(())
+            }
+        }
+
+        let test_env = crate::test::TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let events_clone = events.clone();
+
+        let handler = TestHandler {
+            events: events_clone,
+        };
+
+        // Client opens unidirectional stream and sends events
+        let client_handle = tokio::spawn(async move {
+            use bincode::Options;
+
+            let mut send = client_conn.open_uni().await.unwrap();
+
+            // Write protocol header
+            send.write_all(&[0, 0]).await.unwrap();
+
+            // Send test event
+            let event = EventMessage {
+                time: jiff::Timestamp::now(),
+                kind: crate::types::EventKind::HttpThreat,
+                fields: vec![5, 6, 7],
+            };
+
+            let codec = bincode::DefaultOptions::new();
+            let serialized = codec.serialize(&event).unwrap();
+            #[allow(clippy::cast_possible_truncation)]
+            let len = serialized.len() as u32;
+
+            send.write_all(&len.to_be_bytes()).await.unwrap();
+            send.write_all(&serialized).await.unwrap();
+
+            // Close stream properly to signal EOF
+            send.finish().unwrap();
+
+            // Give server time to accept the stream
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        });
+
+        // Wait for client to send data
+        client_handle.await.unwrap();
+
+        // Now accept uni stream and handle it
+        let server_conn_clone = server_conn.clone();
+        let recv_stream = server_conn_clone.conn.accept_uni().await.unwrap();
+        let server_res = crate::server::Connection::handle_event_stream(recv_stream, handler).await;
+
+        assert!(server_res.is_ok());
+
+        let received_events = events.lock().unwrap();
+        assert_eq!(received_events.len(), 1);
+        assert_eq!(received_events[0].kind, crate::types::EventKind::HttpThreat);
+        assert_eq!(received_events[0].fields, vec![5, 6, 7]);
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[cfg(feature = "server")]
+    #[tokio::test]
+    async fn test_accept_multiple_streams() {
+        use std::sync::{Arc, Mutex};
+
+        struct TestHandler {
+            events: Arc<Mutex<Vec<EventMessage>>>,
+        }
+
+        #[async_trait::async_trait]
+        impl EventStreamHandler for TestHandler {
+            async fn handle_event(&mut self, event: EventMessage) -> Result<(), String> {
+                self.events.lock().unwrap().push(event);
+                Ok(())
+            }
+        }
+
+        let test_env = crate::test::TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let events_for_factory = events.clone();
+
+        // Spawn server task to accept multiple event streams
+        let server_conn_clone = server_conn.clone();
+        let server_handle = tokio::spawn(async move {
+            server_conn_clone
+                .accept_event_streams(
+                    move || TestHandler {
+                        events: events_for_factory.clone(),
+                    },
+                    Some(5),
+                )
+                .await
+        });
+
+        // Client opens multiple unidirectional streams
+        let client_handle = tokio::spawn(async move {
+            use bincode::Options;
+
+            for i in 0..3 {
+                let mut send = client_conn.open_uni().await.unwrap();
+
+                // Write protocol header
+                send.write_all(&[0, 0]).await.unwrap();
+
+                // Send test event
+                let event = EventMessage {
+                    time: jiff::Timestamp::now(),
+                    kind: crate::types::EventKind::DnsCovertChannel,
+                    fields: vec![u8::try_from(i).unwrap()],
+                };
+
+                let codec = bincode::DefaultOptions::new();
+                let serialized = codec.serialize(&event).unwrap();
+                #[allow(clippy::cast_possible_truncation)]
+                let len = serialized.len() as u32;
+
+                send.write_all(&len.to_be_bytes()).await.unwrap();
+                send.write_all(&serialized).await.unwrap();
+
+                // Close stream
+                send.finish().ok();
+
+                // Small delay to ensure streams are processed
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+
+            // Wait a bit for processing
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        });
+
+        // Wait for client to finish sending
+        client_handle.await.unwrap();
+
+        // Give server time to process all streams
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+        // Cancel the server task (it's in an infinite loop)
+        server_handle.abort();
+
+        let received_events = events.lock().unwrap();
+        assert_eq!(received_events.len(), 3);
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[cfg(feature = "server")]
+    #[tokio::test]
+    async fn test_concurrency_limiting() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        };
+
+        use tokio::sync::Mutex;
+
+        struct SlowHandler {
+            concurrent_count: Arc<AtomicUsize>,
+            max_concurrent: Arc<Mutex<usize>>,
+        }
+
+        #[async_trait::async_trait]
+        impl EventStreamHandler for SlowHandler {
+            async fn handle_event(&mut self, _event: EventMessage) -> Result<(), String> {
+                let current = self.concurrent_count.fetch_add(1, Ordering::SeqCst) + 1;
+
+                // Update max concurrent count
+                let mut max = self.max_concurrent.lock().await;
+                if current > *max {
+                    *max = current;
+                }
+                drop(max); // Explicitly drop before await
+
+                // Simulate slow processing
+                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+                self.concurrent_count.fetch_sub(1, Ordering::SeqCst);
+                Ok(())
+            }
+        }
+
+        let test_env = crate::test::TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let concurrent_count = Arc::new(AtomicUsize::new(0));
+        let max_concurrent = Arc::new(Mutex::new(0));
+
+        let concurrent_count_for_factory = concurrent_count.clone();
+        let max_concurrent_for_factory = max_concurrent.clone();
+
+        // Limit to 2 concurrent streams
+        let max_limit = 2;
+
+        // Spawn server task to accept multiple event streams with concurrency limit
+        let server_conn_clone = server_conn.clone();
+        let server_handle = tokio::spawn(async move {
+            server_conn_clone
+                .accept_event_streams(
+                    move || SlowHandler {
+                        concurrent_count: concurrent_count_for_factory.clone(),
+                        max_concurrent: max_concurrent_for_factory.clone(),
+                    },
+                    Some(max_limit),
+                )
+                .await
+        });
+
+        // Client opens multiple unidirectional streams rapidly
+        let client_handle = tokio::spawn(async move {
+            use bincode::Options;
+
+            for i in 0..5 {
+                let mut send = client_conn.open_uni().await.unwrap();
+
+                // Write protocol header
+                send.write_all(&[0, 0]).await.unwrap();
+
+                // Send test event
+                let event = EventMessage {
+                    time: jiff::Timestamp::now(),
+                    kind: crate::types::EventKind::DnsCovertChannel,
+                    fields: vec![u8::try_from(i).unwrap()],
+                };
+
+                let codec = bincode::DefaultOptions::new();
+                let serialized = codec.serialize(&event).unwrap();
+                #[allow(clippy::cast_possible_truncation)]
+                let len = serialized.len() as u32;
+
+                send.write_all(&len.to_be_bytes()).await.unwrap();
+                send.write_all(&serialized).await.unwrap();
+
+                // Close stream
+                send.finish().ok();
+            }
+
+            // Wait for processing to complete
+            tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+        });
+
+        // Wait for client to finish
+        client_handle.await.unwrap();
+
+        // Give server time to finish processing
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+        // Cancel the server task
+        server_handle.abort();
+
+        // Verify concurrency was limited
+        let max = *max_concurrent.lock().await;
+        assert!(
+            max <= max_limit,
+            "Expected max concurrent <= {max_limit}, got {max}"
+        );
 
         test_env.teardown(&server_conn);
     }

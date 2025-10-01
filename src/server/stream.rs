@@ -213,6 +213,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_recv_event_message_validates_length() {
+        // TODO: Will be implemented in issue #93
         // Test that oversized messages are rejected
         // This would need mock stream implementation
         // The actual test implementation would require creating a mock RecvStream
@@ -221,6 +222,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_process_event_stream_handles_eof() {
+        // TODO: Will be implemented in issue #93
         // Test normal stream termination
         // This would need mock stream implementation
         // The actual test implementation would require creating a mock RecvStream
@@ -229,6 +231,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_process_event_stream_handles_handler_errors() {
+        // TODO: Will be implemented in issue #93
         // Test that handler errors are properly propagated
         // This would need mock stream implementation
         // The actual test implementation would require creating a mock RecvStream

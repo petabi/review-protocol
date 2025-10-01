@@ -180,7 +180,7 @@ pub struct ColumnStatisticsUpdate {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct TimeCount {
-    pub time: chrono::NaiveDateTime,
+    pub time: jiff::civil::DateTime,
     pub count: u64,
 }
 
@@ -261,8 +261,8 @@ pub enum EventKind {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct EventMessage {
-    #[serde(with = "chrono::serde::ts_nanoseconds")]
-    pub time: chrono::DateTime<chrono::Utc>,
+    #[serde(with = "jiff::fmt::serde::timestamp::nanosecond::required")]
+    pub time: jiff::Timestamp,
     pub kind: EventKind,
     #[serde(with = "serde_bytes")]
     pub fields: Vec<u8>,

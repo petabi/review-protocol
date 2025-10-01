@@ -18,6 +18,16 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   deserializes `EventMessage` objects, and calls `EventStreamHandler` trait
   methods appropriately.
 
+### Changed
+
+- Replaced `chrono` with `jiff` for date/time handling. The `jiff` crate
+  provides better maintenance, improved API design, and enhanced timezone
+  handling. This changes the types used in the protocol:
+  - `TimeCount::time` now uses `jiff::civil::DateTime` instead of
+    `chrono::NaiveDateTime`
+  - `EventMessage::time` now uses `jiff::Timestamp` instead of
+    `chrono::DateTime<Utc>`
+
 ## [0.12.1] - 2025-09-25
 
 ### Added

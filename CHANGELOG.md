@@ -17,6 +17,14 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   This function reads raw unidirectional streams, handles protocol framing,
   deserializes `EventMessage` objects, and calls `EventStreamHandler` trait
   methods appropriately.
+- Three new server-side `Connection` methods for handling unidirectional
+  event streams:
+  - `accept_event_stream()` accepts and handles the next unidirectional
+    stream using an `EventStreamHandler`
+  - `handle_event_stream()` processes a specific `RecvStream` with a given
+    handler (useful for testing or advanced use cases)
+  - `accept_event_streams()` continuously accepts multiple unidirectional
+    streams with optional concurrency limiting via semaphore
 
 ### Changed
 

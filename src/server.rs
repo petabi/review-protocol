@@ -309,7 +309,10 @@ pub async fn notify_config_update(conn: &quinn::Connection) -> anyhow::Result<()
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    #[cfg(feature = "server")]
+    use crate::EventStreamHandler;
+    #[cfg(feature = "server")]
+    use crate::types::EventMessage;
 
     #[cfg(feature = "server")]
     struct TestEventHandler {
@@ -356,7 +359,7 @@ mod tests {
         let mut handler = TestEventHandler::new();
 
         let event = EventMessage {
-            time: chrono::Utc::now(),
+            time: jiff::Timestamp::now(),
             kind: EventKind::DnsCovertChannel,
             fields: vec![1, 2, 3, 4],
         };
@@ -398,7 +401,7 @@ mod tests {
 
         let mut handler = FailingHandler;
         let event = EventMessage {
-            time: chrono::Utc::now(),
+            time: jiff::Timestamp::now(),
             kind: EventKind::HttpThreat,
             fields: vec![],
         };

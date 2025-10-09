@@ -104,8 +104,12 @@ pub mod request;
 pub mod server;
 #[cfg(any(feature = "client", feature = "server"))]
 pub mod service_id;
-#[cfg(all(test, any(feature = "client", feature = "server")))]
-mod test;
+#[cfg(any(
+    feature = "test-support",
+    all(test, any(feature = "client", feature = "server"))
+))]
+#[doc(hidden)]
+pub mod test;
 pub mod types;
 
 use std::net::SocketAddr;

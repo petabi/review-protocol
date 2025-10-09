@@ -10,6 +10,89 @@ facilitate efficient and secure communication within the REview ecosystem.
 
 [oinq]: https://github.com/petabi/oinq
 
+## Features
+
+- **Bidirectional Request/Response**: High-level APIs for RPC-style
+  communication
+- **Unidirectional Event Streams**: Efficient handling of event streams from
+  agents with protocol encapsulation
+- **Type-safe Protocol**: Strongly typed message formats with Serde
+  serialization
+- **Connection Management**: Built-in handshake and connection lifecycle
+  management
+- **Error Handling**: Comprehensive error handling with custom recovery options
+
+## Unidirectional Event Stream API
+
+The crate provides a high-level API for handling unidirectional event streams,
+encapsulating protocol details behind a clean trait-based interface.
+
+### Basic Usage
+
+Implement the `EventStreamHandler` trait to process events:
+
+```rust
+use review_protocol::{server::EventStreamHandler, types::EventMessage};
+
+struct MyEventHandler;
+
+#[async_trait::async_trait]
+impl EventStreamHandler for MyEventHandler {
+    async fn handle_event(&mut self, event: EventMessage) -> Result<(), String> {
+        println!("Received event: {:?}", event.kind);
+        Ok(())
+    }
+}
+```
+
+Then handle incoming streams:
+
+```rust
+// Single stream
+connection.accept_event_stream(MyEventHandler).await?;
+
+// Multiple concurrent streams with limit
+connection.accept_event_streams(
+    || MyEventHandler,
+    Some(10)  // Max 10 concurrent streams
+).await?;
+```
+
+For more details, see:
+
+- [API Documentation](src/server.rs) - Comprehensive API documentation with
+  examples
+- [Migration Guide](docs/migration-guide.md) - Guide for migrating from direct
+  stream handling
+- [Example](examples/event_handler.rs) - Complete working example with metrics
+  and error handling
+
+### Integration Tests
+
+Comprehensive integration tests are available in
+`tests/unidirectional_streams.rs`, covering:
+
+- Single and multiple concurrent streams
+- Error handling and recovery
+- Protocol compatibility verification
+- Malformed data handling
+- Large event processing
+- Concurrency limiting
+
+Run tests with:
+
+```bash
+cargo test --features client,server
+```
+
+### Performance Benchmarks
+
+Performance benchmarks are available in `benches/unidirectional_streams.rs`:
+
+```bash
+cargo bench --features client,server
+```
+
 ## License
 
 Copyright 2024-2025 Petabi, Inc.

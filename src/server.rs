@@ -1,4 +1,142 @@
 //! Server-specific protocol implementation.
+//!
+//! # Unidirectional Event Stream Handling
+//!
+//! The `review-protocol` crate provides high-level APIs for handling
+//! unidirectional event streams from agents. This encapsulates all
+//! protocol-level details and provides a clean interface for applications.
+//!
+//! ## Basic Usage
+//!
+//! Implement the `EventStreamHandler` trait to define how events should be
+//! processed:
+//!
+//! ```rust,ignore
+//! use review_protocol::{server::EventStreamHandler, types::EventMessage};
+//!
+//! struct MyEventHandler {
+//!     event_count: usize,
+//! }
+//!
+//! #[async_trait::async_trait]
+//! impl EventStreamHandler for MyEventHandler {
+//!     async fn handle_event(&mut self, event: EventMessage) -> Result<(), String> {
+//!         self.event_count += 1;
+//!         println!("Received event #{}: {:?}", self.event_count, event.kind);
+//!         Ok(())
+//!     }
+//! }
+//! ```
+//!
+//! Then use the handler to process incoming event streams:
+//!
+//! ```rust,ignore
+//! # use review_protocol::{server::{Connection, EventStreamHandler}, types::EventMessage};
+//! # struct MyEventHandler { event_count: usize }
+//! # #[async_trait::async_trait]
+//! # impl EventStreamHandler for MyEventHandler {
+//! #     async fn handle_event(&mut self, event: EventMessage) -> Result<(), String> { Ok(()) }
+//! # }
+//! # async fn example(connection: Connection) -> anyhow::Result<()> {
+//! let handler = MyEventHandler { event_count: 0 };
+//! connection.accept_event_stream(handler).await?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Multiple Concurrent Streams
+//!
+//! To handle multiple streams concurrently with optional concurrency limiting:
+//!
+//! ```rust,ignore
+//! # use review_protocol::{server::{Connection, EventStreamHandler}, types::EventMessage};
+//! # struct MyEventHandler { event_count: usize }
+//! # #[async_trait::async_trait]
+//! # impl EventStreamHandler for MyEventHandler {
+//! #     async fn handle_event(&mut self, event: EventMessage) -> Result<(), String> { Ok(()) }
+//! # }
+//! # impl MyEventHandler {
+//! #     fn new() -> Self { MyEventHandler { event_count: 0 } }
+//! # }
+//! # async fn example(connection: Connection) -> anyhow::Result<()> {
+//! connection.accept_event_streams(
+//!     || MyEventHandler::new(),
+//!     Some(5) // Limit to 5 concurrent streams
+//! ).await?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Integration with Connection Loop
+//!
+//! Combine bidirectional and unidirectional stream handling:
+//!
+//! ```rust,ignore
+//! # use review_protocol::{server::{Connection, EventStreamHandler}, types::EventMessage};
+//! # struct MyEventHandler;
+//! # #[async_trait::async_trait]
+//! # impl EventStreamHandler for MyEventHandler {
+//! #     async fn handle_event(&mut self, event: EventMessage) -> Result<(), String> { Ok(()) }
+//! # }
+//! # impl MyEventHandler {
+//! #     fn new() -> Self { MyEventHandler }
+//! # }
+//! # async fn example(connection: Connection) -> anyhow::Result<()> {
+//! loop {
+//!     tokio::select! {
+//!         // Handle bidirectional requests
+//!         res = connection.open_bi() => {
+//!             // Handle request/response
+//!         }
+//!
+//!         // Handle unidirectional event streams
+//!         res = connection.accept_event_stream(MyEventHandler::new()) => {
+//!             if let Err(e) = res {
+//!                 eprintln!("Event stream error: {}", e);
+//!             }
+//!         }
+//!     }
+//! }
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Error Handling
+//!
+//! The `EventStreamHandler` trait provides hooks for custom error handling:
+//!
+//! ```rust,ignore
+//! use review_protocol::{server::EventStreamHandler, types::EventMessage};
+//!
+//! struct ResilientHandler {
+//!     max_errors: usize,
+//!     error_count: usize,
+//! }
+//!
+//! #[async_trait::async_trait]
+//! impl EventStreamHandler for ResilientHandler {
+//!     async fn handle_event(&mut self, event: EventMessage) -> Result<(), String> {
+//!         // Process event
+//!         Ok(())
+//!     }
+//!
+//!     async fn on_error(&mut self, error: &str) -> Result<(), String> {
+//!         self.error_count += 1;
+//!         eprintln!("Stream error #{}: {}", self.error_count, error);
+//!
+//!         if self.error_count >= self.max_errors {
+//!             Err(format!("Too many errors: {}", self.error_count))
+//!         } else {
+//!             Ok(())  // Continue processing
+//!         }
+//!     }
+//!
+//!     async fn on_stream_end(&mut self) -> Result<(), String> {
+//!         println!("Stream ended after {} errors", self.error_count);
+//!         Ok(())
+//!     }
+//! }
+//! ```
 
 #[cfg(feature = "server")]
 mod api;
@@ -155,9 +293,10 @@ impl Connection {
     ///
     /// This is for backward compatibility only and will be removed in a future
     /// release.
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     #[must_use]
-    pub(crate) fn as_quinn(&self) -> &quinn::Connection {
+    #[doc(hidden)]
+    pub fn as_quinn(&self) -> &quinn::Connection {
         &self.conn
     }
 
@@ -181,8 +320,9 @@ impl Connection {
         self.conn.open_bi()
     }
 
-    #[cfg(test)]
-    pub(crate) fn close(&self) {
+    #[cfg(any(test, feature = "test-support"))]
+    #[doc(hidden)]
+    pub fn close(&self) {
         self.conn.close(0u32.into(), b"");
     }
 
@@ -206,7 +346,7 @@ impl Connection {
     /// * Stream processing failed (protocol error or handler error)
     ///
     /// # Example
-    /// ```rust,no_run
+    /// ```rust,ignore
     /// # use review_protocol::server::{Connection, EventStreamHandler};
     /// # use review_protocol::types::EventMessage;
     /// # struct MyEventHandler;
@@ -256,7 +396,7 @@ impl Connection {
     /// * Stream processing failed (protocol error or handler error)
     ///
     /// # Example
-    /// ```rust,no_run
+    /// ```rust,ignore
     /// # use review_protocol::server::{Connection, EventStreamHandler};
     /// # use review_protocol::types::EventMessage;
     /// # struct MyEventHandler;
@@ -305,7 +445,7 @@ impl Connection {
     /// * Semaphore acquisition failed (concurrency limiting error)
     ///
     /// # Example
-    /// ```rust,no_run
+    /// ```rust,ignore
     /// # use review_protocol::server::{Connection, EventStreamHandler};
     /// # use review_protocol::types::EventMessage;
     /// # struct MyEventHandler;

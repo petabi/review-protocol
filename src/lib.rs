@@ -4,8 +4,9 @@ pub mod frame;
 #[cfg(feature = "client")]
 pub mod request;
 pub mod server;
-#[cfg(all(test, any(feature = "client", feature = "server")))]
-mod test;
+#[cfg(feature = "test-support")]
+#[doc(hidden)]
+pub mod test;
 pub mod types;
 
 use std::net::SocketAddr;

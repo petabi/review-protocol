@@ -396,6 +396,16 @@ impl Connection {
     pub fn accept_bi(&self) -> quinn::AcceptBi<'_> {
         self.connection.accept_bi()
     }
+
+    /// Closes the connection.
+    ///
+    /// This is a helper method for testing and should not be used in production
+    /// code.
+    #[cfg(feature = "test-support")]
+    #[doc(hidden)]
+    pub fn close(&self, error_code: quinn::VarInt, reason: &[u8]) {
+        self.connection.close(error_code, reason);
+    }
 }
 
 /// Sends a handshake request and processes the response.

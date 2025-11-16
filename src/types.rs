@@ -258,6 +258,7 @@ pub enum EventKind {
     BlocklistDhcp,
     TorConnectionConn,
     BlocklistRadius,
+    BlocklistMalformedDns,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -317,6 +318,7 @@ mod tests {
             EventKind::BlocklistDhcp,
             EventKind::TorConnectionConn,
             EventKind::BlocklistRadius,
+            EventKind::BlocklistMalformedDns,
         ];
 
         for kind in test_cases {

@@ -27,6 +27,8 @@ Versioning](https://semver.org/spec/v2.0.0.html).
     streams with optional concurrency limiting via semaphore
 - `BlocklistRadius` variant to `EventKind` enum to support RADIUS blocklist
   events.
+- `BlocklistMalformedDns` variant to `EventKind` enum to support malformed DNS
+  blocklist events.
 
 ### Changed
 

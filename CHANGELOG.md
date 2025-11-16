@@ -25,6 +25,8 @@ Versioning](https://semver.org/spec/v2.0.0.html).
     handler (useful for testing or advanced use cases)
   - `accept_event_streams()` continuously accepts multiple unidirectional
     streams with optional concurrency limiting via semaphore
+- `BlocklistRadius` variant to `EventKind` enum to support RADIUS blocklist
+  events.
 
 ### Changed
 

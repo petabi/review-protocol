@@ -257,6 +257,7 @@ pub enum EventKind {
     BlocklistBootp,
     BlocklistDhcp,
     TorConnectionConn,
+    BlocklistRadius,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -266,4 +267,96 @@ pub struct EventMessage {
     pub kind: EventKind,
     #[serde(with = "serde_bytes")]
     pub fields: Vec<u8>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(any(feature = "client", feature = "server"))]
+    #[test]
+    fn event_kind_serialization_round_trip() {
+        // Test that all EventKind variants can be serialized and deserialized
+        let test_cases = vec![
+            EventKind::DnsCovertChannel,
+            EventKind::HttpThreat,
+            EventKind::RdpBruteForce,
+            EventKind::RepeatedHttpSessions,
+            EventKind::ExtraThreat,
+            EventKind::TorConnection,
+            EventKind::DomainGenerationAlgorithm,
+            EventKind::FtpBruteForce,
+            EventKind::FtpPlainText,
+            EventKind::PortScan,
+            EventKind::MultiHostPortScan,
+            EventKind::NonBrowser,
+            EventKind::LdapBruteForce,
+            EventKind::LdapPlainText,
+            EventKind::ExternalDdos,
+            EventKind::CryptocurrencyMiningPool,
+            EventKind::BlocklistConn,
+            EventKind::BlocklistDns,
+            EventKind::BlocklistDceRpc,
+            EventKind::BlocklistFtp,
+            EventKind::BlocklistHttp,
+            EventKind::BlocklistKerberos,
+            EventKind::BlocklistLdap,
+            EventKind::BlocklistMqtt,
+            EventKind::BlocklistNfs,
+            EventKind::BlocklistNtlm,
+            EventKind::BlocklistRdp,
+            EventKind::BlocklistSmb,
+            EventKind::BlocklistSmtp,
+            EventKind::BlocklistSsh,
+            EventKind::BlocklistTls,
+            EventKind::WindowsThreat,
+            EventKind::NetworkThreat,
+            EventKind::LockyRansomware,
+            EventKind::SuspiciousTlsTraffic,
+            EventKind::BlocklistBootp,
+            EventKind::BlocklistDhcp,
+            EventKind::TorConnectionConn,
+            EventKind::BlocklistRadius,
+        ];
+
+        for kind in test_cases {
+            // Serialize with bincode (used in the protocol)
+            let serialized = bincode::serialize(&kind).expect("serialization should succeed");
+
+            // Deserialize back
+            let deserialized: EventKind =
+                bincode::deserialize(&serialized).expect("deserialization should succeed");
+
+            // Verify round-trip
+            assert_eq!(kind, deserialized, "EventKind {kind:?} failed round-trip");
+        }
+    }
+
+    #[cfg(any(feature = "client", feature = "server"))]
+    #[test]
+    fn event_message_with_blocklist_radius_serialization() {
+        // Test EventMessage with BlocklistRadius variant
+        let event = EventMessage {
+            time: jiff::Timestamp::now(),
+            kind: EventKind::BlocklistRadius,
+            fields: vec![1, 2, 3, 4, 5],
+        };
+
+        // Serialize with bincode (used in the protocol)
+        let serialized = bincode::serialize(&event).expect("serialization should succeed");
+
+        // Deserialize back
+        let deserialized: EventMessage =
+            bincode::deserialize(&serialized).expect("deserialization should succeed");
+
+        // Verify the kind matches
+        assert_eq!(
+            event.kind, deserialized.kind,
+            "EventKind should match after round-trip"
+        );
+        assert_eq!(
+            event.fields, deserialized.fields,
+            "Fields should match after round-trip"
+        );
+    }
 }

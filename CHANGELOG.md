@@ -29,6 +29,8 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   events.
 - `BlocklistMalformedDns` variant to `EventKind` enum to support malformed DNS
   blocklist events.
+- `UnusualDestinationPattern` variant to `EventKind` enum to support detection
+  of unusual destination patterns in network traffic.
 
 ### Changed
 

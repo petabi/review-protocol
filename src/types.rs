@@ -143,6 +143,14 @@ pub enum RuleKind {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct UserAgent {
+    pub name: String,
+    pub header: String,
+    pub kind: RuleKind,
+    pub last_modification_time: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct TiRule {
     pub rule_id: u32,
     pub category: Option<EventCategory>,

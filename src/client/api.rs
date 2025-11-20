@@ -1,11 +1,15 @@
-use std::{collections::HashSet, io};
+use std::{
+    collections::{HashMap, HashSet},
+    io,
+    net::IpAddr,
+};
 
 use serde::{Serialize, de::DeserializeOwned};
 
 use super::Connection;
 use crate::{
     server,
-    types::{DataSource, DataSourceKey, HostNetworkGroup},
+    types::{DataSource, DataSourceKey, HostNetworkGroup, UserAgent},
     unary_request,
 };
 
@@ -333,6 +337,48 @@ impl Connection {
         .await?;
         res.map_err(io::Error::other)
     }
+
+    /// Updates host opened ports information on the server.
+    ///
+    /// # Arguments
+    ///
+    /// * `hosts` - The opened ports information of the host.
+    ///   - Key: IP address of the host
+    ///   - Value: `HashMap` where key is (port number, protocol) and value is
+    ///     timestamp
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response is invalid.
+    pub async fn update_host_ports(
+        &self,
+        hosts: &HashMap<IpAddr, HashMap<(u16, u8), u32>>,
+    ) -> io::Result<()> {
+        let res: Result<(), String> =
+            request(self, server::RequestCode::UpdateHostOpenedPorts, hosts).await?;
+        res.map_err(io::Error::other)
+    }
+
+    /// Updates host OS and agent software information on the server.
+    ///
+    /// # Arguments
+    ///
+    /// * `hosts` - The OS & agent software information of the host.
+    ///   - First element: IP address of the host
+    ///   - Second element: Vector of `UserAgent` information
+    ///   - Third element: Vector of OS information strings
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response is invalid.
+    pub async fn update_host_user_agents(
+        &self,
+        hosts: &[(IpAddr, Vec<UserAgent>, Vec<String>)],
+    ) -> io::Result<()> {
+        let res: Result<(), String> =
+            request(self, server::RequestCode::UpdateHostOsAgents, hosts).await?;
+        res.map_err(io::Error::other)
+    }
 }
 
 async fn request<I, O>(conn: &Connection, code: server::RequestCode, input: I) -> io::Result<O>
@@ -347,6 +393,8 @@ where
 #[cfg(all(test, feature = "server"))]
 mod tests {
     #![allow(clippy::unwrap_used)]
+
+    use std::collections::HashMap;
 
     use crate::{
         server::handle,
@@ -686,6 +734,51 @@ mod tests {
             assert_eq!(outliers[0].1, vec![1, 2, 3]);
             assert_eq!(outliers[1].0, "sensor2");
             assert_eq!(outliers[1].1, vec![4, 5, 6]);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn update_host_ports() {
+        run_test(|client_conn| async move {
+            let mut hosts = HashMap::new();
+            let mut ports = HashMap::new();
+            ports.insert((80, 6), 1_234_567_890); // port 80, protocol 6 (TCP), timestamp
+            ports.insert((443, 6), 1_234_567_891);
+            hosts.insert("192.168.1.100".parse().unwrap(), ports);
+
+            let client_res = client_conn.update_host_ports(&hosts).await;
+            assert!(client_res.is_ok());
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn update_host_user_agents() {
+        run_test(|client_conn| async move {
+            use crate::types::{RuleKind, UserAgent};
+
+            let user_agents = vec![
+                UserAgent {
+                    name: "Chrome".to_string(),
+                    header: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)".to_string(),
+                    kind: RuleKind::AgentSoftware,
+                    last_modification_time: 1_234_567_890,
+                },
+                UserAgent {
+                    name: "Firefox".to_string(),
+                    header: "Mozilla/5.0 (X11; Linux x86_64)".to_string(),
+                    kind: RuleKind::AgentSoftware,
+                    last_modification_time: 1_234_567_891,
+                },
+            ];
+
+            let os_info = vec!["Windows 10".to_string(), "Linux Ubuntu 20.04".to_string()];
+
+            let hosts = vec![("192.168.1.100".parse().unwrap(), user_agents, os_info)];
+
+            let client_res = client_conn.update_host_user_agents(&hosts).await;
+            assert!(client_res.is_ok());
         })
         .await;
     }

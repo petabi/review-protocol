@@ -128,6 +128,8 @@ pub(crate) enum RequestCode {
     GetPretrainedModel = 34,
     GetTrustedUserAgentList = 35,
     GetConfig = 36,
+    UpdateHostOpenedPorts = 37,
+    UpdateHostOsAgents = 38,
 
     /// Unknown request
     #[num_enum(default)]

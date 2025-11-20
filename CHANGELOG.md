@@ -5,6 +5,23 @@ file is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and
 this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- New client-side APIs to send host information update requests to the server:
+  - `Connection::update_host_ports` updates host opened ports information
+  - `Connection::update_host_user_agents` updates host OS and agent software
+    information
+- New server-side APIs to handle host information update requests from clients:
+  - `Handler::update_host_ports` handles host opened ports update requests
+  - `Handler::update_host_user_agents` handles host OS and agent software
+    update requests
+- `UserAgent` struct to represent user agent information with name, header,
+  kind, and last modification time
+- `UpdateHostOpenedPorts` and `UpdateHostOsAgents` request codes to support
+  host information updates
+
 ## [0.13.0] - 2025-11-16
 
 ### Added
@@ -441,6 +458,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - `client::handshake` implements the application-level handshake process for the
   client after a QUIC connection is established.
 
+[Unreleased]: https://github.com/petabi/review-protocol/compare/0.13.0...main
 [0.13.0]: https://github.com/petabi/review-protocol/compare/0.12.1...0.13.0
 [0.12.1]: https://github.com/petabi/review-protocol/compare/0.12.0...0.12.1
 [0.12.0]: https://github.com/petabi/review-protocol/compare/0.11.0...0.12.0

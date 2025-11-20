@@ -1,6 +1,10 @@
 //! Requset handler for the server.
 
-use std::{collections::HashSet, io};
+use std::{
+    collections::{HashMap, HashSet},
+    io,
+    net::IpAddr,
+};
 
 use num_enum::FromPrimitive;
 use oinq::request::parse_args;
@@ -8,7 +12,7 @@ use oinq::request::parse_args;
 use super::RequestCode;
 use crate::types::{
     ColumnStatisticsUpdate, DataSource, DataSourceKey, EventMessage, HostNetworkGroup, OutlierInfo,
-    Tidb, TimeSeriesUpdate, UpdateClusterRequest,
+    Tidb, TimeSeriesUpdate, UpdateClusterRequest, UserAgent,
 };
 
 /// A request handler that can handle a request to the server.
@@ -140,6 +144,20 @@ pub trait Handler {
         _outliers: &[OutlierInfo],
         _model_id: u32,
         _timestamp: i64,
+    ) -> Result<(), String> {
+        Err("not supported".to_string())
+    }
+
+    async fn update_host_ports(
+        &self,
+        _hosts: &HashMap<IpAddr, HashMap<(u16, u8), u32>>,
+    ) -> Result<(), String> {
+        Err("not supported".to_string())
+    }
+
+    async fn update_host_user_agents(
+        &self,
+        _hosts: &[(IpAddr, Vec<UserAgent>, Vec<String>)],
     ) -> Result<(), String> {
         Err("not supported".to_string())
     }
@@ -302,6 +320,16 @@ where
                 let result = handler
                     .update_outliers(&outliers, model_id, timestamp)
                     .await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::UpdateHostOpenedPorts => {
+                let hosts = parse_args::<HashMap<IpAddr, HashMap<(u16, u8), u32>>>(body)?;
+                let result = handler.update_host_ports(&hosts).await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::UpdateHostOsAgents => {
+                let hosts = parse_args::<Vec<(IpAddr, Vec<UserAgent>, Vec<String>)>>(body)?;
+                let result = handler.update_host_user_agents(&hosts).await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::Unknown => {

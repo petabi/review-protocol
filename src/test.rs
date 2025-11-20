@@ -447,4 +447,18 @@ impl crate::server::Handler for TestServerHandler {
             Ok(vec![])
         }
     }
+
+    async fn update_host_ports(
+        &self,
+        _hosts: &std::collections::HashMap<IpAddr, std::collections::HashMap<(u16, u8), u32>>,
+    ) -> Result<(), String> {
+        Ok(())
+    }
+
+    async fn update_host_user_agents(
+        &self,
+        _hosts: &[(IpAddr, Vec<crate::types::UserAgent>, Vec<String>)],
+    ) -> Result<(), String> {
+        Ok(())
+    }
 }

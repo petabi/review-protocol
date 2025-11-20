@@ -7,6 +7,21 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- New client-side APIs to send host information update requests to the server:
+  - `Connection::update_host_ports` updates host opened ports information
+  - `Connection::update_host_user_agents` updates host OS and agent software
+    information
+- New server-side APIs to handle host information update requests from clients:
+  - `Handler::update_host_ports` handles host opened ports update requests
+  - `Handler::update_host_user_agents` handles host OS and agent software
+    update requests
+- `UserAgent` struct to represent user agent information with name, header,
+  kind, and last modification time
+- `UpdateHostOpenedPorts` and `UpdateHostOsAgents` request codes to support
+  host information updates
+
 ### Changed
 
 - Changed `model_id` parameter type from `i32` to `u32` in the `Handler` trait
@@ -460,22 +475,24 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 [Unreleased]: https://github.com/petabi/review-protocol/compare/0.14.0...main
 [0.14.0]: https://github.com/petabi/review-protocol/compare/0.13.0...0.14.0
-[0.13.0]: https://github.com/petabi/review-protocol/compare/0.12.1...0.13.0
-[0.12.1]: https://github.com/petabi/review-protocol/compare/0.12.0...0.12.1
-[0.12.0]: https://github.com/petabi/review-protocol/compare/0.11.0...0.12.0
-[0.11.0]: https://github.com/petabi/review-protocol/compare/0.10.0...0.11.0
-[0.10.0]: https://github.com/petabi/review-protocol/compare/0.9.0...0.10.0
-[0.9.0]: https://github.com/petabi/review-protocol/compare/0.8.1...0.9.0
-[0.8.1]: https://github.com/petabi/review-protocol/compare/0.8.0...0.8.1
-[0.8.0]: https://github.com/petabi/review-protocol/compare/0.7.0...0.8.0
-[0.7.0]: https://github.com/petabi/review-protocol/compare/0.6.0...0.7.0
-[0.6.0]: https://github.com/petabi/review-protocol/compare/0.5.0...0.6.0
-[0.5.0]: https://github.com/petabi/review-protocol/compare/0.4.2...0.5.0
-[0.4.2]: https://github.com/petabi/review-protocol/compare/0.4.1...0.4.2
-[0.4.1]: https://github.com/petabi/review-protocol/compare/0.4.0...0.4.1
-[0.4.0]: https://github.com/petabi/review-protocol/compare/0.3.0...0.4.0
-[0.3.0]: https://github.com/petabi/review-protocol/compare/0.2.0...0.3.0
-[0.2.0]: https://github.com/petabi/review-protocol/compare/0.1.2...0.2.0
-[0.1.2]: https://github.com/petabi/review-protocol/compare/0.1.1...0.1.2
-[0.1.1]: https://github.com/petabi/review-protocol/compare/0.1.0...0.1.1
-[0.1.0]: https://github.com/petabi/review-protocol/tree/0.1.0
+||||||| parent of bdac28b (Add APIs for host info updates)
+[Unreleased]: <https://github.com/petabi/review-protocol/compare/0.13.0...main>
+[0.13.0]: <https://github.com/petabi/review-protocol/compare/0.12.1...0.13.0>
+[0.12.1]: <https://github.com/petabi/review-protocol/compare/0.12.0...0.12.1>
+[0.12.0]: <https://github.com/petabi/review-protocol/compare/0.11.0...0.12.0>
+[0.11.0]: <https://github.com/petabi/review-protocol/compare/0.10.0...0.11.0>
+[0.10.0]: <https://github.com/petabi/review-protocol/compare/0.9.0...0.10.0>
+[0.9.0]: <https://github.com/petabi/review-protocol/compare/0.8.1...0.9.0>
+[0.8.1]: <https://github.com/petabi/review-protocol/compare/0.8.0...0.8.1>
+[0.8.0]: <https://github.com/petabi/review-protocol/compare/0.7.0...0.8.0>
+[0.7.0]: <https://github.com/petabi/review-protocol/compare/0.6.0...0.7.0>
+[0.6.0]: <https://github.com/petabi/review-protocol/compare/0.5.0...0.6.0>
+[0.5.0]: <https://github.com/petabi/review-protocol/compare/0.4.2...0.5.0>
+[0.4.2]: <https://github.com/petabi/review-protocol/compare/0.4.1...0.4.2>
+[0.4.1]: <https://github.com/petabi/review-protocol/compare/0.4.0...0.4.1>
+[0.4.0]: <https://github.com/petabi/review-protocol/compare/0.3.0...0.4.0>
+[0.3.0]: <https://github.com/petabi/review-protocol/compare/0.2.0...0.3.0>
+[0.2.0]: <https://github.com/petabi/review-protocol/compare/0.1.2...0.2.0>
+[0.1.2]: <https://github.com/petabi/review-protocol/compare/0.1.1...0.1.2>
+[0.1.1]: <https://github.com/petabi/review-protocol/compare/0.1.0...0.1.1>
+[0.1.0]: <https://github.com/petabi/review-protocol/tree/0.1.0>

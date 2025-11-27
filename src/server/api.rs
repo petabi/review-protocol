@@ -1,5 +1,4 @@
 use anyhow::anyhow;
-use bincode::Options;
 use oinq::frame;
 
 use super::Connection;
@@ -157,11 +156,14 @@ impl Connection {
         request_code: client::RequestCode,
         payload: &T,
     ) -> anyhow::Result<S> {
-        let Ok(mut buf) = bincode::serialize::<u32>(&request_code.into()) else {
+        let code: u32 = request_code.into();
+        let Ok(mut buf) = bincode::serde::encode_to_vec(
+            code,
+            bincode::config::standard().with_fixed_int_encoding(),
+        ) else {
             unreachable!("serialization of u32 into memory buffer should not fail")
         };
-        let ser = bincode::DefaultOptions::new();
-        buf.extend(ser.serialize(payload)?);
+        bincode::serde::encode_into_std_write(payload, &mut buf, bincode::config::standard())?;
 
         let (mut send, mut recv) = self.conn.open_bi().await?;
         frame::send_raw(&mut send, &buf).await?;

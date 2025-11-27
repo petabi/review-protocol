@@ -486,7 +486,10 @@ pub async fn send_trusted_domain_list(
 pub async fn notify_config_update(conn: &quinn::Connection) -> anyhow::Result<()> {
     use anyhow::anyhow;
 
-    let Ok(msg) = bincode::serialize::<u32>(&client::RequestCode::UpdateConfig.into()) else {
+    let code: u32 = client::RequestCode::UpdateConfig.into();
+    let Ok(msg) =
+        bincode::serde::encode_to_vec(code, bincode::config::standard().with_fixed_int_encoding())
+    else {
         unreachable!("serialization of u32 into memory buffer should not fail")
     };
 
@@ -729,8 +732,6 @@ mod tests {
 
         // Client opens unidirectional stream and sends events
         let client_handle = tokio::spawn(async move {
-            use bincode::Options;
-
             let mut send = client_conn.open_uni().await.unwrap();
 
             // Write protocol header
@@ -743,8 +744,8 @@ mod tests {
                 fields: vec![1, 2, 3, 4],
             };
 
-            let codec = bincode::DefaultOptions::new();
-            let serialized = codec.serialize(&event).unwrap();
+            let codec = bincode::config::standard();
+            let serialized = bincode::serde::encode_to_vec(&event, codec).unwrap();
             #[allow(clippy::cast_possible_truncation)]
             let len = serialized.len() as u32;
 
@@ -806,8 +807,6 @@ mod tests {
 
         // Client opens unidirectional stream and sends events
         let client_handle = tokio::spawn(async move {
-            use bincode::Options;
-
             let mut send = client_conn.open_uni().await.unwrap();
 
             // Write protocol header
@@ -820,8 +819,8 @@ mod tests {
                 fields: vec![5, 6, 7],
             };
 
-            let codec = bincode::DefaultOptions::new();
-            let serialized = codec.serialize(&event).unwrap();
+            let codec = bincode::config::standard();
+            let serialized = bincode::serde::encode_to_vec(&event, codec).unwrap();
             #[allow(clippy::cast_possible_truncation)]
             let len = serialized.len() as u32;
 
@@ -891,8 +890,6 @@ mod tests {
 
         // Client opens multiple unidirectional streams
         let client_handle = tokio::spawn(async move {
-            use bincode::Options;
-
             for i in 0..3 {
                 let mut send = client_conn.open_uni().await.unwrap();
 
@@ -906,8 +903,8 @@ mod tests {
                     fields: vec![u8::try_from(i).unwrap()],
                 };
 
-                let codec = bincode::DefaultOptions::new();
-                let serialized = codec.serialize(&event).unwrap();
+                let codec = bincode::config::standard();
+                let serialized = bincode::serde::encode_to_vec(&event, codec).unwrap();
                 #[allow(clippy::cast_possible_truncation)]
                 let len = serialized.len() as u32;
 
@@ -1003,8 +1000,6 @@ mod tests {
 
         // Client opens multiple unidirectional streams rapidly
         let client_handle = tokio::spawn(async move {
-            use bincode::Options;
-
             for i in 0..5 {
                 let mut send = client_conn.open_uni().await.unwrap();
 
@@ -1018,8 +1013,8 @@ mod tests {
                     fields: vec![u8::try_from(i).unwrap()],
                 };
 
-                let codec = bincode::DefaultOptions::new();
-                let serialized = codec.serialize(&event).unwrap();
+                let codec = bincode::config::standard();
+                let serialized = bincode::serde::encode_to_vec(&event, codec).unwrap();
                 #[allow(clippy::cast_possible_truncation)]
                 let len = serialized.len() as u32;
 

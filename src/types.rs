@@ -325,11 +325,18 @@ mod tests {
 
         for kind in test_cases {
             // Serialize with bincode (used in the protocol)
-            let serialized = bincode::serialize(&kind).expect("serialization should succeed");
+            let serialized = bincode::serde::encode_to_vec(
+                kind,
+                bincode::config::standard().with_fixed_int_encoding(),
+            )
+            .expect("serialization should succeed");
 
             // Deserialize back
-            let deserialized: EventKind =
-                bincode::deserialize(&serialized).expect("deserialization should succeed");
+            let (deserialized, _len): (EventKind, usize) = bincode::serde::decode_from_slice(
+                &serialized,
+                bincode::config::standard().with_fixed_int_encoding(),
+            )
+            .expect("deserialization should succeed");
 
             // Verify round-trip
             assert_eq!(kind, deserialized, "EventKind {kind:?} failed round-trip");
@@ -347,11 +354,18 @@ mod tests {
         };
 
         // Serialize with bincode (used in the protocol)
-        let serialized = bincode::serialize(&event).expect("serialization should succeed");
+        let serialized = bincode::serde::encode_to_vec(
+            &event,
+            bincode::config::standard().with_fixed_int_encoding(),
+        )
+        .expect("serialization should succeed");
 
         // Deserialize back
-        let deserialized: EventMessage =
-            bincode::deserialize(&serialized).expect("deserialization should succeed");
+        let (deserialized, _len): (EventMessage, usize) = bincode::serde::decode_from_slice(
+            &serialized,
+            bincode::config::standard().with_fixed_int_encoding(),
+        )
+        .expect("deserialization should succeed");
 
         // Verify the kind matches
         assert_eq!(

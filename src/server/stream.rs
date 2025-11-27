@@ -3,11 +3,9 @@
 use std::io;
 
 use anyhow::{Context, Result};
-use bincode::Options;
 use quinn::RecvStream;
 
 use self::super::EventStreamHandler;
-use crate::types::EventMessage;
 
 /// Processes a unidirectional event stream with the given handler
 ///
@@ -47,7 +45,7 @@ where
         .context("failed to read protocol header")?;
 
     // Setup for message processing
-    let codec = bincode::DefaultOptions::new();
+    let codec = bincode::config::standard();
     let mut message_buf = Vec::new();
 
     // Process messages until stream ends
@@ -56,8 +54,8 @@ where
         match recv_event_message(&mut recv, &mut message_buf).await {
             Ok(()) => {
                 // Deserialize and handle message
-                match codec.deserialize::<EventMessage>(&message_buf) {
-                    Ok(msg) => {
+                match bincode::serde::borrow_decode_from_slice(&message_buf, codec) {
+                    Ok((msg, _len)) => {
                         if let Err(e) = handler.handle_event(msg).await {
                             return Err(anyhow::anyhow!("handler error: {e}"));
                         }
@@ -159,6 +157,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     use super::*;
+    use crate::types::EventMessage;
 
     // Mock handler for testing
     struct TestHandler {

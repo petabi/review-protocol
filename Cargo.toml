@@ -33,7 +33,7 @@ bincode = { version = "1", optional = true }
 ipnet = { version = "2", features = ["serde"] }
 jiff = { version = "0.2.15", features = ["serde"] }
 num_enum = { version = "0.7" }
-oinq = { git = "https://github.com/petabi/oinq.git", tag = "0.13.0", optional = true }
+oinq = { git = "https://github.com/petabi/oinq.git", tag = "0.13.1", optional = true }
 quinn = { version = "0.11", optional = true }
 rustls = { version = "0.23", default-features = false, optional = true }
 rustls-pemfile = { version = "2", optional = true }
@@ -41,25 +41,18 @@ semver = { version = "1", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_bytes = "0.11.19"
 serde_repr = "0.1.19"
-structured = "0.15.0"
+structured = "0.16.0"
 thiserror = { version = "2", optional = true }
 tokio = { version = "1", features = ["sync"], optional = true }
 
 [dev-dependencies]
 quinn = { version = "0.11", features = ["ring"] }
-rcgen = "0.13"
+rcgen = "0.14"
 rustls = { version = "0.23", default-features = false, features = [
   "ring",
   "std",
 ] }
 tokio = { version = "1", features = ["macros", "rt"] }
-
-# Not directly used by review-protocol, but added to avoid rcgen using time-0.3.40.
-# time-0.3.40 causes the following clippy error:
-# https://github.com/petabi/review-protocol/actions/runs/14022787817/job/39256916777
-[dev-dependencies.time]
-version = "=0.3.39"
-default-features = false
 
 [lints.clippy]
 pedantic = "warn"

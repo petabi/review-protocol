@@ -13,6 +13,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   methods: `get_outliers`, `insert_column_statistics`, `insert_event_labels`,
   `insert_time_series`, `update_clusters`, and `update_outliers`. This change
   is also reflected in the corresponding client API methods.
+- Changed `UpdateClusterRequest::cluster_id` field type from `String` to `i32`.
 
 ## [0.14.0] - 2025-11-27
 

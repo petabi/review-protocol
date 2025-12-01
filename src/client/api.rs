@@ -600,7 +600,7 @@ mod tests {
     async fn update_clusters() {
         run_test(|client_conn| async move {
             let data = vec![crate::types::UpdateClusterRequest {
-                cluster_id: "test-cluster".to_string(),
+                cluster_id: 1,
                 detector_id: 1,
                 signature: "test-sig".to_string(),
                 score: Some(0.5),

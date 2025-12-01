@@ -554,7 +554,7 @@ mod tests {
     async fn insert_column_statistics() {
         run_test(|client_conn| async move {
             let data = vec![crate::types::ColumnStatisticsUpdate {
-                cluster_id: "test-cluster".to_string(),
+                cluster_id: 1,
                 column_statistics: vec![],
             }];
             let client_res = client_conn.insert_column_statistics(&data, 1, 1000).await;

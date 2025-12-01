@@ -174,7 +174,7 @@ pub enum Status {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ColumnStatisticsUpdate {
-    pub cluster_id: String,
+    pub cluster_id: u32,
     pub column_statistics: Vec<ColumnStatistics>,
 }
 

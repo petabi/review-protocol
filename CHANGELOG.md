@@ -14,6 +14,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   `insert_time_series`, `update_clusters`, and `update_outliers`. This change
   is also reflected in the corresponding client API methods.
 - Changed `UpdateClusterRequest::cluster_id` field type from `String` to `i32`.
+- Changed `ColumnStatisticsUpdate::cluster_id` field type from `String` to `u32`.
 
 ## [0.14.0] - 2025-11-27
 

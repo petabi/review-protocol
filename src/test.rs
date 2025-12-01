@@ -373,7 +373,7 @@ impl crate::server::Handler for TestServerHandler {
     async fn insert_column_statistics(
         &self,
         _statistics: &[crate::types::ColumnStatisticsUpdate],
-        _model_id: i32,
+        _model_id: u32,
         _batch_ts: i64,
     ) -> Result<(), String> {
         Ok(())
@@ -386,7 +386,7 @@ impl crate::server::Handler for TestServerHandler {
     async fn insert_time_series(
         &self,
         _time_series: &[crate::types::TimeSeriesUpdate],
-        _model_id: i32,
+        _model_id: u32,
         _batch_ts: i64,
     ) -> Result<(), String> {
         Ok(())
@@ -399,7 +399,7 @@ impl crate::server::Handler for TestServerHandler {
     async fn update_clusters(
         &self,
         _input: &[crate::types::UpdateClusterRequest],
-        _model_id: i32,
+        _model_id: u32,
     ) -> Result<(), String> {
         Ok(())
     }
@@ -411,7 +411,7 @@ impl crate::server::Handler for TestServerHandler {
     async fn update_outliers(
         &self,
         _outliers: &[crate::types::OutlierInfo],
-        _model_id: i32,
+        _model_id: u32,
         _timestamp: i64,
     ) -> Result<(), String> {
         Ok(())
@@ -419,7 +419,7 @@ impl crate::server::Handler for TestServerHandler {
 
     async fn insert_event_labels(
         &self,
-        _model_id: i32,
+        _model_id: u32,
         _round: u32,
         _event_labels: &[crate::types::EventMessage],
     ) -> Result<(), String> {
@@ -435,7 +435,7 @@ impl crate::server::Handler for TestServerHandler {
 
     async fn get_outliers(
         &self,
-        model_id: i32,
+        model_id: u32,
         _timestamp: i64,
     ) -> Result<Vec<(String, Vec<i64>)>, String> {
         if model_id == 10 {

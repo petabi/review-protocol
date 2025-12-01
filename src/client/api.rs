@@ -178,7 +178,7 @@ impl Connection {
     pub async fn insert_column_statistics(
         &self,
         statistics: &[crate::types::ColumnStatisticsUpdate],
-        model_id: i32,
+        model_id: u32,
         batch_ts: i64,
     ) -> io::Result<()> {
         let res: Result<(), String> = request(
@@ -209,7 +209,7 @@ impl Connection {
     pub async fn insert_time_series(
         &self,
         time_series: &[crate::types::TimeSeriesUpdate],
-        model_id: i32,
+        model_id: u32,
         batch_ts: i64,
     ) -> io::Result<()> {
         let res: Result<(), String> = request(
@@ -239,7 +239,7 @@ impl Connection {
     pub async fn update_clusters(
         &self,
         input: &[crate::types::UpdateClusterRequest],
-        model_id: i32,
+        model_id: u32,
     ) -> io::Result<()> {
         let res: Result<(), String> = request(
             self,
@@ -269,7 +269,7 @@ impl Connection {
     pub async fn update_outliers(
         &self,
         outliers: &[crate::types::OutlierInfo],
-        model_id: i32,
+        model_id: u32,
         timestamp: i64,
     ) -> io::Result<()> {
         let res: Result<(), String> = request(
@@ -288,7 +288,7 @@ impl Connection {
     /// Returns an error if the request fails or the response is invalid.
     pub async fn insert_event_labels(
         &self,
-        model_id: i32,
+        model_id: u32,
         round: u32,
         event_labels: &[crate::types::EventMessage],
     ) -> io::Result<()> {
@@ -322,7 +322,7 @@ impl Connection {
     /// Returns an error if the request fails or the response is invalid.
     pub async fn get_outliers(
         &self,
-        model_id: i32,
+        model_id: u32,
         timestamp: i64,
     ) -> io::Result<Vec<(String, Vec<i64>)>> {
         let res: Result<Vec<(String, Vec<i64>)>, String> = request(

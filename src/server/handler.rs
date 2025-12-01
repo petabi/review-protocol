@@ -51,7 +51,7 @@ pub trait Handler {
 
     async fn get_outliers(
         &self,
-        _model_id: i32,
+        _model_id: u32,
         _timestamp: i64,
     ) -> Result<Vec<(String, Vec<i64>)>, String> {
         Err("not supported".to_string())
@@ -83,7 +83,7 @@ pub trait Handler {
     async fn insert_column_statistics(
         &self,
         _statistics: &[ColumnStatisticsUpdate],
-        _model_id: i32,
+        _model_id: u32,
         _batch_ts: i64,
     ) -> Result<(), String> {
         Err("not supported".to_string())
@@ -95,7 +95,7 @@ pub trait Handler {
 
     async fn insert_event_labels(
         &self,
-        _model_id: i32,
+        _model_id: u32,
         _round: u32,
         _event_labels: &[EventMessage],
     ) -> Result<(), String> {
@@ -109,7 +109,7 @@ pub trait Handler {
     async fn insert_time_series(
         &self,
         _time_series: &[TimeSeriesUpdate],
-        _model_id: i32,
+        _model_id: u32,
         _batch_ts: i64,
     ) -> Result<(), String> {
         Err("not supported".to_string())
@@ -126,7 +126,7 @@ pub trait Handler {
     async fn update_clusters(
         &self,
         _input: &[UpdateClusterRequest],
-        _model_id: i32,
+        _model_id: u32,
     ) -> Result<(), String> {
         Err("not supported".to_string())
     }
@@ -138,7 +138,7 @@ pub trait Handler {
     async fn update_outliers(
         &self,
         _outliers: &[OutlierInfo],
-        _model_id: i32,
+        _model_id: u32,
         _timestamp: i64,
     ) -> Result<(), String> {
         Err("not supported".to_string())
@@ -236,7 +236,7 @@ where
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::GetOutliers => {
-                let (model_id, timestamp) = parse_args::<(i32, i64)>(body)?;
+                let (model_id, timestamp) = parse_args::<(u32, i64)>(body)?;
                 let result = handler.get_outliers(model_id, timestamp).await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
@@ -247,7 +247,7 @@ where
             }
             RequestCode::InsertColumnStatistics => {
                 let (statistics, model_id, batch_ts) =
-                    parse_args::<(Vec<ColumnStatisticsUpdate>, i32, i64)>(body)?;
+                    parse_args::<(Vec<ColumnStatisticsUpdate>, u32, i64)>(body)?;
                 let result = handler
                     .insert_column_statistics(&statistics, model_id, batch_ts)
                     .await;
@@ -260,7 +260,7 @@ where
             }
             RequestCode::InsertEventLabels => {
                 let (model_id, round, event_labels) =
-                    parse_args::<(i32, u32, Vec<EventMessage>)>(body)?;
+                    parse_args::<(u32, u32, Vec<EventMessage>)>(body)?;
                 let result = handler
                     .insert_event_labels(model_id, round, &event_labels)
                     .await;
@@ -272,7 +272,7 @@ where
             }
             RequestCode::InsertTimeSeries => {
                 let (time_series, model_id, batch_ts) =
-                    parse_args::<(Vec<TimeSeriesUpdate>, i32, i64)>(body)?;
+                    parse_args::<(Vec<TimeSeriesUpdate>, u32, i64)>(body)?;
                 let result = handler
                     .insert_time_series(&time_series, model_id, batch_ts)
                     .await;
@@ -288,7 +288,7 @@ where
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::UpdateClusters => {
-                let (input, model_id) = parse_args::<(Vec<UpdateClusterRequest>, i32)>(body)?;
+                let (input, model_id) = parse_args::<(Vec<UpdateClusterRequest>, u32)>(body)?;
                 let result = handler.update_clusters(&input, model_id).await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
@@ -298,7 +298,7 @@ where
             }
             RequestCode::UpdateOutliers => {
                 let (outliers, model_id, timestamp) =
-                    parse_args::<(Vec<OutlierInfo>, i32, i64)>(body)?;
+                    parse_args::<(Vec<OutlierInfo>, u32, i64)>(body)?;
                 let result = handler
                     .update_outliers(&outliers, model_id, timestamp)
                     .await;

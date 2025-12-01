@@ -102,7 +102,7 @@ pub trait Handler {
         Err("not supported".to_string())
     }
 
-    async fn insert_model(&self, _model: &[u8]) -> Result<i32, String> {
+    async fn insert_model(&self, _model: &[u8]) -> Result<u32, String> {
         Err("not supported".to_string())
     }
 
@@ -131,7 +131,7 @@ pub trait Handler {
         Err("not supported".to_string())
     }
 
-    async fn update_model(&self, _model: &[u8]) -> Result<i32, String> {
+    async fn update_model(&self, _model: &[u8]) -> Result<u32, String> {
         Err("not supported".to_string())
     }
 

@@ -195,8 +195,8 @@ impl Connection {
     /// # Errors
     ///
     /// Returns an error if the request fails or the response is invalid.
-    pub async fn insert_model(&self, model: &[u8]) -> io::Result<i32> {
-        let res: Result<i32, String> =
+    pub async fn insert_model(&self, model: &[u8]) -> io::Result<u32> {
+        let res: Result<u32, String> =
             request(self, server::RequestCode::InsertModel, model).await?;
         res.map_err(io::Error::other)
     }
@@ -255,8 +255,8 @@ impl Connection {
     /// # Errors
     ///
     /// Returns an error if the request fails or the response is invalid.
-    pub async fn update_model(&self, model: &[u8]) -> io::Result<i32> {
-        let res: Result<i32, String> =
+    pub async fn update_model(&self, model: &[u8]) -> io::Result<u32> {
+        let res: Result<u32, String> =
             request(self, server::RequestCode::UpdateModel, model).await?;
         res.map_err(io::Error::other)
     }

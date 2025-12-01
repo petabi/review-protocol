@@ -379,7 +379,7 @@ impl crate::server::Handler for TestServerHandler {
         Ok(())
     }
 
-    async fn insert_model(&self, _model: &[u8]) -> Result<i32, String> {
+    async fn insert_model(&self, _model: &[u8]) -> Result<u32, String> {
         Ok(42)
     }
 
@@ -404,7 +404,7 @@ impl crate::server::Handler for TestServerHandler {
         Ok(())
     }
 
-    async fn update_model(&self, _model: &[u8]) -> Result<i32, String> {
+    async fn update_model(&self, _model: &[u8]) -> Result<u32, String> {
         Ok(55)
     }
 

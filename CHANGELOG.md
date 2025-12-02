@@ -63,6 +63,18 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   blocklist events.
 - `UnusualDestinationPattern` variant to `EventKind` enum to support detection
   of unusual destination patterns in network traffic.
+- Comprehensive integration tests in `tests/unidirectional_streams.rs`
+  covering protocol compatibility, error handling, concurrent streams, and
+  edge cases
+- Performance benchmarks in `benches/unidirectional_streams.rs` for measuring
+  event throughput, event sizes, concurrent streams, and deserialization
+  overhead
+- Complete working example in `examples/event_handler.rs` demonstrating event
+  handler implementation with metrics collection and error handling
+- Migration guide in `docs/migration-guide.md` to help applications migrate
+  from direct stream handling to the encapsulated API
+- Enhanced API documentation with usage examples for single streams, multiple
+  concurrent streams, and integration patterns
 
 ### Changed
 

@@ -25,6 +25,8 @@ server = [
   "tokio",
 ]
 tokio = ["dep:tokio"]
+test-support = ["client", "server", "rcgen", "tokio/rt-multi-thread"]
+rcgen = ["dep:rcgen"]
 
 [dependencies]
 anyhow = { version = "1", optional = true }
@@ -35,6 +37,7 @@ jiff = { version = "0.2.15", features = ["serde"] }
 num_enum = { version = "0.7" }
 oinq = { git = "https://github.com/petabi/oinq.git", tag = "0.13.1", optional = true }
 quinn = { version = "0.11", optional = true }
+rcgen = { version = "0.13", optional = true }
 rustls = { version = "0.23", default-features = false, optional = true }
 rustls-pemfile = { version = "2", optional = true }
 semver = { version = "1", optional = true }
@@ -46,13 +49,24 @@ thiserror = { version = "2", optional = true }
 tokio = { version = "1", features = ["sync"], optional = true }
 
 [dev-dependencies]
+criterion = "0.7.0"
 quinn = { version = "0.11", features = ["ring"] }
-rcgen = "0.14"
+rcgen = "0.13"
 rustls = { version = "0.23", default-features = false, features = [
   "ring",
   "std",
 ] }
 tokio = { version = "1", features = ["macros", "rt"] }
+tokio-test = "0.4.4"
+
+[[bench]]
+name = "unidirectional_streams"
+harness = false
+required-features = ["test-support"]
+
+[[example]]
+name = "event_handler"
+required-features = ["test-support"]
 
 [lints.clippy]
 pedantic = "warn"

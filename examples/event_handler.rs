@@ -8,7 +8,14 @@
 //! - Multiple concurrent stream handling
 //! - Integration with a connection loop
 //!
-//! Run with: cargo run --example event_handler --features test-support
+//! Run with: `cargo run --example event_handler --features test-support`
+
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::doc_markdown)]
+#![allow(clippy::uninlined_format_args)]
+#![allow(clippy::items_after_statements)]
+#![allow(clippy::manual_is_multiple_of)]
+#![allow(clippy::redundant_pattern_matching)]
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -139,8 +146,6 @@ async fn send_events(
     event_count: usize,
     stream_id: usize,
 ) {
-    use bincode::Options;
-
     println!(
         "[Client] Stream {}: Opening unidirectional stream",
         stream_id
@@ -174,8 +179,8 @@ async fn send_events(
             fields: format!("stream_{}_event_{}", stream_id, i).into_bytes(),
         };
 
-        let codec = bincode::DefaultOptions::new();
-        let serialized = codec.serialize(&event).expect("Failed to serialize");
+        let serialized = bincode::serde::encode_to_vec(&event, bincode::config::standard())
+            .expect("Failed to serialize");
         #[allow(clippy::cast_possible_truncation)]
         let len_bytes = (serialized.len() as u32).to_be_bytes();
 

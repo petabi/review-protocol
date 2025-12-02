@@ -4,12 +4,15 @@
 //! of the event stream API under various conditions.
 
 #![cfg(feature = "test-support")]
+#![allow(clippy::unwrap_used)]
+#![allow(clippy::explicit_iter_loop)]
+#![allow(clippy::cast_sign_loss)]
 
-use std::sync::Arc;
+use std::hint::black_box;
 
-use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use review_protocol::{
-    server::{Connection, EventStreamHandler},
+    server::EventStreamHandler,
     test::TEST_ENV,
     types::{EventKind, EventMessage},
 };
@@ -56,6 +59,7 @@ fn benchmark_event_throughput(c: &mut Criterion) {
                         let (server_conn, client_conn) = test_env.setup().await;
 
                         let handler = NoopHandler;
+                        let server_conn_for_teardown = server_conn.clone();
 
                         let server_handle =
                             tokio::spawn(
@@ -73,7 +77,11 @@ fn benchmark_event_throughput(c: &mut Criterion) {
                                     fields: format!("event_{i}").into_bytes(),
                                 };
 
-                                let serialized = bincode::serialize(&event).unwrap();
+                                let serialized = bincode::serde::encode_to_vec(
+                                    &event,
+                                    bincode::config::standard(),
+                                )
+                                .unwrap();
                                 #[allow(clippy::cast_possible_truncation)]
                                 let len_bytes = (serialized.len() as u32).to_be_bytes();
 
@@ -86,7 +94,7 @@ fn benchmark_event_throughput(c: &mut Criterion) {
 
                         let _ = tokio::join!(server_handle, client_handle);
 
-                        test_env.teardown(&server_conn);
+                        test_env.teardown(&server_conn_for_teardown);
 
                         black_box(event_count);
                     });
@@ -103,7 +111,7 @@ fn benchmark_event_sizes(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("event_sizes");
 
-    for size in [100, 1024, 10240, 102400].iter() {
+    for size in [100, 1024, 10_240, 102_400].iter() {
         group.throughput(Throughput::Bytes(*size as u64));
 
         group.bench_with_input(BenchmarkId::new("bytes", size), size, |b, &size| {
@@ -113,6 +121,7 @@ fn benchmark_event_sizes(c: &mut Criterion) {
                     let (server_conn, client_conn) = test_env.setup().await;
 
                     let handler = NoopHandler;
+                    let server_conn_for_teardown = server_conn.clone();
 
                     let server_handle =
                         tokio::spawn(async move { server_conn.accept_event_stream(handler).await });
@@ -127,7 +136,9 @@ fn benchmark_event_sizes(c: &mut Criterion) {
                             fields: vec![0x42; size],
                         };
 
-                        let serialized = bincode::serialize(&event).unwrap();
+                        let serialized =
+                            bincode::serde::encode_to_vec(&event, bincode::config::standard())
+                                .unwrap();
                         #[allow(clippy::cast_possible_truncation)]
                         let len_bytes = (serialized.len() as u32).to_be_bytes();
 
@@ -138,7 +149,7 @@ fn benchmark_event_sizes(c: &mut Criterion) {
 
                     let _ = tokio::join!(server_handle, client_handle);
 
-                    test_env.teardown(&server_conn);
+                    test_env.teardown(&server_conn_for_teardown);
 
                     black_box(size);
                 });
@@ -193,7 +204,11 @@ fn benchmark_concurrent_streams(c: &mut Criterion) {
                                                 .into_bytes(),
                                         };
 
-                                        let serialized = bincode::serialize(&event).unwrap();
+                                        let serialized = bincode::serde::encode_to_vec(
+                                            &event,
+                                            bincode::config::standard(),
+                                        )
+                                        .unwrap();
                                         #[allow(clippy::cast_possible_truncation)]
                                         let len_bytes = (serialized.len() as u32).to_be_bytes();
 
@@ -243,8 +258,11 @@ fn benchmark_deserialization_overhead(c: &mut Criterion) {
                     fields: b"test event data".to_vec(),
                 };
 
-                let serialized = bincode::serialize(&event).unwrap();
-                let _deserialized: EventMessage = bincode::deserialize(&serialized).unwrap();
+                let serialized =
+                    bincode::serde::encode_to_vec(&event, bincode::config::standard()).unwrap();
+                let (_deserialized, _len): (EventMessage, usize) =
+                    bincode::serde::decode_from_slice(&serialized, bincode::config::standard())
+                        .unwrap();
 
                 black_box(event);
             });

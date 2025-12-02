@@ -46,7 +46,7 @@ pub(crate) async fn channel() -> Channel {
     let cert =
         rcgen::generate_simple_self_signed([TEST_SERVER_NAME.to_string()]).expect("infallible");
     let cert_der = vec![CertificateDer::from(cert.cert)];
-    let key_der = PrivatePkcs8KeyDer::from(cert.signing_key.serialize_der());
+    let key_der = PrivatePkcs8KeyDer::from(cert.key_pair.serialize_der());
     let server_config = quinn::ServerConfig::with_single_cert(cert_der.clone(), key_der.into())
         .expect("infallible");
     let server_addr = SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), TEST_PORT);
@@ -131,7 +131,7 @@ impl TestEnvironment {
         let server_cert_pem = server_certified_key.cert.pem();
         let server_certs_der = vec![CertificateDer::from(server_certified_key.cert)];
         let server_key_der =
-            PrivatePkcs8KeyDer::from(server_certified_key.signing_key.serialize_der());
+            PrivatePkcs8KeyDer::from(server_certified_key.key_pair.serialize_der());
         let server_config =
             quinn::ServerConfig::with_single_cert(server_certs_der.clone(), server_key_der.into())
                 .expect("valid certificate");
@@ -188,7 +188,7 @@ impl TestEnvironment {
         let client_certified_key =
             rcgen::generate_simple_self_signed([CLIENT_NAME.to_string()]).expect("infallible");
         let client_cert_pem = client_certified_key.cert.pem();
-        let client_key_pem = client_certified_key.signing_key.serialize_pem();
+        let client_key_pem = client_certified_key.key_pair.serialize_pem();
         let mut builder = crate::client::ConnectionBuilder::new(
             Self::SERVER_NAME,
             Self::SERVER_ADDR,

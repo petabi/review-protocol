@@ -9,6 +9,10 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `ThreatLevel` enum to represent the threat level of detection events. The enum
+  includes four variants: `Low`, `Medium`, `High`, and `VeryHigh`.
+- `triage_score` field of type `Option<ThreatLevel>` to `EventMessage` struct
+  to allow detection events to include their threat level.
 - New client-side APIs to send host information update requests to the server:
   - `Connection::update_host_ports` updates host opened ports information
   - `Connection::update_host_user_agents` updates host OS and agent software

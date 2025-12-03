@@ -41,7 +41,7 @@ where
     let mut header_buf = vec![0_u8; 2];
     recv.read_exact(&mut header_buf)
         .await
-        .map_err(io::Error::other)?;
+        .map_err(from_read_exact_error_to_io_error)?;
 
     // Setup for message processing
     let codec = bincode::config::standard();
@@ -73,6 +73,13 @@ where
     }
 
     Ok(())
+}
+
+fn from_read_exact_error_to_io_error(e: quinn::ReadExactError) -> io::Error {
+    match e {
+        quinn::ReadExactError::FinishedEarly(_) => io::Error::from(io::ErrorKind::UnexpectedEof),
+        quinn::ReadExactError::ReadError(e) => e.into(),
+    }
 }
 
 #[cfg(test)]

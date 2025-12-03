@@ -180,6 +180,15 @@ pub enum Status {
     Idle,
 }
 
+/// Threat level of a detection event.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum ThreatLevel {
+    Low,
+    Medium,
+    High,
+    VeryHigh,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ColumnStatisticsUpdate {
     pub cluster_id: u32,
@@ -275,6 +284,7 @@ pub struct EventMessage {
     #[serde(with = "jiff::fmt::serde::timestamp::nanosecond::required")]
     pub time: jiff::Timestamp,
     pub kind: EventKind,
+    pub triage_score: Option<ThreatLevel>,
     #[serde(with = "serde_bytes")]
     pub fields: Vec<u8>,
 }
@@ -359,6 +369,7 @@ mod tests {
         let event = EventMessage {
             time: jiff::Timestamp::now(),
             kind: EventKind::BlocklistRadius,
+            triage_score: Some(ThreatLevel::High),
             fields: vec![1, 2, 3, 4, 5],
         };
 
@@ -382,8 +393,46 @@ mod tests {
             "EventKind should match after round-trip"
         );
         assert_eq!(
+            event.triage_score, deserialized.triage_score,
+            "ThreatLevel should match after round-trip"
+        );
+        assert_eq!(
             event.fields, deserialized.fields,
             "Fields should match after round-trip"
         );
+    }
+
+    #[cfg(any(feature = "client", feature = "server"))]
+    #[test]
+    fn threat_level_serialization_round_trip() {
+        // Test that all ThreatLevel variants can be serialized and deserialized
+        let test_cases = vec![
+            ThreatLevel::Low,
+            ThreatLevel::Medium,
+            ThreatLevel::High,
+            ThreatLevel::VeryHigh,
+        ];
+
+        for level in test_cases {
+            // Serialize with bincode (used in the protocol)
+            let serialized = bincode::serde::encode_to_vec(
+                level,
+                bincode::config::standard().with_fixed_int_encoding(),
+            )
+            .expect("serialization should succeed");
+
+            // Deserialize back
+            let (deserialized, _len): (ThreatLevel, usize) = bincode::serde::decode_from_slice(
+                &serialized,
+                bincode::config::standard().with_fixed_int_encoding(),
+            )
+            .expect("deserialization should succeed");
+
+            // Verify round-trip
+            assert_eq!(
+                level, deserialized,
+                "ThreatLevel {level:?} failed round-trip"
+            );
+        }
     }
 }

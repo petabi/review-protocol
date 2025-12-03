@@ -695,6 +695,7 @@ mod tests {
             let data = vec![crate::types::EventMessage {
                 time: jiff::Timestamp::now(),
                 kind: crate::types::EventKind::ExtraThreat,
+                triage_score: None,
                 fields: vec![0x01, 0x02],
             }];
             let client_res = client_conn.insert_event_labels(1, 100, &data).await;

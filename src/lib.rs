@@ -38,7 +38,7 @@ pub enum HandshakeError {
     IncompatibleProtocol(String, String),
 }
 
-#[cfg(feature = "server")]
+#[cfg(any(feature = "server", test))]
 fn handle_handshake_send_io_error(e: std::io::Error) -> HandshakeError {
     if e.kind() == std::io::ErrorKind::InvalidData {
         HandshakeError::MessageTooLarge
@@ -47,7 +47,7 @@ fn handle_handshake_send_io_error(e: std::io::Error) -> HandshakeError {
     }
 }
 
-#[cfg(feature = "server")]
+#[cfg(any(feature = "server", test))]
 fn handle_handshake_recv_io_error(e: std::io::Error) -> HandshakeError {
     match e.kind() {
         std::io::ErrorKind::InvalidData => HandshakeError::InvalidMessage,
@@ -94,8 +94,8 @@ mod tests {
     #[cfg(feature = "server")]
     use crate::test::{TOKEN, channel};
 
-    #[cfg(feature = "server")]
     #[tokio::test]
+    #[cfg(feature = "server")]
     async fn handshake() {
         use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
@@ -137,8 +137,8 @@ mod tests {
         assert!(res.is_ok());
     }
 
-    #[cfg(feature = "server")]
     #[tokio::test]
+    #[cfg(feature = "server")]
     async fn handshake_version_incompatible_err() {
         use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
@@ -177,8 +177,8 @@ mod tests {
         assert!(res.is_err());
     }
 
-    #[cfg(feature = "server")]
     #[tokio::test]
+    #[cfg(feature = "server")]
     async fn handshake_incompatible_err() {
         use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 

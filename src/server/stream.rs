@@ -2,7 +2,6 @@
 
 use std::io;
 
-use anyhow::{Context, Result};
 use quinn::RecvStream;
 
 use self::super::EventStreamHandler;
@@ -34,7 +33,7 @@ use self::super::EventStreamHandler;
 /// * A handler error occurs during error handling
 /// * A handler error occurs during stream end handling
 /// * A network error occurs while reading messages
-pub async fn process_event_stream<H>(mut recv: RecvStream, mut handler: H) -> Result<()>
+pub async fn process_event_stream<H>(mut recv: RecvStream, mut handler: H) -> io::Result<()>
 where
     H: EventStreamHandler + Send,
 {
@@ -42,7 +41,7 @@ where
     let mut header_buf = vec![0_u8; 2];
     recv.read_exact(&mut header_buf)
         .await
-        .context("failed to read protocol header")?;
+        .map_err(io::Error::other)?;
 
     // Setup for message processing
     let codec = bincode::config::standard();
@@ -51,105 +50,29 @@ where
     // Process messages until stream ends
     loop {
         // Read next message
-        match recv_event_message(&mut recv, &mut message_buf).await {
-            Ok(()) => {
-                // Deserialize and handle message
-                match bincode::serde::borrow_decode_from_slice(&message_buf, codec) {
-                    Ok((msg, _len)) => {
-                        if let Err(e) = handler.handle_event(msg).await {
-                            return Err(anyhow::anyhow!("handler error: {e}"));
-                        }
-                    }
-                    Err(e) => {
-                        let error_msg = format!("deserialization error: {e}");
-                        if let Err(e) = handler.on_error(&error_msg).await {
-                            return Err(anyhow::anyhow!(
-                                "handler error during error handling: {e}"
-                            ));
-                        }
-                        // Continue processing other messages
-                    }
-                }
-            }
-            Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => {
-                // Stream ended normally
-                if let Err(e) = handler.on_stream_end().await {
-                    return Err(anyhow::anyhow!("handler error during stream end: {e}"));
-                }
+        if let Err(e) = oinq::frame::recv_raw(&mut recv, &mut message_buf).await {
+            if e.kind() == io::ErrorKind::UnexpectedEof {
+                // Stream ended
+                handler.on_stream_end().await?;
                 break;
             }
+            return Err(e);
+        }
+
+        // Deserialize and handle message
+        match bincode::serde::borrow_decode_from_slice(&message_buf, codec) {
+            Ok((msg, _len)) => {
+                handler.handle_event(msg).await?;
+            }
             Err(e) => {
-                // Network or protocol error
-                let error_msg = format!("failed to receive message: {e}");
-                if let Err(handler_err) = handler.on_error(&error_msg).await {
-                    return Err(anyhow::anyhow!(
-                        "handler error during error handling: {handler_err}"
-                    ));
-                }
-                return Err(anyhow::anyhow!("network error: {e}"));
+                let error_msg = format!("decoding error: {e}");
+                handler.on_error(&error_msg).await?;
+                // Continue processing other messages
             }
         }
     }
 
     Ok(())
-}
-
-/// Reads a single length-prefixed message from the stream
-///
-/// # Protocol Format
-/// - 4-byte big-endian message length
-/// - Message payload of specified length
-///
-/// # Arguments
-/// * `recv` - The receive stream
-/// * `buf` - Buffer to store the message (will be resized)
-///
-/// # Returns
-/// * `Ok(())` - Message read successfully into buf
-/// * `Err(e)` - IO error (including `UnexpectedEof` for stream end)
-///
-/// # Errors
-///
-/// This function will return an error if:
-/// * Failed to read the length prefix (stream ended or network error)
-/// * Message length exceeds maximum allowed size (10MB)
-/// * Failed to read the message payload (stream ended or network error)
-async fn recv_event_message(recv: &mut RecvStream, buf: &mut Vec<u8>) -> io::Result<()> {
-    use std::mem;
-
-    const MAX_MESSAGE_SIZE: usize = 10 * 1024 * 1024; // 10MB
-
-    // Read 4-byte length prefix
-    let mut len_buf = [0; mem::size_of::<u32>()];
-    recv.read_exact(&mut len_buf)
-        .await
-        .map_err(map_recv_error)?;
-
-    let len = u32::from_be_bytes(len_buf) as usize;
-
-    // Validate message length (prevent DoS)
-    if len > MAX_MESSAGE_SIZE {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("message too large: {len} bytes"),
-        ));
-    }
-
-    // Read message payload
-    buf.resize(len, 0);
-    recv.read_exact(buf.as_mut_slice())
-        .await
-        .map_err(map_recv_error)
-}
-
-/// Map Quinn read errors to standard `io::Error`
-fn map_recv_error(e: quinn::ReadExactError) -> io::Error {
-    match e {
-        quinn::ReadExactError::FinishedEarly(_) => {
-            io::Error::new(io::ErrorKind::UnexpectedEof, "stream ended early")
-        }
-        quinn::ReadExactError::ReadError(read_err) => read_err.into(),
-    }
 }
 
 #[cfg(test)]
@@ -191,20 +114,20 @@ mod tests {
 
     #[async_trait::async_trait]
     impl EventStreamHandler for TestHandler {
-        async fn handle_event(&mut self, event: EventMessage) -> Result<(), String> {
+        async fn handle_event(&mut self, event: EventMessage) -> io::Result<()> {
             if self.should_fail_on_event {
-                return Err("test failure".to_string());
+                return Err(io::Error::other("test failure"));
             }
             self.events.lock().unwrap().push(event);
             Ok(())
         }
 
-        async fn on_error(&mut self, error: &str) -> Result<(), String> {
+        async fn on_error(&mut self, error: &str) -> io::Result<()> {
             self.errors.lock().unwrap().push(error.to_string());
             Ok(())
         }
 
-        async fn on_stream_end(&mut self) -> Result<(), String> {
+        async fn on_stream_end(&mut self) -> io::Result<()> {
             *self.stream_ended.lock().unwrap() = true;
             Ok(())
         }

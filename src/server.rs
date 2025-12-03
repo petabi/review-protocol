@@ -8,6 +8,8 @@ mod handler;
 pub mod stream;
 
 #[cfg(feature = "server")]
+use std::io;
+#[cfg(feature = "server")]
 use std::net::SocketAddr;
 
 #[cfg(any(feature = "client", feature = "server"))]
@@ -25,17 +27,18 @@ pub use self::handler::{Handler, handle};
 #[cfg(feature = "server")]
 pub use self::stream::process_event_stream;
 #[cfg(feature = "server")]
+use crate::types::EventMessage;
+#[cfg(feature = "server")]
 use crate::{
     AgentInfo, HandshakeError, client, handle_handshake_recv_io_error,
-    handle_handshake_send_io_error,
-    types::{EventMessage, Tidb},
+    handle_handshake_send_io_error, types::Tidb,
 };
 
 /// Trait for handling incoming event messages from unidirectional streams
 ///
 /// This trait provides a standardized interface for processing event messages
 /// received from unidirectional streams, abstracting away protocol-level details.
-#[cfg(feature = "server")]
+#[cfg(any(feature = "server", test))]
 #[async_trait::async_trait]
 pub trait EventStreamHandler {
     /// Handles a single event message
@@ -56,7 +59,7 @@ pub trait EventStreamHandler {
     /// * The event processing logic fails
     /// * The handler determines the event is invalid or cannot be processed
     /// * Any downstream processing of the event fails
-    async fn handle_event(&mut self, event: EventMessage) -> Result<(), String>;
+    async fn handle_event(&mut self, event: EventMessage) -> io::Result<()>;
 
     /// Called when the stream ends normally
     ///
@@ -68,7 +71,7 @@ pub trait EventStreamHandler {
     /// This function will return an error if:
     /// * Cleanup operations fail
     /// * Final processing steps cannot be completed
-    async fn on_stream_end(&mut self) -> Result<(), String> {
+    async fn on_stream_end(&mut self) -> io::Result<()> {
         Ok(())
     }
 
@@ -76,21 +79,11 @@ pub trait EventStreamHandler {
     ///
     /// This includes deserialization errors, network errors, etc.
     /// The handler can decide whether to treat the error as fatal.
-    /// Default implementation logs and continues.
+    /// Default implementation logs the error.
     ///
     /// # Arguments
     /// * `error` - Description of the error that occurred
-    ///
-    /// # Returns
-    /// * `Ok(())` - Continue processing (if possible)
-    /// * `Err(msg)` - Stop processing and return error
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if:
-    /// * The error should be treated as fatal
-    /// * Error recovery operations fail
-    async fn on_error(&mut self, error: &str) -> Result<(), String> {
+    async fn on_error(&mut self, error: &str) -> io::Result<()> {
         eprintln!("Event stream error: {error}");
         Ok(())
     }
@@ -136,14 +129,14 @@ pub(crate) enum RequestCode {
     Unknown = u32::MAX,
 }
 
-#[cfg(feature = "server")]
+#[cfg(any(feature = "server", test))]
 /// A connection from a client.
 #[derive(Clone, Debug)]
 pub struct Connection {
     conn: quinn::Connection,
 }
 
-#[cfg(feature = "server")]
+#[cfg(any(feature = "server", test))]
 impl Connection {
     /// Creates a new connection from a QUIC connection from the `quinn` crate.
     #[must_use]
@@ -212,27 +205,21 @@ impl Connection {
     /// # struct MyEventHandler;
     /// # #[async_trait::async_trait]
     /// # impl EventStreamHandler for MyEventHandler {
-    /// #     async fn handle_event(&mut self, event: EventMessage) -> Result<(), String> {
+    /// #     async fn handle_event(&mut self, event: EventMessage) -> std::io::Result<()> {
     /// #         Ok(())
     /// #     }
     /// # }
-    /// # async fn example(connection: Connection) -> anyhow::Result<()> {
+    /// # async fn example(connection: Connection) -> std::io::Result<()> {
     /// let handler = MyEventHandler;
     /// connection.accept_event_stream(handler).await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn accept_event_stream<H>(&self, handler: H) -> anyhow::Result<()>
+    pub async fn accept_event_stream<H>(&self, handler: H) -> io::Result<()>
     where
         H: EventStreamHandler + Send + 'static,
     {
-        use anyhow::Context;
-
-        let recv_stream = self
-            .conn
-            .accept_uni()
-            .await
-            .context("failed to accept unidirectional stream")?;
+        let recv_stream = self.conn.accept_uni().await?;
 
         self::stream::process_event_stream(recv_stream, handler).await
     }
@@ -262,7 +249,7 @@ impl Connection {
     /// # struct MyEventHandler;
     /// # #[async_trait::async_trait]
     /// # impl EventStreamHandler for MyEventHandler {
-    /// #     async fn handle_event(&mut self, event: EventMessage) -> Result<(), String> {
+    /// #     async fn handle_event(&mut self, event: EventMessage) -> std::io::Result<()> {
     /// #         Ok(())
     /// #     }
     /// # }
@@ -275,7 +262,7 @@ impl Connection {
     pub async fn handle_event_stream<H>(
         recv_stream: quinn::RecvStream,
         handler: H,
-    ) -> anyhow::Result<()>
+    ) -> io::Result<()>
     where
         H: EventStreamHandler + Send + 'static,
     {
@@ -311,14 +298,14 @@ impl Connection {
     /// # struct MyEventHandler;
     /// # #[async_trait::async_trait]
     /// # impl EventStreamHandler for MyEventHandler {
-    /// #     async fn handle_event(&mut self, event: EventMessage) -> Result<(), String> {
+    /// #     async fn handle_event(&mut self, event: EventMessage) -> std::io::Result<()> {
     /// #         Ok(())
     /// #     }
     /// # }
     /// # impl MyEventHandler {
     /// #     fn new() -> Self { MyEventHandler }
     /// # }
-    /// # async fn example(connection: Connection) -> anyhow::Result<()> {
+    /// # async fn example(connection: Connection) -> std::io::Result<()> {
     /// connection.accept_event_streams(
     ///     || MyEventHandler::new(),
     ///     Some(10) // Max 10 concurrent streams
@@ -330,14 +317,12 @@ impl Connection {
         &self,
         handler_factory: F,
         max_concurrent: Option<usize>,
-    ) -> anyhow::Result<()>
+    ) -> io::Result<()>
     where
         H: EventStreamHandler + Send + 'static,
         F: Fn() -> H + Send + Sync + 'static,
     {
         use std::sync::Arc;
-
-        use anyhow::Context;
 
         let semaphore = max_concurrent.map(|n| Arc::new(tokio::sync::Semaphore::new(n)));
 
@@ -349,7 +334,7 @@ impl Connection {
                     break;
                 }
                 Err(e) => {
-                    return Err(anyhow::anyhow!("failed to accept stream: {e}"));
+                    return Err(io::Error::other(format!("failed to accept stream: {e}")));
                 }
             };
 
@@ -359,7 +344,7 @@ impl Connection {
                     sem.clone()
                         .acquire_owned()
                         .await
-                        .context("semaphore closed")?,
+                        .map_err(io::Error::other)?,
                 )
             } else {
                 None
@@ -379,7 +364,7 @@ impl Connection {
     }
 }
 
-#[cfg(feature = "server")]
+#[cfg(any(feature = "server", test))]
 /// Processes a handshake message and sends a response.
 ///
 /// # Errors
@@ -507,6 +492,9 @@ pub async fn notify_config_update(conn: &quinn::Connection) -> anyhow::Result<()
 #[cfg(test)]
 mod tests {
     #[cfg(feature = "server")]
+    use std::io;
+
+    #[cfg(feature = "server")]
     use crate::EventStreamHandler;
     #[cfg(feature = "server")]
     use crate::types::EventMessage;
@@ -532,24 +520,24 @@ mod tests {
     #[cfg(feature = "server")]
     #[async_trait::async_trait]
     impl EventStreamHandler for TestEventHandler {
-        async fn handle_event(&mut self, event: EventMessage) -> Result<(), String> {
+        async fn handle_event(&mut self, event: EventMessage) -> io::Result<()> {
             self.events.push(event);
             Ok(())
         }
 
-        async fn on_error(&mut self, error: &str) -> Result<(), String> {
+        async fn on_error(&mut self, error: &str) -> io::Result<()> {
             self.errors.push(error.to_string());
             Ok(())
         }
 
-        async fn on_stream_end(&mut self) -> Result<(), String> {
+        async fn on_stream_end(&mut self) -> io::Result<()> {
             self.stream_ended = true;
             Ok(())
         }
     }
 
-    #[cfg(feature = "server")]
     #[tokio::test]
+    #[cfg(feature = "server")]
     async fn test_event_stream_handler_interface() {
         use crate::types::EventKind;
 
@@ -574,8 +562,8 @@ mod tests {
         assert!(handler.stream_ended);
     }
 
-    #[cfg(feature = "server")]
     #[tokio::test]
+    #[cfg(feature = "server")]
     async fn test_event_handler_error_handling() {
         use crate::types::EventKind;
 
@@ -583,16 +571,16 @@ mod tests {
 
         #[async_trait::async_trait]
         impl EventStreamHandler for FailingHandler {
-            async fn handle_event(&mut self, _event: EventMessage) -> Result<(), String> {
-                Err("processing failed".to_string())
+            async fn handle_event(&mut self, _event: EventMessage) -> io::Result<()> {
+                Err(io::Error::other("processing failed"))
             }
 
-            async fn on_error(&mut self, _error: &str) -> Result<(), String> {
-                Err("error handling failed".to_string())
+            async fn on_error(&mut self, _error: &str) -> io::Result<()> {
+                Err(io::Error::other("error handling failed"))
             }
 
-            async fn on_stream_end(&mut self) -> Result<(), String> {
-                Err("stream end failed".to_string())
+            async fn on_stream_end(&mut self) -> io::Result<()> {
+                Err(io::Error::other("stream end failed"))
             }
         }
 
@@ -608,14 +596,14 @@ mod tests {
         assert!(handler.on_stream_end().await.is_err());
     }
 
-    #[cfg(feature = "server")]
     #[tokio::test]
+    #[cfg(feature = "server")]
     async fn test_default_implementations() {
         struct MinimalHandler;
 
         #[async_trait::async_trait]
         impl EventStreamHandler for MinimalHandler {
-            async fn handle_event(&mut self, _event: EventMessage) -> Result<(), String> {
+            async fn handle_event(&mut self, _event: EventMessage) -> io::Result<()> {
                 Ok(())
             }
         }
@@ -626,8 +614,8 @@ mod tests {
         assert!(handler.on_error("test error").await.is_ok());
     }
 
-    #[cfg(all(feature = "client", feature = "server"))]
     #[tokio::test]
+    #[cfg(all(feature = "client", feature = "server"))]
     async fn trusted_domain_list() {
         use crate::test::TEST_ENV;
 
@@ -670,8 +658,8 @@ mod tests {
         test_env.teardown(&server_conn);
     }
 
-    #[cfg(all(feature = "client", feature = "server"))]
     #[tokio::test]
+    #[cfg(all(feature = "client", feature = "server"))]
     async fn notify_config_update() {
         use crate::test::TEST_ENV;
 
@@ -702,8 +690,8 @@ mod tests {
         test_env.teardown(&server_conn);
     }
 
-    #[cfg(feature = "server")]
     #[tokio::test]
+    #[cfg(feature = "server")]
     async fn test_accept_event_stream() {
         use std::sync::{Arc, Mutex};
 
@@ -713,7 +701,7 @@ mod tests {
 
         #[async_trait::async_trait]
         impl EventStreamHandler for TestHandler {
-            async fn handle_event(&mut self, event: EventMessage) -> Result<(), String> {
+            async fn handle_event(&mut self, event: EventMessage) -> io::Result<()> {
                 self.events.lock().unwrap().push(event);
                 Ok(())
             }
@@ -780,8 +768,8 @@ mod tests {
         test_env.teardown(&server_conn_for_teardown);
     }
 
-    #[cfg(feature = "server")]
     #[tokio::test]
+    #[cfg(feature = "server")]
     async fn test_handle_event_stream() {
         use std::sync::{Arc, Mutex};
 
@@ -791,7 +779,7 @@ mod tests {
 
         #[async_trait::async_trait]
         impl EventStreamHandler for TestHandler {
-            async fn handle_event(&mut self, event: EventMessage) -> Result<(), String> {
+            async fn handle_event(&mut self, event: EventMessage) -> io::Result<()> {
                 self.events.lock().unwrap().push(event);
                 Ok(())
             }
@@ -854,8 +842,8 @@ mod tests {
         test_env.teardown(&server_conn);
     }
 
-    #[cfg(feature = "server")]
     #[tokio::test]
+    #[cfg(feature = "server")]
     async fn test_accept_multiple_streams() {
         use std::sync::{Arc, Mutex};
 
@@ -865,7 +853,7 @@ mod tests {
 
         #[async_trait::async_trait]
         impl EventStreamHandler for TestHandler {
-            async fn handle_event(&mut self, event: EventMessage) -> Result<(), String> {
+            async fn handle_event(&mut self, event: EventMessage) -> io::Result<()> {
                 self.events.lock().unwrap().push(event);
                 Ok(())
             }
@@ -939,8 +927,8 @@ mod tests {
         test_env.teardown(&server_conn);
     }
 
-    #[cfg(feature = "server")]
     #[tokio::test]
+    #[cfg(feature = "server")]
     async fn test_concurrency_limiting() {
         use std::sync::{
             Arc,
@@ -956,7 +944,7 @@ mod tests {
 
         #[async_trait::async_trait]
         impl EventStreamHandler for SlowHandler {
-            async fn handle_event(&mut self, _event: EventMessage) -> Result<(), String> {
+            async fn handle_event(&mut self, _event: EventMessage) -> io::Result<()> {
                 let current = self.concurrent_count.fetch_add(1, Ordering::SeqCst) + 1;
 
                 // Update max concurrent count

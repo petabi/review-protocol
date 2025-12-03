@@ -281,6 +281,7 @@ pub struct EventMessage {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(any(feature = "client", feature = "server"))]
     use super::*;
 
     #[cfg(any(feature = "client", feature = "server"))]

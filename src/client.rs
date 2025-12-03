@@ -3,17 +3,17 @@
 #[cfg(feature = "client")]
 mod api;
 
-#[cfg(any(feature = "client", all(test, feature = "server")))]
+#[cfg(feature = "client")]
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
 #[cfg(any(feature = "client", feature = "server"))]
 use num_enum::{FromPrimitive, IntoPrimitive};
-#[cfg(any(feature = "client", all(test, feature = "server")))]
-use oinq::frame::{self};
+#[cfg(feature = "client")]
+use oinq::frame;
 #[cfg(feature = "client")]
 pub use oinq::message::{send_err, send_ok, send_request};
 
-#[cfg(any(feature = "client", all(test, feature = "server")))]
+#[cfg(feature = "client")]
 use crate::AgentInfo;
 
 /// Numeric representation of the message types that a client should handle.
@@ -343,7 +343,7 @@ pub struct Connection {
     connection: quinn::Connection,
 }
 
-#[cfg(feature = "client")]
+#[cfg(any(feature = "client", test))]
 impl Connection {
     /// Gets the local address of the connection.
     ///
@@ -404,7 +404,6 @@ impl Connection {
 ///
 /// Returns `HandshakeError` if the handshake failed.
 #[cfg(test)]
-#[cfg(feature = "server")]
 pub(crate) async fn handshake(
     conn: &quinn::Connection,
     app_name: &str,

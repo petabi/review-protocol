@@ -52,6 +52,7 @@ rustls = { version = "0.23", default-features = false, features = [
   "ring",
   "std",
 ] }
+rustls-pemfile = "2"
 tokio = { version = "1", features = ["macros", "rt"] }
 
 [lints.clippy]

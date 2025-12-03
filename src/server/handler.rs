@@ -1,4 +1,4 @@
-//! Requset handler for the server.
+//! Request handler for the server.
 
 use std::{
     collections::{HashMap, HashSet},

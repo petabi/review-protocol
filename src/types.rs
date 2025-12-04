@@ -284,7 +284,6 @@ pub struct EventMessage {
     #[serde(with = "jiff::fmt::serde::timestamp::nanosecond::required")]
     pub time: jiff::Timestamp,
     pub kind: EventKind,
-    pub triage_score: Option<ThreatLevel>,
     #[serde(with = "serde_bytes")]
     pub fields: Vec<u8>,
 }
@@ -369,7 +368,6 @@ mod tests {
         let event = EventMessage {
             time: jiff::Timestamp::now(),
             kind: EventKind::BlocklistRadius,
-            triage_score: Some(ThreatLevel::High),
             fields: vec![1, 2, 3, 4, 5],
         };
 
@@ -391,10 +389,6 @@ mod tests {
         assert_eq!(
             event.kind, deserialized.kind,
             "EventKind should match after round-trip"
-        );
-        assert_eq!(
-            event.triage_score, deserialized.triage_score,
-            "ThreatLevel should match after round-trip"
         );
         assert_eq!(
             event.fields, deserialized.fields,

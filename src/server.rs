@@ -546,7 +546,6 @@ mod tests {
         let event = EventMessage {
             time: jiff::Timestamp::now(),
             kind: EventKind::DnsCovertChannel,
-            triage_score: None,
             fields: vec![1, 2, 3, 4],
         };
 
@@ -589,7 +588,6 @@ mod tests {
         let event = EventMessage {
             time: jiff::Timestamp::now(),
             kind: EventKind::HttpThreat,
-            triage_score: None,
             fields: vec![],
         };
 
@@ -733,7 +731,6 @@ mod tests {
             let event = EventMessage {
                 time: jiff::Timestamp::now(),
                 kind: crate::types::EventKind::DnsCovertChannel,
-                triage_score: None,
                 fields: vec![1, 2, 3, 4],
             };
 
@@ -809,7 +806,6 @@ mod tests {
             let event = EventMessage {
                 time: jiff::Timestamp::now(),
                 kind: crate::types::EventKind::HttpThreat,
-                triage_score: None,
                 fields: vec![5, 6, 7],
             };
 
@@ -894,7 +890,6 @@ mod tests {
                 let event = EventMessage {
                     time: jiff::Timestamp::now(),
                     kind: crate::types::EventKind::DnsCovertChannel,
-                    triage_score: None,
                     fields: vec![u8::try_from(i).unwrap()],
                 };
 
@@ -1005,7 +1000,6 @@ mod tests {
                 let event = EventMessage {
                     time: jiff::Timestamp::now(),
                     kind: crate::types::EventKind::DnsCovertChannel,
-                    triage_score: None,
                     fields: vec![u8::try_from(i).unwrap()],
                 };
 

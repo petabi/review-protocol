@@ -183,6 +183,7 @@ pub enum Status {
 /// Threat level of a detection event.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum ThreatLevel {
+    VeryLow,
     Low,
     Medium,
     High,
@@ -401,6 +402,7 @@ mod tests {
     fn threat_level_serialization_round_trip() {
         // Test that all ThreatLevel variants can be serialized and deserialized
         let test_cases = vec![
+            ThreatLevel::VeryLow,
             ThreatLevel::Low,
             ThreatLevel::Medium,
             ThreatLevel::High,

@@ -5,6 +5,14 @@ file is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and
 this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- `Handler::get_allowlist` and `Handler::get_blocklist` now accept the peer
+  identifier so servers can return customer-specific lists. The server handler
+  now forwards the peer when serving allowlist and blocklist requests.
+
 ## [0.15.0] - 2025-12-03
 
 ### Added
@@ -475,6 +483,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - `client::handshake` implements the application-level handshake process for the
   client after a QUIC connection is established.
 
+[Unreleased]: https://github.com/petabi/review-protocol/compare/0.15.0...main
 [0.15.0]: https://github.com/petabi/review-protocol/compare/0.14.0...0.15.0
 [0.14.0]: https://github.com/petabi/review-protocol/compare/0.13.0...0.14.0
 [0.13.0]: https://github.com/petabi/review-protocol/compare/0.12.1...0.13.0

@@ -289,8 +289,11 @@ impl crate::server::Handler for TestServerHandler {
         Ok("test-config".to_string())
     }
 
-    async fn get_allowlist(&self) -> Result<HostNetworkGroup, String> {
+    async fn get_allowlist(&self, peer: &str) -> Result<HostNetworkGroup, String> {
         use std::net::{IpAddr, Ipv6Addr};
+        if peer != "test-peer" {
+            return Err(format!("unexpected peer: {peer}"));
+        }
         Ok(HostNetworkGroup {
             hosts: vec![IpAddr::V6(Ipv6Addr::LOCALHOST)],
             networks: vec![],
@@ -298,8 +301,11 @@ impl crate::server::Handler for TestServerHandler {
         })
     }
 
-    async fn get_blocklist(&self) -> Result<HostNetworkGroup, String> {
+    async fn get_blocklist(&self, peer: &str) -> Result<HostNetworkGroup, String> {
         use std::net::{IpAddr, Ipv4Addr};
+        if peer != "test-peer" {
+            return Err(format!("unexpected peer: {peer}"));
+        }
         Ok(HostNetworkGroup {
             hosts: vec![IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1))],
             networks: vec![],

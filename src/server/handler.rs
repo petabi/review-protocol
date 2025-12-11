@@ -18,11 +18,11 @@ use crate::types::{
 /// A request handler that can handle a request to the server.
 #[async_trait::async_trait]
 pub trait Handler {
-    async fn get_allowlist(&self) -> Result<HostNetworkGroup, String> {
+    async fn get_allowlist(&self, _peer: &str) -> Result<HostNetworkGroup, String> {
         Err("not supported".to_string())
     }
 
-    async fn get_blocklist(&self) -> Result<HostNetworkGroup, String> {
+    async fn get_blocklist(&self, _peer: &str) -> Result<HostNetworkGroup, String> {
         Err("not supported".to_string())
     }
 
@@ -195,12 +195,12 @@ where
         match RequestCode::from_primitive(code) {
             RequestCode::GetAllowlist => {
                 parse_args::<()>(body)?;
-                let result = handler.get_allowlist().await;
+                let result = handler.get_allowlist(peer).await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::GetBlocklist => {
                 parse_args::<()>(body)?;
-                let result = handler.get_blocklist().await;
+                let result = handler.get_blocklist(peer).await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::GetDataSource => {

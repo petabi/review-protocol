@@ -12,6 +12,10 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - `Handler::get_allowlist` and `Handler::get_blocklist` now accept the peer
   identifier so servers can return customer-specific lists. The server handler
   now forwards the peer when serving allowlist and blocklist requests.
+- `Handler::update_host_ports` and `Handler::update_host_user_agents` now
+  accept the peer identifier so servers can update host information for
+  specific customers. The server handler now forwards the peer when serving
+  these requests.
 
 ## [0.15.0] - 2025-12-03
 

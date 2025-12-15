@@ -456,6 +456,7 @@ impl crate::server::Handler for TestServerHandler {
 
     async fn update_host_ports(
         &self,
+        _peer: &str,
         _hosts: &std::collections::HashMap<IpAddr, std::collections::HashMap<(u16, u8), u32>>,
     ) -> Result<(), String> {
         Ok(())
@@ -463,6 +464,7 @@ impl crate::server::Handler for TestServerHandler {
 
     async fn update_host_user_agents(
         &self,
+        _peer: &str,
         _hosts: &[(IpAddr, Vec<crate::types::UserAgent>, Vec<String>)],
     ) -> Result<(), String> {
         Ok(())

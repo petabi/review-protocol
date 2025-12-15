@@ -150,6 +150,7 @@ pub trait Handler {
 
     async fn update_host_ports(
         &self,
+        _peer: &str,
         _hosts: &HashMap<IpAddr, HashMap<(u16, u8), u32>>,
     ) -> Result<(), String> {
         Err("not supported".to_string())
@@ -157,6 +158,7 @@ pub trait Handler {
 
     async fn update_host_user_agents(
         &self,
+        _peer: &str,
         _hosts: &[(IpAddr, Vec<UserAgent>, Vec<String>)],
     ) -> Result<(), String> {
         Err("not supported".to_string())
@@ -324,12 +326,12 @@ where
             }
             RequestCode::UpdateHostOpenedPorts => {
                 let hosts = parse_args::<HashMap<IpAddr, HashMap<(u16, u8), u32>>>(body)?;
-                let result = handler.update_host_ports(&hosts).await;
+                let result = handler.update_host_ports(peer, &hosts).await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::UpdateHostOsAgents => {
                 let hosts = parse_args::<Vec<(IpAddr, Vec<UserAgent>, Vec<String>)>>(body)?;
-                let result = handler.update_host_user_agents(&hosts).await;
+                let result = handler.update_host_user_agents(peer, &hosts).await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::Unknown => {

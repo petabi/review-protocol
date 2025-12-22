@@ -287,7 +287,8 @@ where
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::InsertModel => {
-                let result = handler.insert_model(body).await;
+                let body = parse_args::<Vec<u8>>(body)?;
+                let result = handler.insert_model(&body).await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::InsertTimeSeries => {
@@ -313,7 +314,8 @@ where
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::UpdateModel => {
-                let result = handler.update_model(body).await;
+                let body = parse_args::<Vec<u8>>(body)?;
+                let result = handler.update_model(&body).await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::UpdateOutliers => {

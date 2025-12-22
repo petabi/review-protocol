@@ -355,3 +355,91 @@ where
     }
     Ok(None)
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{Arc, Mutex};
+
+    use super::*;
+    use crate::test::{TOKEN, channel};
+
+    struct ModelHandler {
+        insert_model_payload: Arc<Mutex<Option<Vec<u8>>>>,
+        update_model_payload: Arc<Mutex<Option<Vec<u8>>>>,
+    }
+
+    #[async_trait::async_trait]
+    impl Handler for ModelHandler {
+        async fn insert_model(&self, model: &[u8]) -> Result<u32, String> {
+            *self.insert_model_payload.lock().unwrap() = Some(model.to_vec());
+            Ok(42)
+        }
+
+        async fn update_model(&self, model: &[u8]) -> Result<u32, String> {
+            *self.update_model_payload.lock().unwrap() = Some(model.to_vec());
+            Ok(55)
+        }
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn insert_and_update_model_deserialize_payload() {
+        let _lock = TOKEN.lock().await;
+        let channel = channel().await;
+
+        let insert_model_payload = Arc::new(Mutex::new(None));
+        let update_model_payload = Arc::new(Mutex::new(None));
+
+        let mut handler = ModelHandler {
+            insert_model_payload: Arc::clone(&insert_model_payload),
+            update_model_payload: Arc::clone(&update_model_payload),
+        };
+
+        let (mut server_send, mut server_recv) = (channel.server.send, channel.server.recv);
+        let (mut client_send, mut client_recv) = (channel.client.send, channel.client.recv);
+
+        let server_task = tokio::spawn(async move {
+            super::handle(
+                &mut handler,
+                &mut server_send,
+                &mut server_recv,
+                "test-peer",
+            )
+            .await
+        });
+
+        let insert_payload = vec![0x10, 0x20, 0x30, 0x40];
+        let insert_res: Result<u32, String> = crate::unary_request(
+            &mut client_send,
+            &mut client_recv,
+            u32::from(RequestCode::InsertModel),
+            insert_payload.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(insert_res.unwrap(), 42);
+
+        let update_payload = vec![0x01, 0x02, 0x03];
+        let update_res: Result<u32, String> = crate::unary_request(
+            &mut client_send,
+            &mut client_recv,
+            u32::from(RequestCode::UpdateModel),
+            update_payload.clone(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(update_res.unwrap(), 55);
+
+        drop(client_send);
+        drop(client_recv);
+
+        let server_res = server_task.await.unwrap();
+        match server_res {
+            Ok(_) => {}
+            Err(e) if e.kind() == io::ErrorKind::NotConnected => {}
+            Err(e) => panic!("unexpected server error: {e:?}"),
+        }
+        assert_eq!(*insert_model_payload.lock().unwrap(), Some(insert_payload));
+        assert_eq!(*update_model_payload.lock().unwrap(), Some(update_payload));
+    }
+}

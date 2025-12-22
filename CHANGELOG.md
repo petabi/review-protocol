@@ -17,6 +17,11 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   specific customers. The server handler now forwards the peer when serving
   these requests.
 
+### Fixed
+
+- Fixed server-side deserialization for `InsertModel` and `UpdateModel`
+  requests so the raw model payload is correctly decoded before handling.
+
 ## [0.15.0] - 2025-12-03
 
 ### Added

@@ -544,7 +544,10 @@ mod tests {
         let mut handler = TestEventHandler::new();
 
         let event = EventMessage {
-            time: jiff::Timestamp::now(),
+            time: jiff::Timestamp::now()
+                .as_nanosecond()
+                .try_into()
+                .unwrap_or_default(),
             kind: EventKind::DnsCovertChannel,
             fields: vec![1, 2, 3, 4],
         };
@@ -586,7 +589,10 @@ mod tests {
 
         let mut handler = FailingHandler;
         let event = EventMessage {
-            time: jiff::Timestamp::now(),
+            time: jiff::Timestamp::now()
+                .as_nanosecond()
+                .try_into()
+                .unwrap_or_default(),
             kind: EventKind::HttpThreat,
             fields: vec![],
         };
@@ -729,7 +735,10 @@ mod tests {
 
             // Send test event
             let event = EventMessage {
-                time: jiff::Timestamp::now(),
+                time: jiff::Timestamp::now()
+                    .as_nanosecond()
+                    .try_into()
+                    .unwrap_or_default(),
                 kind: crate::types::EventKind::DnsCovertChannel,
                 fields: vec![1, 2, 3, 4],
             };
@@ -804,7 +813,10 @@ mod tests {
 
             // Send test event
             let event = EventMessage {
-                time: jiff::Timestamp::now(),
+                time: jiff::Timestamp::now()
+                    .as_nanosecond()
+                    .try_into()
+                    .unwrap_or_default(),
                 kind: crate::types::EventKind::HttpThreat,
                 fields: vec![5, 6, 7],
             };
@@ -888,7 +900,10 @@ mod tests {
 
                 // Send test event
                 let event = EventMessage {
-                    time: jiff::Timestamp::now(),
+                    time: jiff::Timestamp::now()
+                        .as_nanosecond()
+                        .try_into()
+                        .unwrap_or_default(),
                     kind: crate::types::EventKind::DnsCovertChannel,
                     fields: vec![u8::try_from(i).unwrap()],
                 };
@@ -998,7 +1013,10 @@ mod tests {
 
                 // Send test event
                 let event = EventMessage {
-                    time: jiff::Timestamp::now(),
+                    time: jiff::Timestamp::now()
+                        .as_nanosecond()
+                        .try_into()
+                        .unwrap_or_default(),
                     kind: crate::types::EventKind::DnsCovertChannel,
                     fields: vec![u8::try_from(i).unwrap()],
                 };

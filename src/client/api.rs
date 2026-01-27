@@ -693,7 +693,10 @@ mod tests {
     async fn insert_event_labels() {
         run_test(|client_conn| async move {
             let data = vec![crate::types::EventMessage {
-                time: jiff::Timestamp::now(),
+                time: jiff::Timestamp::now()
+                    .as_nanosecond()
+                    .try_into()
+                    .unwrap_or_default(),
                 kind: crate::types::EventKind::ExtraThreat,
                 fields: vec![0x01, 0x02],
             }];

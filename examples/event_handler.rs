@@ -81,7 +81,7 @@ impl MetricsEventHandler {
 
 #[async_trait::async_trait]
 impl EventStreamHandler for MetricsEventHandler {
-    async fn handle_event(&mut self, event: EventMessage) -> Result<(), String> {
+    async fn handle_event(&mut self, event: EventMessage) -> std::io::Result<()> {
         // Record metrics
         {
             let mut metrics = self.metrics.lock().unwrap();
@@ -105,7 +105,7 @@ impl EventStreamHandler for MetricsEventHandler {
         Ok(())
     }
 
-    async fn on_error(&mut self, error: &str) -> Result<(), String> {
+    async fn on_error(&mut self, error: &str) -> std::io::Result<()> {
         self.error_count += 1;
 
         // Record error in metrics
@@ -121,16 +121,16 @@ impl EventStreamHandler for MetricsEventHandler {
 
         // Continue processing unless we've hit the error limit
         if self.error_count >= self.max_errors {
-            Err(format!(
+            Err(std::io::Error::other(format!(
                 "Too many errors: {}/{}",
                 self.error_count, self.max_errors
-            ))
+            )))
         } else {
             Ok(())
         }
     }
 
-    async fn on_stream_end(&mut self) -> Result<(), String> {
+    async fn on_stream_end(&mut self) -> std::io::Result<()> {
         println!("[Handler] Stream ended gracefully");
 
         let mut metrics = self.metrics.lock().unwrap();
@@ -310,15 +310,15 @@ async fn example_error_handling() {
 
     #[async_trait::async_trait]
     impl EventStreamHandler for ErrorSimulatingHandler {
-        async fn handle_event(&mut self, event: EventMessage) -> Result<(), String> {
+        async fn handle_event(&mut self, event: EventMessage) -> std::io::Result<()> {
             self.events_processed += 1;
 
             // Simulate an error on every 5th event
             if self.events_processed % 5 == 0 {
-                return Err(format!(
+                return Err(std::io::Error::other(format!(
                     "Simulated error on event {}",
                     self.events_processed
-                ));
+                )));
             }
 
             println!(
@@ -328,13 +328,13 @@ async fn example_error_handling() {
             Ok(())
         }
 
-        async fn on_error(&mut self, error: &str) -> Result<(), String> {
+        async fn on_error(&mut self, error: &str) -> std::io::Result<()> {
             self.errors_encountered += 1;
             eprintln!("[Handler] Recoverable error: {}", error);
             Ok(()) // Continue processing
         }
 
-        async fn on_stream_end(&mut self) -> Result<(), String> {
+        async fn on_stream_end(&mut self) -> std::io::Result<()> {
             println!(
                 "[Handler] Stream ended: {} events processed, {} errors",
                 self.events_processed, self.errors_encountered

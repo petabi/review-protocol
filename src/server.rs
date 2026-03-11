@@ -20,7 +20,7 @@
 //!
 //! #[async_trait::async_trait]
 //! impl EventStreamHandler for MyEventHandler {
-//!     async fn handle_event(&mut self, event: EventMessage) -> Result<(), String> {
+//!     async fn handle_event(&mut self, event: EventMessage) -> std::io::Result<()> {
 //!         self.event_count += 1;
 //!         println!("Received event #{}: {:?}", self.event_count, event.kind);
 //!         Ok(())
@@ -35,7 +35,7 @@
 //! # struct MyEventHandler { event_count: usize }
 //! # #[async_trait::async_trait]
 //! # impl EventStreamHandler for MyEventHandler {
-//! #     async fn handle_event(&mut self, event: EventMessage) -> Result<(), String> { Ok(()) }
+//! #     async fn handle_event(&mut self, event: EventMessage) -> std::io::Result<()> { Ok(()) }
 //! # }
 //! # async fn example(connection: Connection) -> anyhow::Result<()> {
 //! let handler = MyEventHandler { event_count: 0 };
@@ -53,7 +53,7 @@
 //! # struct MyEventHandler { event_count: usize }
 //! # #[async_trait::async_trait]
 //! # impl EventStreamHandler for MyEventHandler {
-//! #     async fn handle_event(&mut self, event: EventMessage) -> Result<(), String> { Ok(()) }
+//! #     async fn handle_event(&mut self, event: EventMessage) -> std::io::Result<()> { Ok(()) }
 //! # }
 //! # impl MyEventHandler {
 //! #     fn new() -> Self { MyEventHandler { event_count: 0 } }
@@ -76,7 +76,7 @@
 //! # struct MyEventHandler;
 //! # #[async_trait::async_trait]
 //! # impl EventStreamHandler for MyEventHandler {
-//! #     async fn handle_event(&mut self, event: EventMessage) -> Result<(), String> { Ok(()) }
+//! #     async fn handle_event(&mut self, event: EventMessage) -> std::io::Result<()> { Ok(()) }
 //! # }
 //! # impl MyEventHandler {
 //! #     fn new() -> Self { MyEventHandler }
@@ -115,23 +115,23 @@
 //!
 //! #[async_trait::async_trait]
 //! impl EventStreamHandler for ResilientHandler {
-//!     async fn handle_event(&mut self, event: EventMessage) -> Result<(), String> {
+//!     async fn handle_event(&mut self, event: EventMessage) -> std::io::Result<()> {
 //!         // Process event
 //!         Ok(())
 //!     }
 //!
-//!     async fn on_error(&mut self, error: &str) -> Result<(), String> {
+//!     async fn on_error(&mut self, error: &str) -> std::io::Result<()> {
 //!         self.error_count += 1;
 //!         eprintln!("Stream error #{}: {}", self.error_count, error);
 //!
 //!         if self.error_count >= self.max_errors {
-//!             Err(format!("Too many errors: {}", self.error_count))
+//!             Err(std::io::Error::other(format!("Too many errors: {}", self.error_count)))
 //!         } else {
 //!             Ok(())  // Continue processing
 //!         }
 //!     }
 //!
-//!     async fn on_stream_end(&mut self) -> Result<(), String> {
+//!     async fn on_stream_end(&mut self) -> std::io::Result<()> {
 //!         println!("Stream ended after {} errors", self.error_count);
 //!         Ok(())
 //!     }

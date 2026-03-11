@@ -23,7 +23,7 @@ struct NoopHandler;
 
 #[async_trait::async_trait]
 impl EventStreamHandler for NoopHandler {
-    async fn handle_event(&mut self, _event: EventMessage) -> Result<(), String> {
+    async fn handle_event(&mut self, _event: EventMessage) -> std::io::Result<()> {
         Ok(())
     }
 }
@@ -35,7 +35,7 @@ struct MinimalHandler {
 
 #[async_trait::async_trait]
 impl EventStreamHandler for MinimalHandler {
-    async fn handle_event(&mut self, _event: EventMessage) -> Result<(), String> {
+    async fn handle_event(&mut self, _event: EventMessage) -> std::io::Result<()> {
         self.count += 1;
         Ok(())
     }

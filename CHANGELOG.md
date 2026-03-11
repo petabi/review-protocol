@@ -18,6 +18,14 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Renamed `Tidb` references to `LabelDb` (including request codes/handler-client
   methods) and `TiKind`/`TiRule` to `LabelDbKind`/`LabelDbRule` (Breaking Change).
+- Shared `node` request and response types for nine feature
+  families: service control, network interface management,
+  hostname management, time synchronization, logging
+  configuration, remote access configuration, power control,
+  host observation, and version management. Existing
+  `reboot`/`shutdown` and `process_list`/`resource_usage` APIs
+  are representable through the new `NodePowerRequest` and
+  `NodeObservationRequest` types respectively.
 
 ## [0.16.0] - 2025-12-22
 

@@ -48,7 +48,7 @@ pub enum DataType {
 }
 
 /// CPU, memory, and disk usage.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct ResourceUsage {
     /// The average CPU usage in percent.
     pub cpu_usage: f32,
@@ -66,7 +66,7 @@ pub struct ResourceUsage {
     pub disk_available_bytes: u64,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Process {
     pub user: String,
     pub cpu_usage: f32,
@@ -287,6 +287,552 @@ pub struct EventMessage {
     pub kind: EventKind,
     #[serde(with = "serde_bytes")]
     pub fields: Vec<u8>,
+}
+
+/// Types for the `node` agent family, grouping host-control and
+/// host-observation functionality under stable feature families.
+pub mod node {
+    use serde::{Deserialize, Serialize};
+
+    use super::Process;
+
+    // ── service control ─────────────────────────────────────────
+
+    /// Request for managing system services on a node.
+    ///
+    /// Each variant carries only the data its operation requires,
+    /// making invalid combinations unrepresentable.
+    #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+    pub enum NodeServiceRequest {
+        /// Start a service by name.
+        Start { name: String },
+        /// Stop a service by name.
+        Stop { name: String },
+        /// Restart a service by name.
+        Restart { name: String },
+        /// Query the status of a service by name.
+        Status { name: String },
+        /// List all known services.
+        List,
+    }
+
+    /// Response from a service-control operation.
+    #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+    pub enum NodeServiceResponse {
+        /// The operation completed successfully.
+        Ok,
+        /// Status of a single service.
+        Status {
+            name: String,
+            active: bool,
+            pid: Option<u32>,
+            details: Option<String>,
+        },
+        /// A list of services on the node.
+        List { services: Vec<ServiceInfo> },
+    }
+
+    /// Summary information for a single system service.
+    #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+    pub struct ServiceInfo {
+        pub name: String,
+        pub active: bool,
+        pub description: Option<String>,
+    }
+
+    // ── network interface management ────────────────────────────
+
+    /// Request for managing network interfaces on a node.
+    #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+    pub enum NodeNetworkInterfaceRequest {
+        /// List all network interfaces.
+        List,
+        /// Get status of a specific interface by name.
+        Get { name: String },
+        /// Apply configuration to a named interface.
+        Configure {
+            name: String,
+            cfg: NetworkInterfaceConfig,
+        },
+        /// Bring an interface up.
+        Up { name: String },
+        /// Bring an interface down.
+        Down { name: String },
+    }
+
+    /// Response from a network-interface operation.
+    #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+    pub enum NodeNetworkInterfaceResponse {
+        /// A list of all interfaces.
+        List {
+            interfaces: Vec<NetworkInterfaceStatus>,
+        },
+        /// Status of a single interface.
+        Get { status: NetworkInterfaceStatus },
+        /// The operation completed successfully.
+        Ok,
+    }
+
+    /// Configuration payload for a network interface.
+    #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+    pub struct NetworkInterfaceConfig {
+        /// IP addresses to assign (as strings to support CIDR
+        /// notation).
+        pub addresses: Vec<String>,
+        /// Maximum transmission unit.
+        pub mtu: Option<u32>,
+        /// Whether DHCP should be enabled.
+        pub dhcp: Option<bool>,
+        /// MAC address override.
+        pub mac: Option<String>,
+    }
+
+    /// Observed status of a network interface.
+    #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+    pub struct NetworkInterfaceStatus {
+        pub name: String,
+        pub up: bool,
+        /// Currently assigned addresses.
+        pub addresses: Vec<String>,
+        pub mtu: Option<u32>,
+        pub mac: Option<String>,
+    }
+
+    // ── hostname management ─────────────────────────────────────
+
+    /// Request for reading or setting the node hostname.
+    #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+    pub enum NodeHostnameRequest {
+        /// Retrieve the current hostname.
+        Get,
+        /// Set the hostname to the given value.
+        Set { hostname: String },
+    }
+
+    /// Response from a hostname operation.
+    #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+    pub enum NodeHostnameResponse {
+        /// The current hostname.
+        Get { hostname: String },
+        /// The operation completed successfully.
+        Ok,
+    }
+
+    // ── time synchronization management ─────────────────────────
+
+    /// Request for managing NTP / time-synchronization settings.
+    #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+    pub enum NodeTimeSyncRequest {
+        /// Retrieve the current time-sync configuration.
+        Get,
+        /// Replace the list of NTP servers.
+        Set { servers: Vec<String> },
+        /// Enable time synchronization.
+        Enable,
+        /// Disable time synchronization.
+        Disable,
+        /// Query synchronization status.
+        Status,
+    }
+
+    /// Response from a time-synchronization operation.
+    #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+    pub enum NodeTimeSyncResponse {
+        /// Current time-sync configuration.
+        Get { servers: Vec<String>, enabled: bool },
+        /// Current synchronization status.
+        Status {
+            synced: bool,
+            offset_seconds: Option<f64>,
+        },
+        /// The operation completed successfully.
+        Ok,
+    }
+
+    // ── logging configuration ───────────────────────────────────
+
+    /// Request for managing logging configuration on a node.
+    #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+    pub enum NodeLoggingRequest {
+        /// Retrieve the current logging configuration.
+        GetConfig,
+        /// Replace the entire logging configuration.
+        SetConfig { cfg: LoggingConfig },
+        /// Set the log level, optionally scoped to a facility.
+        SetLevel {
+            facility: Option<String>,
+            level: LogLevel,
+        },
+    }
+
+    /// Response from a logging-configuration operation.
+    #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+    pub enum NodeLoggingResponse {
+        /// The current logging configuration.
+        Config { cfg: LoggingConfig },
+        /// The operation completed successfully.
+        Ok,
+    }
+
+    /// Full logging configuration for a node.
+    #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+    pub struct LoggingConfig {
+        pub default_level: LogLevel,
+        pub rules: Vec<LoggingRule>,
+    }
+
+    /// A per-target log-level override.
+    #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+    pub struct LoggingRule {
+        pub target: String,
+        pub level: LogLevel,
+    }
+
+    /// Standard log severity levels.
+    #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+    pub enum LogLevel {
+        Trace,
+        Debug,
+        Info,
+        Warn,
+        Error,
+    }
+
+    // ── remote access configuration ─────────────────────────────
+
+    /// Request for managing remote-access (e.g. SSH) settings.
+    #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+    pub enum NodeRemoteAccessRequest {
+        /// Retrieve the current remote-access configuration.
+        GetConfig,
+        /// Replace the remote-access configuration.
+        SetConfig { cfg: RemoteAccessConfig },
+        /// Enable remote access.
+        Enable,
+        /// Disable remote access.
+        Disable,
+        /// List authorized public keys.
+        ListAuthorizedKeys,
+    }
+
+    /// Response from a remote-access operation.
+    #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+    pub enum NodeRemoteAccessResponse {
+        /// The current remote-access configuration.
+        Config { cfg: RemoteAccessConfig },
+        /// List of authorized public keys.
+        AuthorizedKeys { keys: Vec<String> },
+        /// The operation completed successfully.
+        Ok,
+    }
+
+    /// Remote-access (SSH) configuration for a node.
+    #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+    pub struct RemoteAccessConfig {
+        pub ssh_enabled: bool,
+        pub port: Option<u16>,
+        pub authorized_keys: Vec<String>,
+    }
+
+    // ── power control ───────────────────────────────────────────
+
+    /// Request for node power-control operations.
+    ///
+    /// Maps the existing flat `reboot` and `shutdown` APIs into the
+    /// `node` domain.
+    #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+    pub enum NodePowerRequest {
+        /// Reboot the node.
+        Reboot {
+            force: bool,
+            delay_seconds: Option<u32>,
+        },
+        /// Shut down the node.
+        Shutdown {
+            force: bool,
+            delay_seconds: Option<u32>,
+        },
+        /// Halt the node immediately.
+        Halt { force: bool },
+    }
+
+    /// Response from a power-control operation.
+    #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+    pub enum NodePowerResponse {
+        /// The operation completed (or was accepted) successfully.
+        Ok,
+        /// A power operation has been scheduled.
+        Status { scheduled_in_seconds: Option<u32> },
+    }
+
+    // ── host observation ────────────────────────────────────────
+
+    /// Request for observing host state.
+    ///
+    /// Maps the existing flat `process_list` and `resource_usage`
+    /// APIs into the `node` domain.
+    #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+    pub enum NodeObservationRequest {
+        /// List all running processes.
+        ProcessList,
+        /// Get aggregate resource usage (CPU, memory, disk).
+        ResourceUsage,
+        /// Get information about a specific process by PID.
+        ProcessInfo { pid: u32 },
+    }
+
+    /// Response from a host-observation operation.
+    ///
+    /// Reuses the existing [`Process`] and [`ResourceUsage`] types.
+    #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+    pub enum NodeObservationResponse {
+        /// List of running processes.
+        ProcessList { processes: Vec<Process> },
+        /// Aggregate resource usage.
+        ResourceUsage { usage: super::ResourceUsage },
+        /// Information about a single process, or `None` if the PID
+        /// was not found.
+        ProcessInfo { process: Option<Process> },
+    }
+
+    // ── version management ──────────────────────────────────────
+
+    /// Request for querying or updating the node software version.
+    #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+    pub enum NodeVersionRequest {
+        /// Get the currently running version.
+        Get,
+        /// Check whether an update is available.
+        CheckUpdate,
+        /// Apply an available update.
+        Update,
+    }
+
+    /// Response from a version-management operation.
+    #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+    pub enum NodeVersionResponse {
+        /// The current version string.
+        Version { version: String },
+        /// An update is available.
+        UpdateAvailable { latest: String },
+        /// The operation completed successfully.
+        Ok,
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::super::ResourceUsage;
+        use super::*;
+
+        /// Helper: bincode round-trip for any `Serialize + Deserialize`
+        /// type.
+        fn roundtrip<T>(value: &T) -> T
+        where
+            T: Serialize + serde::de::DeserializeOwned + std::fmt::Debug,
+        {
+            let bytes = bincode::serde::encode_to_vec(
+                value,
+                bincode::config::standard().with_fixed_int_encoding(),
+            )
+            .expect("serialization should succeed");
+            let (decoded, _): (T, usize) = bincode::serde::decode_from_slice(
+                &bytes,
+                bincode::config::standard().with_fixed_int_encoding(),
+            )
+            .expect("deserialization should succeed");
+            decoded
+        }
+
+        #[test]
+        fn serde_roundtrip_node_service() {
+            let req = NodeServiceRequest::Start {
+                name: "nginx".into(),
+            };
+            assert_eq!(req, roundtrip(&req));
+
+            let req = NodeServiceRequest::List;
+            assert_eq!(req, roundtrip(&req));
+
+            let resp = NodeServiceResponse::Status {
+                name: "nginx".into(),
+                active: true,
+                pid: Some(1234),
+                details: None,
+            };
+            assert_eq!(resp, roundtrip(&resp));
+
+            let resp = NodeServiceResponse::List {
+                services: vec![ServiceInfo {
+                    name: "sshd".into(),
+                    active: true,
+                    description: Some("OpenSSH server".into()),
+                }],
+            };
+            assert_eq!(resp, roundtrip(&resp));
+        }
+
+        #[test]
+        fn serde_roundtrip_node_network_interface() {
+            let req = NodeNetworkInterfaceRequest::Configure {
+                name: "eth0".into(),
+                cfg: NetworkInterfaceConfig {
+                    addresses: vec!["192.168.1.10/24".into()],
+                    mtu: Some(1500),
+                    dhcp: Some(false),
+                    mac: None,
+                },
+            };
+            assert_eq!(req, roundtrip(&req));
+
+            let resp = NodeNetworkInterfaceResponse::Get {
+                status: NetworkInterfaceStatus {
+                    name: "eth0".into(),
+                    up: true,
+                    addresses: vec!["192.168.1.10".into()],
+                    mtu: Some(1500),
+                    mac: Some("00:11:22:33:44:55".into()),
+                },
+            };
+            assert_eq!(resp, roundtrip(&resp));
+        }
+
+        #[test]
+        fn serde_roundtrip_node_hostname() {
+            let req = NodeHostnameRequest::Set {
+                hostname: "node-1".into(),
+            };
+            assert_eq!(req, roundtrip(&req));
+
+            let resp = NodeHostnameResponse::Get {
+                hostname: "node-1".into(),
+            };
+            assert_eq!(resp, roundtrip(&resp));
+        }
+
+        #[test]
+        fn serde_roundtrip_node_time_sync() {
+            let req = NodeTimeSyncRequest::Set {
+                servers: vec!["0.pool.ntp.org".into(), "1.pool.ntp.org".into()],
+            };
+            assert_eq!(req, roundtrip(&req));
+
+            let resp = NodeTimeSyncResponse::Get {
+                servers: vec!["0.pool.ntp.org".into()],
+                enabled: true,
+            };
+            assert_eq!(resp, roundtrip(&resp));
+
+            let resp = NodeTimeSyncResponse::Status {
+                synced: true,
+                offset_seconds: Some(0.003),
+            };
+            assert_eq!(resp, roundtrip(&resp));
+        }
+
+        #[test]
+        fn serde_roundtrip_node_logging() {
+            let req = NodeLoggingRequest::SetConfig {
+                cfg: LoggingConfig {
+                    default_level: LogLevel::Info,
+                    rules: vec![LoggingRule {
+                        target: "network".into(),
+                        level: LogLevel::Debug,
+                    }],
+                },
+            };
+            assert_eq!(req, roundtrip(&req));
+
+            let req = NodeLoggingRequest::SetLevel {
+                facility: Some("auth".into()),
+                level: LogLevel::Warn,
+            };
+            assert_eq!(req, roundtrip(&req));
+
+            let resp = NodeLoggingResponse::Ok;
+            assert_eq!(resp, roundtrip(&resp));
+        }
+
+        #[test]
+        fn serde_roundtrip_node_remote_access() {
+            let req = NodeRemoteAccessRequest::SetConfig {
+                cfg: RemoteAccessConfig {
+                    ssh_enabled: true,
+                    port: Some(22),
+                    authorized_keys: vec!["ssh-ed25519 AAAA...".into()],
+                },
+            };
+            assert_eq!(req, roundtrip(&req));
+
+            let resp = NodeRemoteAccessResponse::AuthorizedKeys {
+                keys: vec!["ssh-ed25519 AAAA...".into()],
+            };
+            assert_eq!(resp, roundtrip(&resp));
+        }
+
+        #[test]
+        fn serde_roundtrip_node_power() {
+            let req = NodePowerRequest::Reboot {
+                force: false,
+                delay_seconds: Some(30),
+            };
+            assert_eq!(req, roundtrip(&req));
+
+            let req = NodePowerRequest::Shutdown {
+                force: true,
+                delay_seconds: None,
+            };
+            assert_eq!(req, roundtrip(&req));
+
+            let resp = NodePowerResponse::Status {
+                scheduled_in_seconds: Some(30),
+            };
+            assert_eq!(resp, roundtrip(&resp));
+        }
+
+        #[test]
+        fn serde_roundtrip_node_observation() {
+            let req = NodeObservationRequest::ProcessInfo { pid: 42 };
+            assert_eq!(req, roundtrip(&req));
+
+            let resp = NodeObservationResponse::ProcessList {
+                processes: vec![Process {
+                    user: "root".into(),
+                    cpu_usage: 1.5,
+                    mem_usage: 0.8,
+                    start_time: 1_700_000_000,
+                    command: "/usr/sbin/sshd".into(),
+                }],
+            };
+            assert_eq!(resp, roundtrip(&resp));
+
+            let resp = NodeObservationResponse::ResourceUsage {
+                usage: ResourceUsage {
+                    cpu_usage: 45.2,
+                    total_memory: 16_000_000_000,
+                    used_memory: 8_000_000_000,
+                    disk_used_bytes: 100_000_000_000,
+                    disk_available_bytes: 400_000_000_000,
+                },
+            };
+            assert_eq!(resp, roundtrip(&resp));
+        }
+
+        #[test]
+        fn serde_roundtrip_node_version() {
+            let req = NodeVersionRequest::CheckUpdate;
+            assert_eq!(req, roundtrip(&req));
+
+            let resp = NodeVersionResponse::UpdateAvailable {
+                latest: "2.1.0".into(),
+            };
+            assert_eq!(resp, roundtrip(&resp));
+
+            let resp = NodeVersionResponse::Version {
+                version: "2.0.0".into(),
+            };
+            assert_eq!(resp, roundtrip(&resp));
+        }
+    }
 }
 
 #[cfg(test)]

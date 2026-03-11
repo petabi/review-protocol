@@ -123,6 +123,7 @@ pub(crate) enum RequestCode {
     GetConfig = 36,
     UpdateHostOpenedPorts = 37,
     UpdateHostOsAgents = 38,
+    GetSamplingPolicyList = 39,
 
     /// Unknown request
     #[num_enum(default)]

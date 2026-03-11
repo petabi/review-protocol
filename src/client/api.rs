@@ -9,7 +9,7 @@ use serde::{Serialize, de::DeserializeOwned};
 use super::Connection;
 use crate::{
     server,
-    types::{DataSource, DataSourceKey, HostNetworkGroup, UserAgent},
+    types::{DataSource, DataSourceKey, HostNetworkGroup, SamplingPolicy, UserAgent},
     unary_request,
 };
 
@@ -127,6 +127,17 @@ impl Connection {
     pub async fn get_trusted_user_agent_list(&self) -> io::Result<Vec<String>> {
         let res: Result<Vec<String>, String> =
             request(self, server::RequestCode::GetTrustedUserAgentList, ()).await?;
+        res.map_err(io::Error::other)
+    }
+
+    /// Fetches the list of sampling policies from the server.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails or the response is invalid.
+    pub async fn get_sampling_policy_list(&self) -> io::Result<Vec<SamplingPolicy>> {
+        let res: Result<Vec<SamplingPolicy>, String> =
+            request(self, server::RequestCode::GetSamplingPolicyList, ()).await?;
         res.map_err(io::Error::other)
     }
 
@@ -549,6 +560,19 @@ mod tests {
             assert_eq!(received_list.len(), 2);
             assert_eq!(received_list[0], "Mozilla/5.0 (trusted)");
             assert_eq!(received_list[1], "Chrome/test");
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn get_sampling_policy_list() {
+        run_test(|client_conn| async move {
+            let client_res = client_conn.get_sampling_policy_list().await;
+            assert!(client_res.is_ok());
+            let policies = client_res.unwrap();
+            assert_eq!(policies.len(), 1);
+            assert_eq!(policies[0].id, 1);
+            assert_eq!(policies[0].node, Some("node1".to_string()));
         })
         .await;
     }

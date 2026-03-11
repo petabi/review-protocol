@@ -54,20 +54,20 @@ impl CollectingHandler {
 
 #[async_trait::async_trait]
 impl EventStreamHandler for CollectingHandler {
-    async fn handle_event(&mut self, event: EventMessage) -> Result<(), String> {
+    async fn handle_event(&mut self, event: EventMessage) -> std::io::Result<()> {
         let mut events = self.events.lock().expect("Failed to lock events");
         events.push(event);
 
         if let Some(max) = self.max_events
             && events.len() >= max
         {
-            return Err("reached event limit".to_string());
+            return Err(std::io::Error::other("reached event limit"));
         }
 
         Ok(())
     }
 
-    async fn on_error(&mut self, error: &str) -> Result<(), String> {
+    async fn on_error(&mut self, error: &str) -> std::io::Result<()> {
         self.errors
             .lock()
             .expect("Failed to lock errors")
@@ -506,7 +506,7 @@ async fn test_concurrent_stream_processing() {
 
     #[async_trait::async_trait]
     impl EventStreamHandler for CountingHandler {
-        async fn handle_event(&mut self, _event: EventMessage) -> Result<(), String> {
+        async fn handle_event(&mut self, _event: EventMessage) -> std::io::Result<()> {
             {
                 let mut count = self
                     .processed_count

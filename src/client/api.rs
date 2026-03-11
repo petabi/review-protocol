@@ -626,7 +626,7 @@ mod tests {
     async fn insert_time_series() {
         run_test(|client_conn| async move {
             let data = vec![crate::types::TimeSeriesUpdate {
-                cluster_id: "test-cluster".to_string(),
+                cluster_id: 1,
                 time_series: vec![],
             }];
             let client_res = client_conn.insert_time_series(&data, 1, 1000).await;

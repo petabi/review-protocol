@@ -210,13 +210,13 @@ pub struct TimeSeries {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct TimeSeriesUpdate {
-    pub cluster_id: String,
+    pub cluster_id: u32,
     pub time_series: Vec<TimeSeries>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct UpdateClusterRequest {
-    pub cluster_id: i32,
+    pub cluster_id: u32,
     pub detector_id: i32,
     pub signature: String,
     pub score: Option<f64>,

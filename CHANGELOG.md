@@ -82,6 +82,10 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- - Changed `TimeSeriesUpdate::cluster_id` field type from
+  `String` to `u32`.
+- Changed `UpdateClusterRequest::cluster_id` field type from
+  `i32` to `u32`.
 - Flat host-control APIs (`send_reboot_cmd`, `send_shutdown_cmd`,
   `get_process_list`, `get_resource_usage`) now route through the
   corresponding `node_power` / `node_observation` methods

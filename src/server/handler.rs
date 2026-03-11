@@ -12,7 +12,7 @@ use oinq::request::parse_args;
 use super::RequestCode;
 use crate::types::{
     ColumnStatisticsUpdate, DataSource, DataSourceKey, EventMessage, HostNetworkGroup, LabelDb,
-    OutlierInfo, TimeSeriesUpdate, UpdateClusterRequest, UserAgent,
+    OutlierInfo, SamplingPolicy, TimeSeriesUpdate, UpdateClusterRequest, UserAgent,
 };
 
 /// A request handler that can handle a request to the server.
@@ -62,6 +62,10 @@ pub trait Handler {
     }
 
     async fn get_pretrained_model(&self, _name: &str) -> Result<Vec<u8>, String> {
+        Err("not supported".to_string())
+    }
+
+    async fn get_sampling_policy_list(&self) -> Result<Vec<SamplingPolicy>, String> {
         Err("not supported".to_string())
     }
 
@@ -263,6 +267,11 @@ where
             RequestCode::GetPretrainedModel => {
                 let name = parse_args::<String>(body)?;
                 let result = handler.get_pretrained_model(&name).await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::GetSamplingPolicyList => {
+                parse_args::<()>(body)?;
+                let result = handler.get_sampling_policy_list().await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::InsertColumnStatistics => {

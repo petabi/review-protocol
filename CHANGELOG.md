@@ -7,6 +7,12 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `get_sampling_policy_list` method to the server `Handler` trait
+  and `client::Connection`, allowing clients to retrieve the
+  sampling policy list from the server.
+
 ### Changed
 
 - Renamed `Tidb` references to `LabelDb` (including request codes/handler-client

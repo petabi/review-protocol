@@ -14,7 +14,7 @@ use tokio::sync::Mutex;
 
 use crate::types::{
     DataSource, DataSourceKey, DataType, EventCategory, HostNetworkGroup, LabelDb, LabelDbKind,
-    LabelDbRule,
+    LabelDbRule, SamplingKind, SamplingPolicy,
 };
 
 pub(crate) struct Channel {
@@ -332,6 +332,20 @@ impl crate::server::Handler for TestServerHandler {
             networks: vec![],
             ip_ranges: vec![],
         })
+    }
+
+    async fn get_sampling_policy_list(&self) -> Result<Vec<SamplingPolicy>, String> {
+        Ok(vec![SamplingPolicy {
+            id: 1,
+            kind: SamplingKind::Conn,
+            interval: std::time::Duration::from_secs(60),
+            period: std::time::Duration::from_secs(3600),
+            offset: 0,
+            src_ip: None,
+            dst_ip: None,
+            node: Some("node1".to_string()),
+            column: None,
+        }])
     }
 
     async fn get_pretrained_model(&self, name: &str) -> Result<Vec<u8>, String> {

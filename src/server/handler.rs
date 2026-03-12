@@ -65,7 +65,7 @@ pub trait Handler {
         Err("not supported".to_string())
     }
 
-    async fn get_sampling_policy_list(&self) -> Result<Vec<SamplingPolicy>, String> {
+    async fn get_sampling_policy_list(&self, _peer: &str) -> Result<Vec<SamplingPolicy>, String> {
         Err("not supported".to_string())
     }
 
@@ -271,7 +271,7 @@ where
             }
             RequestCode::GetSamplingPolicyList => {
                 parse_args::<()>(body)?;
-                let result = handler.get_sampling_policy_list().await;
+                let result = handler.get_sampling_policy_list(peer).await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::InsertColumnStatistics => {

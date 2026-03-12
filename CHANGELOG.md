@@ -9,9 +9,10 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- `get_sampling_policy_list` method to the server `Handler` trait
-  and `client::Connection`, allowing clients to retrieve the
-  sampling policy list from the server.
+- `Connection::get_sampling_policy_list` to retrieve the sampling
+  policy list from the server.
+- `Handler::get_sampling_policy_list` to handle sampling policy list
+  requests from clients.
 
 ### Changed
 

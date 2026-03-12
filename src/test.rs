@@ -334,7 +334,7 @@ impl crate::server::Handler for TestServerHandler {
         })
     }
 
-    async fn get_sampling_policy_list(&self) -> Result<Vec<SamplingPolicy>, String> {
+    async fn get_sampling_policy_list(&self, _peer: &str) -> Result<Vec<SamplingPolicy>, String> {
         Ok(vec![SamplingPolicy {
             id: 1,
             kind: SamplingKind::Conn,

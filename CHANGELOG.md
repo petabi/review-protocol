@@ -10,7 +10,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - Renamed `Tidb` references to `LabelDb` (including request codes/handler-client
-  methods) and `TiKind`/`TiRule` to `LabelDbKind`/`LabelDbRule`(Breaking Change)
+  methods) and `TiKind`/`TiRule` to `LabelDbKind`/`LabelDbRule` (Breaking Change).
 
 ## [0.16.0] - 2025-12-22
 

@@ -282,8 +282,7 @@ pub enum EventKind {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct EventMessage {
-    #[serde(with = "jiff::fmt::serde::timestamp::nanosecond::required")]
-    pub time: jiff::Timestamp,
+    pub time: i64,
     pub kind: EventKind,
     #[serde(with = "serde_bytes")]
     pub fields: Vec<u8>,
@@ -367,7 +366,10 @@ mod tests {
     fn event_message_with_blocklist_radius_serialization() {
         // Test EventMessage with BlocklistRadius variant
         let event = EventMessage {
-            time: jiff::Timestamp::now(),
+            time: jiff::Timestamp::now()
+                .as_nanosecond()
+                .try_into()
+                .unwrap_or_default(),
             kind: EventKind::BlocklistRadius,
             fields: vec![1, 2, 3, 4, 5],
         };

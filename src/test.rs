@@ -1,4 +1,6 @@
 //! Shared test code
+//!
+//! This module is exposed for integration tests and benchmarks.
 
 #![allow(clippy::unwrap_used)]
 
@@ -17,21 +19,25 @@ use crate::types::{
     LabelDbRule, SamplingKind, SamplingPolicy,
 };
 
+#[allow(dead_code)]
 pub(crate) struct Channel {
     pub(crate) server: Endpoint,
     pub(crate) client: Endpoint,
 }
 
+#[allow(dead_code)]
 pub(crate) struct Endpoint {
     pub(crate) conn: Connection,
     pub(crate) send: SendStream,
     pub(crate) recv: RecvStream,
 }
 
+#[allow(dead_code)]
 pub(crate) static TOKEN: LazyLock<Mutex<u32>> = LazyLock::new(|| Mutex::new(0));
 
 /// Creates a bidirectional channel, returning server's send and receive and
 /// client's send and receive streams.
+#[allow(dead_code)]
 pub(crate) async fn channel() -> Channel {
     use std::sync::Arc;
 
@@ -41,7 +47,7 @@ pub(crate) async fn channel() -> Channel {
     let cert =
         rcgen::generate_simple_self_signed([TEST_SERVER_NAME.to_string()]).expect("infallible");
     let cert_der = vec![CertificateDer::from(cert.cert)];
-    let key_der = PrivatePkcs8KeyDer::from(cert.signing_key.serialize_der());
+    let key_der = PrivatePkcs8KeyDer::from(cert.key_pair.serialize_der());
     let server_config = quinn::ServerConfig::with_single_cert(cert_der.clone(), key_der.into())
         .expect("infallible");
     let server_addr = SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), TEST_PORT);
@@ -105,13 +111,11 @@ pub(crate) async fn channel() -> Channel {
     }
 }
 
-#[cfg(test)]
-pub(crate) struct TestEnvironment {
+pub struct TestEnvironment {
     server_cert_pem: String,
     server_config: quinn::ServerConfig,
 }
 
-#[cfg(test)]
 impl TestEnvironment {
     // server configuration
     const SERVER_NAME: &str = "test-server";
@@ -126,7 +130,7 @@ impl TestEnvironment {
         let server_cert_pem = server_certified_key.cert.pem();
         let server_certs_der = vec![CertificateDer::from(server_certified_key.cert)];
         let server_key_der =
-            PrivatePkcs8KeyDer::from(server_certified_key.signing_key.serialize_der());
+            PrivatePkcs8KeyDer::from(server_certified_key.key_pair.serialize_der());
         let server_config =
             quinn::ServerConfig::with_single_cert(server_certs_der.clone(), server_key_der.into())
                 .expect("valid certificate");
@@ -137,7 +141,7 @@ impl TestEnvironment {
         }
     }
 
-    pub(crate) async fn setup(&self) -> (crate::server::Connection, crate::client::Connection) {
+    pub async fn setup(&self) -> (crate::server::Connection, crate::client::Connection) {
         use crate::Status;
 
         // client configuration
@@ -183,7 +187,7 @@ impl TestEnvironment {
         let client_certified_key =
             rcgen::generate_simple_self_signed([CLIENT_NAME.to_string()]).expect("infallible");
         let client_cert_pem = client_certified_key.cert.pem();
-        let client_key_pem = client_certified_key.signing_key.serialize_pem();
+        let client_key_pem = client_certified_key.key_pair.serialize_pem();
         let mut builder = crate::client::ConnectionBuilder::new(
             Self::SERVER_NAME,
             Self::SERVER_ADDR,
@@ -210,20 +214,18 @@ impl TestEnvironment {
         )
     }
 
-    pub(crate) fn teardown(&self, server_conn: &crate::server::Connection) {
+    pub fn teardown(&self, server_conn: &crate::server::Connection) {
         let _ = self; // Silence unused warning for `self`
         server_conn.close();
     }
 }
 
-#[cfg(any(feature = "client", feature = "server"))]
-pub(crate) static TEST_ENV: LazyLock<Mutex<TestEnvironment>> =
+pub static TEST_ENV: LazyLock<Mutex<TestEnvironment>> =
     LazyLock::new(|| Mutex::new(TestEnvironment::new()));
 
-#[cfg(feature = "client")]
+#[allow(dead_code)]
 pub(crate) struct TestServerHandler;
 
-#[cfg(feature = "client")]
 #[async_trait::async_trait]
 impl crate::server::Handler for TestServerHandler {
     // Returns `Some` for `id` 5 and `name` "name5" only.

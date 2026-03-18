@@ -364,28 +364,33 @@ pub mod node {
     }
 
     /// Configuration payload for a network interface.
+    ///
+    /// All fields are optional so that partial updates can be
+    /// expressed (e.g. changing only `dhcp` without touching
+    /// `addresses`).
     #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
     pub struct NodeNetworkInterfaceConfig {
         /// IP addresses to assign (as strings to support CIDR
         /// notation).
-        pub addresses: Vec<String>,
-        /// Maximum transmission unit.
-        pub mtu: Option<u32>,
+        pub addresses: Option<Vec<String>>,
         /// Whether DHCP should be enabled.
         pub dhcp: Option<bool>,
-        /// MAC address override.
-        pub mac: Option<String>,
+        /// Default gateway address.
+        pub gateway: Option<String>,
+        /// DNS nameserver addresses.
+        pub nameservers: Option<Vec<String>>,
+        /// Whether the interface is optional (i.e. the system should
+        /// not wait for it during boot).
+        pub optional: Option<bool>,
     }
 
-    /// Full observed state of a network interface.
+    /// A network interface together with its configuration.
     #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
     pub struct NodeNetworkInterface {
-        pub name: String,
-        pub up: bool,
-        /// Currently assigned addresses.
-        pub addresses: Vec<String>,
-        pub mtu: Option<u32>,
-        pub mac: Option<String>,
+        /// The device name (e.g. `"eth0"`).
+        pub device: String,
+        /// The interface configuration.
+        pub config: NodeNetworkInterfaceConfig,
     }
 
     // ── hostname management ─────────────────────────────────────
@@ -592,7 +597,7 @@ pub mod node {
         Done,
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, any(feature = "client", feature = "server")))]
     mod tests {
         use std::time::Duration;
 
@@ -647,21 +652,25 @@ pub mod node {
             let req = NodeNetworkInterfaceRequest::Set {
                 device: "eth0".into(),
                 config: NodeNetworkInterfaceConfig {
-                    addresses: vec!["192.168.1.10/24".into()],
-                    mtu: Some(1500),
+                    addresses: Some(vec!["192.168.1.10/24".into()]),
                     dhcp: Some(false),
-                    mac: None,
+                    gateway: Some("192.168.1.1".into()),
+                    nameservers: Some(vec!["8.8.8.8".into()]),
+                    optional: None,
                 },
             };
             assert_eq!(req, roundtrip(&req));
 
             let resp = NodeNetworkInterfaceResponse::Get {
                 interface: Some(NodeNetworkInterface {
-                    name: "eth0".into(),
-                    up: true,
-                    addresses: vec!["192.168.1.10".into()],
-                    mtu: Some(1500),
-                    mac: Some("00:11:22:33:44:55".into()),
+                    device: "eth0".into(),
+                    config: NodeNetworkInterfaceConfig {
+                        addresses: Some(vec!["192.168.1.10/24".into()]),
+                        dhcp: Some(false),
+                        gateway: Some("192.168.1.1".into()),
+                        nameservers: Some(vec!["8.8.8.8".into()]),
+                        optional: Some(false),
+                    },
                 }),
             };
             assert_eq!(resp, roundtrip(&resp));

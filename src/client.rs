@@ -133,13 +133,14 @@ pub struct ConnectionBuilder {
     protocol_version: String,
     status: crate::Status,
     roots: rustls::RootCertStore,
-    cert: rustls::pki_types::CertificateDer<'static>,
+    certs: Vec<rustls::pki_types::CertificateDer<'static>>,
     key: rustls::pki_types::PrivateKeyDer<'static>,
 }
 
 #[cfg(feature = "client")]
 impl ConnectionBuilder {
-    /// Creates a new builder with the remote address, certificate, and key.
+    /// Creates a new builder with the remote address, certificate chain,
+    /// and key.
     ///
     /// # Errors
     ///
@@ -160,11 +161,14 @@ impl ConnectionBuilder {
         } else {
             IpAddr::V4(Ipv4Addr::UNSPECIFIED)
         };
-        let cert = rustls_pemfile::certs(&mut std::io::Cursor::new(cert))
-            .next()
-            .ok_or_else(|| {
-                std::io::Error::new(std::io::ErrorKind::InvalidData, "no certificate")
-            })??;
+        let certs: Vec<_> =
+            rustls_pemfile::certs(&mut std::io::Cursor::new(cert)).collect::<Result<_, _>>()?;
+        if certs.is_empty() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "no certificate",
+            ));
+        }
         let key = rustls_pemfile::private_key(&mut std::io::Cursor::new(key))
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?
             .ok_or_else(|| {
@@ -179,22 +183,29 @@ impl ConnectionBuilder {
             protocol_version: protocol_version.to_string(),
             status,
             roots: rustls::RootCertStore::empty(),
-            cert,
+            certs,
             key,
         })
     }
 
-    /// Sets the certificate for the connection.
+    /// Sets the client certificate chain for the connection.
+    ///
+    /// If the PEM contains a full chain (leaf + intermediates), all
+    /// certificates are preserved and sent during the TLS handshake.
     ///
     /// # Errors
     ///
     /// Returns an error if the certificate is invalid.
     pub fn cert(&mut self, cert: &[u8]) -> std::io::Result<&mut Self> {
-        self.cert = rustls_pemfile::certs(&mut std::io::Cursor::new(cert))
-            .next()
-            .ok_or_else(|| {
-                std::io::Error::new(std::io::ErrorKind::InvalidData, "no certificate")
-            })??;
+        let certs: Vec<_> =
+            rustls_pemfile::certs(&mut std::io::Cursor::new(cert)).collect::<Result<_, _>>()?;
+        if certs.is_empty() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "no certificate",
+            ));
+        }
+        self.certs = certs;
         Ok(self)
     }
 
@@ -214,6 +225,9 @@ impl ConnectionBuilder {
 
     /// Sets the root certificates for the connection.
     ///
+    /// Each item may contain multiple PEM-encoded certificates (e.g. a
+    /// CA bundle); all certificates are loaded into the trust store.
+    ///
     /// # Errors
     ///
     /// Returns an error if any of the certificates are invalid.
@@ -223,15 +237,13 @@ impl ConnectionBuilder {
         I::Item: AsRef<[u8]>,
     {
         self.roots = rustls::RootCertStore::empty();
-        for cert in certs {
-            let cert = rustls_pemfile::certs(&mut std::io::Cursor::new(cert.as_ref()))
-                .next()
-                .ok_or_else(|| {
-                    std::io::Error::new(std::io::ErrorKind::InvalidData, "invalid certificate")
-                })??;
-            self.roots
-                .add(cert)
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        for pem in certs {
+            for cert in rustls_pemfile::certs(&mut std::io::Cursor::new(pem.as_ref())) {
+                let cert = cert?;
+                self.roots
+                    .add(cert)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+            }
         }
         Ok(self)
     }
@@ -354,7 +366,7 @@ impl ConnectionBuilder {
 
         let tls_cfg = rustls::ClientConfig::builder()
             .with_root_certificates(self.roots.clone())
-            .with_client_auth_cert(vec![self.cert.clone()], self.key.clone_key())
+            .with_client_auth_cert(self.certs.clone(), self.key.clone_key())
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
         let mut transport = quinn::TransportConfig::default();
         transport.keep_alive_interval(Some(KEEP_ALIVE_INTERVAL));

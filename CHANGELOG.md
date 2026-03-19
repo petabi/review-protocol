@@ -13,11 +13,6 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   policy list from the server.
 - `Handler::get_sampling_policy_list` to handle sampling policy list
   requests from clients.
-
-### Changed
-
-- Renamed `Tidb` references to `LabelDb` (including request codes/handler-client
-  methods) and `TiKind`/`TiRule` to `LabelDbKind`/`LabelDbRule` (Breaking Change).
 - Shared `node` request and response types for nine feature families:
   service control, network interface management, hostname management,
   time synchronization, logging configuration, remote access
@@ -25,6 +20,11 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   management. Includes auxiliary types `NodeNetworkInterfaceConfig`,
   `NodeNetworkInterface`, `NodeLoggingProtocol`, `NodeLoggingEndpoint`,
   and `NodeRemoteAccessConfig`.
+
+### Changed
+
+- Renamed `Tidb` references to `LabelDb` (including request codes/handler-client
+  methods) and `TiKind`/`TiRule` to `LabelDbKind`/`LabelDbRule` (Breaking Change).
 
 ## [0.16.0] - 2025-12-22
 

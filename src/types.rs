@@ -292,7 +292,6 @@ pub struct EventMessage {
 /// Types for the `node` agent family, grouping host-control and
 /// host-observation functionality under stable feature families.
 pub mod node {
-    use std::net::SocketAddr;
     use std::time::Duration;
 
     use serde::{Deserialize, Serialize};
@@ -302,9 +301,6 @@ pub mod node {
     // ── service control ─────────────────────────────────────────
 
     /// Request for managing system services on a node.
-    ///
-    /// Each variant carries only the data its operation requires,
-    /// making invalid combinations unrepresentable.
     #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
     pub enum NodeServiceRequest {
         /// Start a service by name.
@@ -366,22 +362,19 @@ pub mod node {
     /// Configuration payload for a network interface.
     ///
     /// All fields are optional so that partial updates can be
-    /// expressed (e.g. changing only `dhcp` without touching
+    /// expressed (e.g. changing only `dhcp4` without touching
     /// `addresses`).
     #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
     pub struct NodeNetworkInterfaceConfig {
         /// IP addresses to assign (as strings to support CIDR
         /// notation).
         pub addresses: Option<Vec<String>>,
-        /// Whether DHCP should be enabled.
-        pub dhcp: Option<bool>,
-        /// Default gateway address.
-        pub gateway: Option<String>,
+        /// Whether DHCP for IPv4 should be enabled.
+        pub dhcp4: Option<bool>,
+        /// Default IPv4 gateway address.
+        pub gateway4: Option<String>,
         /// DNS nameserver addresses.
         pub nameservers: Option<Vec<String>>,
-        /// Whether the interface is optional (i.e. the system should
-        /// not wait for it during boot).
-        pub optional: Option<bool>,
     }
 
     /// A network interface together with its configuration.
@@ -457,8 +450,10 @@ pub mod node {
     pub struct NodeLoggingEndpoint {
         /// Transport protocol to use.
         pub protocol: NodeLoggingProtocol,
-        /// The destination address (host and port).
-        pub destination: SocketAddr,
+        /// The destination address (hostname or IP).
+        pub address: String,
+        /// The destination port.
+        pub port: u16,
     }
 
     /// Request for managing logging configuration on a node.
@@ -653,10 +648,9 @@ pub mod node {
                 device: "eth0".into(),
                 config: NodeNetworkInterfaceConfig {
                     addresses: Some(vec!["192.168.1.10/24".into()]),
-                    dhcp: Some(false),
-                    gateway: Some("192.168.1.1".into()),
+                    dhcp4: Some(false),
+                    gateway4: Some("192.168.1.1".into()),
                     nameservers: Some(vec!["8.8.8.8".into()]),
-                    optional: None,
                 },
             };
             assert_eq!(req, roundtrip(&req));
@@ -666,10 +660,9 @@ pub mod node {
                     device: "eth0".into(),
                     config: NodeNetworkInterfaceConfig {
                         addresses: Some(vec!["192.168.1.10/24".into()]),
-                        dhcp: Some(false),
-                        gateway: Some("192.168.1.1".into()),
+                        dhcp4: Some(false),
+                        gateway4: Some("192.168.1.1".into()),
                         nameservers: Some(vec!["8.8.8.8".into()]),
-                        optional: Some(false),
                     },
                 }),
             };
@@ -721,7 +714,8 @@ pub mod node {
             let req = NodeLoggingRequest::Set {
                 endpoints: vec![NodeLoggingEndpoint {
                     protocol: NodeLoggingProtocol::Tcp,
-                    destination: "192.168.1.100:514".parse().unwrap(),
+                    address: "192.168.1.100".into(),
+                    port: 514,
                 }],
             };
             assert_eq!(req, roundtrip(&req));
@@ -732,7 +726,8 @@ pub mod node {
             let resp = NodeLoggingResponse::Get {
                 endpoints: Some(vec![NodeLoggingEndpoint {
                     protocol: NodeLoggingProtocol::Udp,
-                    destination: "10.0.0.1:514".parse().unwrap(),
+                    address: "10.0.0.1".into(),
+                    port: 514,
                 }]),
             };
             assert_eq!(resp, roundtrip(&resp));

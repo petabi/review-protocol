@@ -10,6 +10,18 @@ facilitate efficient and secure communication within the REview ecosystem.
 
 [oinq]: https://github.com/petabi/oinq
 
+## Feature Requirements
+
+This crate requires at least one of the `client` or `server` features
+to be enabled. Running `cargo build` or `cargo test` without either
+feature will produce a compile-time error.
+
+```sh
+cargo test --features client    # test client functionality
+cargo test --features server    # test server functionality
+cargo test --all-features       # test everything (used in CI)
+```
+
 ## License
 
 Copyright 2024-2025 Petabi, Inc.

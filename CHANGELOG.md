@@ -16,6 +16,8 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Building or testing without enabling `client` or `server` now
+  produces a clear `compile_error!` instead of confusing failures.
 - Renamed `Tidb` references to `LabelDb` (including request codes/handler-client
   methods) and `TiKind`/`TiRule` to `LabelDbKind`/`LabelDbRule` (Breaking Change).
 

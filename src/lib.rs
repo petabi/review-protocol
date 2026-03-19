@@ -1,3 +1,11 @@
+#[cfg(not(any(feature = "client", feature = "server")))]
+compile_error!(
+    "review-protocol requires at least one of the features `client` or `server` to be enabled. \
+     To run tests locally use: `cargo test --features client` or `cargo test --features server` \
+     or `cargo test --all-features`. If you intended to use this crate as a library, enable one \
+     of the features in your dependency specification."
+);
+
 pub mod client;
 #[cfg(feature = "client")]
 pub mod frame;

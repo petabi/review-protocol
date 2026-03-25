@@ -296,7 +296,7 @@ pub mod node {
 
     use serde::{Deserialize, Serialize};
 
-    use super::Process;
+    use super::{Process, ResourceUsage};
 
     // ── service control ─────────────────────────────────────────
 
@@ -561,7 +561,7 @@ pub mod node {
         /// Aggregate resource usage for a host.
         ResourceUsage {
             hostname: String,
-            resource_usage: super::ResourceUsage,
+            resource_usage: ResourceUsage,
         },
         /// The node uptime.
         Uptime { uptime: Duration },

@@ -212,15 +212,41 @@ pub trait Handler: Send {
 
     /// Handles a node power-control request.
     ///
+    /// The default implementation delegates to the corresponding flat
+    /// handler method ([`reboot`](Self::reboot) or
+    /// [`shutdown`](Self::shutdown)) so that agents which only
+    /// implement the legacy flat methods can also accept the new
+    /// `node_power` wire requests. See issue #142 for the migration
+    /// plan: agents accept both formats first, then `REview` switches
+    /// to the `node` wire format, and finally the flat methods are
+    /// removed.
+    ///
     /// # Errors
     ///
     /// Returns an error message if the request is not supported or
     /// the underlying operation fails.
-    async fn node_power(&mut self, _req: NodePowerRequest) -> Result<NodePowerResponse, String> {
-        Err("not supported".to_string())
+    async fn node_power(&mut self, req: NodePowerRequest) -> Result<NodePowerResponse, String> {
+        match req {
+            NodePowerRequest::Reboot => self.reboot().await.map(|()| NodePowerResponse::Initiated),
+            NodePowerRequest::Shutdown => {
+                self.shutdown().await.map(|()| NodePowerResponse::Initiated)
+            }
+            NodePowerRequest::GracefulReboot | NodePowerRequest::GracefulShutdown => {
+                Err("not supported".to_string())
+            }
+        }
     }
 
     /// Handles a node host-observation request.
+    ///
+    /// The default implementation delegates to the corresponding flat
+    /// handler method ([`process_list`](Self::process_list) or
+    /// [`resource_usage`](Self::resource_usage)) so that agents which
+    /// only implement the legacy flat methods can also accept the new
+    /// `node_observation` wire requests. See issue #142 for the
+    /// migration plan: agents accept both formats first, then `REview`
+    /// switches to the `node` wire format, and finally the flat
+    /// methods are removed.
     ///
     /// # Errors
     ///
@@ -228,9 +254,25 @@ pub trait Handler: Send {
     /// the underlying operation fails.
     async fn node_observation(
         &mut self,
-        _req: NodeObservationRequest,
+        req: NodeObservationRequest,
     ) -> Result<NodeObservationResponse, String> {
-        Err("not supported".to_string())
+        match req {
+            NodeObservationRequest::ProcessList => self
+                .process_list()
+                .await
+                .map(|processes| NodeObservationResponse::ProcessList { processes }),
+            NodeObservationRequest::ResourceUsage => {
+                self.resource_usage()
+                    .await
+                    .map(
+                        |(hostname, resource_usage)| NodeObservationResponse::ResourceUsage {
+                            hostname,
+                            resource_usage,
+                        },
+                    )
+            }
+            NodeObservationRequest::Uptime => Err("not supported".to_string()),
+        }
     }
 
     /// Handles a node version-management request.
@@ -248,6 +290,24 @@ pub trait Handler: Send {
 }
 
 /// Handles requests to an agent.
+///
+/// Both legacy flat request codes and new `node` request codes are
+/// dispatched here. For the overlapping host-control operations
+/// (`reboot`, `shutdown`, `process_list`, `resource_usage`), both
+/// wire formats are supported:
+///
+/// - Legacy flat codes call the flat handler methods directly.
+/// - New `node` codes (`NodePower`, `NodeObservation`) call the
+///   grouped handler methods, whose default implementations
+///   delegate back to the flat methods.
+///
+/// This dual support lets updated agents work with both old `REview`
+/// (sending flat codes) and future `REview` (sending `node` codes).
+/// See issue #142 for the intended migration order:
+///
+/// 1. Update agents to accept both wire formats (this change).
+/// 2. Switch `REview` to send `node` wire requests.
+/// 3. Remove legacy flat handling from agents.
 ///
 /// # Errors
 ///
@@ -1160,5 +1220,219 @@ mod tests {
             },
         )
         .await;
+    }
+
+    // ── dual wire-format tests ────────────────────────────────────
+    //
+    // These tests verify that agents implementing only the legacy flat
+    // handler methods can also accept the new `node` wire requests
+    // for the overlapping operations (reboot, shutdown, process_list,
+    // resource_usage). This is the core of issue #144: updated agents
+    // must handle both wire formats before REview switches to the new
+    // `node` format.
+
+    /// A handler that implements only the legacy flat methods for the
+    /// overlapping operations. The `node_power` and
+    /// `node_observation` methods are NOT overridden, so the default
+    /// delegation to the flat methods is exercised.
+    #[cfg(feature = "server")]
+    struct FlatOnlyHandler;
+
+    #[cfg(feature = "server")]
+    #[async_trait::async_trait]
+    impl super::Handler for FlatOnlyHandler {
+        async fn reboot(&mut self) -> Result<(), String> {
+            Ok(())
+        }
+
+        async fn shutdown(&mut self) -> Result<(), String> {
+            Ok(())
+        }
+
+        async fn process_list(&mut self) -> Result<Vec<crate::types::Process>, String> {
+            Ok(vec![crate::types::Process {
+                user: "root".into(),
+                cpu_usage: 1.5,
+                mem_usage: 100_000.0,
+                start_time: 1_000_000,
+                command: "/sbin/init".into(),
+            }])
+        }
+
+        async fn resource_usage(
+            &mut self,
+        ) -> Result<(String, crate::types::ResourceUsage), String> {
+            Ok((
+                "test-host".into(),
+                crate::types::ResourceUsage {
+                    cpu_usage: 25.0,
+                    total_memory: 16_000_000_000,
+                    used_memory: 8_000_000_000,
+                    disk_used_bytes: 100_000_000_000,
+                    disk_available_bytes: 400_000_000_000,
+                },
+            ))
+        }
+    }
+
+    /// Helper: sends a request through `request::handle` backed by
+    /// `FlatOnlyHandler` and returns the decoded response.
+    #[cfg(feature = "server")]
+    async fn flat_only_roundtrip<Req, Resp>(code: RequestCode, req: Req) -> Result<Resp, String>
+    where
+        Req: serde::Serialize + std::fmt::Debug,
+        Resp: serde::de::DeserializeOwned + std::fmt::Debug,
+    {
+        use crate::test::{TOKEN, channel};
+
+        let _lock = TOKEN.lock().await;
+        let channel = channel().await;
+
+        let (mut server_send, mut server_recv) = (channel.server.send, channel.server.recv);
+        let (mut client_send, mut client_recv) = (channel.client.send, channel.client.recv);
+
+        let server_task = tokio::spawn(async move {
+            let mut handler = FlatOnlyHandler;
+            super::handle(&mut handler, &mut server_send, &mut server_recv).await
+        });
+
+        let res: Result<Resp, String> =
+            crate::unary_request(&mut client_send, &mut client_recv, u32::from(code), req)
+                .await
+                .expect("wire transport should succeed");
+
+        drop(client_send);
+        drop(client_recv);
+
+        let server_res = server_task.await.unwrap();
+        assert!(server_res.is_ok());
+
+        res
+    }
+
+    // ── flat wire format with FlatOnlyHandler ─────────────────────
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn flat_reboot_dispatches_correctly() {
+        let res: Result<(), String> = flat_only_roundtrip(RequestCode::Reboot, ()).await;
+        assert!(res.is_ok(), "flat reboot should succeed");
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn flat_shutdown_dispatches_correctly() {
+        let res: Result<(), String> = flat_only_roundtrip(RequestCode::Shutdown, ()).await;
+        assert!(res.is_ok(), "flat shutdown should succeed");
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn flat_process_list_dispatches_correctly() {
+        let res: Result<Vec<crate::types::Process>, String> =
+            flat_only_roundtrip(RequestCode::ProcessList, ()).await;
+        let processes = res.expect("flat process_list should succeed");
+        assert_eq!(processes.len(), 1);
+        assert_eq!(processes[0].user, "root");
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn flat_resource_usage_dispatches_correctly() {
+        let res: Result<(String, crate::types::ResourceUsage), String> =
+            flat_only_roundtrip(RequestCode::ResourceUsage, ()).await;
+        let (hostname, usage) = res.expect("flat resource_usage should succeed");
+        assert_eq!(hostname, "test-host");
+        assert!((usage.cpu_usage - 25.0).abs() < f32::EPSILON);
+    }
+
+    // ── node wire format with FlatOnlyHandler ─────────────────────
+    //
+    // These are the key migration tests: the handler only implements
+    // flat methods, but the default `node_power` / `node_observation`
+    // implementations delegate to them, so the node wire format
+    // should produce equivalent results.
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn node_power_reboot_delegates_to_flat() {
+        use crate::types::node::{NodePowerRequest, NodePowerResponse};
+        let res: Result<NodePowerResponse, String> =
+            flat_only_roundtrip(RequestCode::NodePower, NodePowerRequest::Reboot).await;
+        assert_eq!(
+            res.expect("node reboot should succeed"),
+            NodePowerResponse::Initiated,
+        );
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn node_power_shutdown_delegates_to_flat() {
+        use crate::types::node::{NodePowerRequest, NodePowerResponse};
+        let res: Result<NodePowerResponse, String> =
+            flat_only_roundtrip(RequestCode::NodePower, NodePowerRequest::Shutdown).await;
+        assert_eq!(
+            res.expect("node shutdown should succeed"),
+            NodePowerResponse::Initiated,
+        );
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn node_power_graceful_not_supported_by_flat() {
+        use crate::types::node::{NodePowerRequest, NodePowerResponse};
+        let res: Result<NodePowerResponse, String> =
+            flat_only_roundtrip(RequestCode::NodePower, NodePowerRequest::GracefulReboot).await;
+        assert_eq!(res.unwrap_err(), "not supported");
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn node_observation_process_list_delegates_to_flat() {
+        use crate::types::node::{NodeObservationRequest, NodeObservationResponse};
+        let res: Result<NodeObservationResponse, String> = flat_only_roundtrip(
+            RequestCode::NodeObservation,
+            NodeObservationRequest::ProcessList,
+        )
+        .await;
+        let resp = res.expect("node process_list should succeed");
+        match resp {
+            NodeObservationResponse::ProcessList { processes } => {
+                assert_eq!(processes.len(), 1);
+                assert_eq!(processes[0].user, "root");
+            }
+            other => panic!("expected ProcessList, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn node_observation_resource_usage_delegates_to_flat() {
+        use crate::types::node::{NodeObservationRequest, NodeObservationResponse};
+        let res: Result<NodeObservationResponse, String> = flat_only_roundtrip(
+            RequestCode::NodeObservation,
+            NodeObservationRequest::ResourceUsage,
+        )
+        .await;
+        let resp = res.expect("node resource_usage should succeed");
+        match resp {
+            NodeObservationResponse::ResourceUsage {
+                hostname,
+                resource_usage,
+            } => {
+                assert_eq!(hostname, "test-host");
+                assert!((resource_usage.cpu_usage - 25.0).abs() < f32::EPSILON);
+            }
+            other => panic!("expected ResourceUsage, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn node_observation_uptime_not_supported_by_flat() {
+        use crate::types::node::{NodeObservationRequest, NodeObservationResponse};
+        let res: Result<NodeObservationResponse, String> =
+            flat_only_roundtrip(RequestCode::NodeObservation, NodeObservationRequest::Uptime).await;
+        assert_eq!(res.unwrap_err(), "not supported");
     }
 }

@@ -494,3 +494,162 @@ pub(crate) async fn handshake(
         Err(e) => Err(handle_handshake_recv_io_error(e)),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+
+    use rcgen::{BasicConstraints, CertificateParams, IsCa, Issuer, KeyPair};
+
+    use super::*;
+
+    /// Generates a root CA, an intermediate CA signed by the root, and a leaf
+    /// certificate signed by the intermediate. Returns the full client PEM
+    /// chain (leaf + intermediate), the leaf private key PEM, the root CA PEM,
+    /// and the count of certificates in the chain.
+    fn generate_chain() -> (String, String, String, usize) {
+        // Root CA
+        let mut root_params = CertificateParams::new(vec!["root-ca".to_string()]).unwrap();
+        root_params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
+        let root_key = KeyPair::generate().unwrap();
+        let root_cert = root_params.self_signed(&root_key).unwrap();
+        let root_issuer = Issuer::from_params(&root_params, &root_key);
+
+        // Intermediate CA signed by root
+        let mut intermediate_params =
+            CertificateParams::new(vec!["intermediate-ca".to_string()]).unwrap();
+        intermediate_params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
+        let intermediate_key = KeyPair::generate().unwrap();
+        let intermediate_cert = intermediate_params
+            .signed_by(&intermediate_key, &root_issuer)
+            .unwrap();
+        let intermediate_issuer = Issuer::from_params(&intermediate_params, &intermediate_key);
+
+        // Leaf certificate signed by intermediate
+        let leaf_params = CertificateParams::new(vec!["test-client".to_string()]).unwrap();
+        let leaf_key = KeyPair::generate().unwrap();
+        let leaf_cert = leaf_params
+            .signed_by(&leaf_key, &intermediate_issuer)
+            .unwrap();
+
+        // Build the full chain PEM: leaf + intermediate
+        let chain_pem = format!("{}{}", leaf_cert.pem(), intermediate_cert.pem());
+        let leaf_key_pem = leaf_key.serialize_pem();
+        let root_pem = root_cert.pem();
+
+        (chain_pem, leaf_key_pem, root_pem, 2)
+    }
+
+    #[test]
+    fn new_preserves_full_cert_chain() {
+        let (chain_pem, key_pem, _root_pem, expected_count) = generate_chain();
+
+        let builder = ConnectionBuilder::new(
+            "test-server",
+            "127.0.0.1:443".parse().unwrap(),
+            "app",
+            "1.0",
+            "1.0",
+            crate::Status::Ready,
+            chain_pem.as_bytes(),
+            key_pem.as_bytes(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            builder.certs.len(),
+            expected_count,
+            "ConnectionBuilder::new must preserve the full certificate chain (leaf + intermediate)"
+        );
+    }
+
+    #[test]
+    fn cert_preserves_full_chain() {
+        let (chain_pem, key_pem, _root_pem, expected_count) = generate_chain();
+
+        // Start with a single self-signed cert
+        let single = rcgen::generate_simple_self_signed(vec!["tmp".to_string()]).unwrap();
+        let mut builder = ConnectionBuilder::new(
+            "test-server",
+            "127.0.0.1:443".parse().unwrap(),
+            "app",
+            "1.0",
+            "1.0",
+            crate::Status::Ready,
+            single.cert.pem().as_bytes(),
+            single.signing_key.serialize_pem().as_bytes(),
+        )
+        .unwrap();
+        assert_eq!(builder.certs.len(), 1);
+
+        // Replace with a full chain via cert()
+        builder.cert(chain_pem.as_bytes()).unwrap();
+        builder.key(key_pem.as_bytes()).unwrap();
+
+        assert_eq!(
+            builder.certs.len(),
+            expected_count,
+            "cert() must preserve the full certificate chain (leaf + intermediate)"
+        );
+    }
+
+    #[test]
+    fn root_certs_loads_multiple_ca_certs() {
+        let (_chain_pem, _key_pem, root_pem, _) = generate_chain();
+
+        // Create a second independent CA
+        let mut ca2_params = CertificateParams::new(vec!["ca2".to_string()]).unwrap();
+        ca2_params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
+        let ca2_key = KeyPair::generate().unwrap();
+        let ca2_cert = ca2_params.self_signed(&ca2_key).unwrap();
+
+        // Bundle both CAs into a single PEM blob
+        let bundle = format!("{}{}", root_pem, ca2_cert.pem());
+
+        let single = rcgen::generate_simple_self_signed(vec!["tmp".to_string()]).unwrap();
+        let mut builder = ConnectionBuilder::new(
+            "test-server",
+            "127.0.0.1:443".parse().unwrap(),
+            "app",
+            "1.0",
+            "1.0",
+            crate::Status::Ready,
+            single.cert.pem().as_bytes(),
+            single.signing_key.serialize_pem().as_bytes(),
+        )
+        .unwrap();
+
+        builder.root_certs([bundle.as_bytes()]).unwrap();
+
+        assert_eq!(
+            builder.roots.len(),
+            2,
+            "root_certs() must load all certificates from a CA bundle PEM"
+        );
+    }
+
+    #[tokio::test]
+    async fn full_chain_builds_valid_endpoint() {
+        let (chain_pem, key_pem, root_pem, _) = generate_chain();
+
+        let mut builder = ConnectionBuilder::new(
+            "test-server",
+            "[::1]:443".parse().unwrap(),
+            "app",
+            "1.0",
+            "1.0",
+            crate::Status::Ready,
+            chain_pem.as_bytes(),
+            key_pem.as_bytes(),
+        )
+        .unwrap();
+        builder.root_certs([root_pem.as_bytes()]).unwrap();
+
+        let endpoint = builder.build_endpoint();
+        assert!(
+            endpoint.is_ok(),
+            "build_endpoint() must succeed with a full certificate chain: {}",
+            endpoint.unwrap_err()
+        );
+    }
+}

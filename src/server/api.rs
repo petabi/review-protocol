@@ -4,7 +4,16 @@ use oinq::frame;
 use super::Connection;
 use crate::{
     client,
-    types::{HostNetworkGroup, Process, ResourceUsage, SamplingPolicy, TrafficFilterRule},
+    types::{
+        HostNetworkGroup, Process, ResourceUsage, SamplingPolicy, TrafficFilterRule,
+        node::{
+            NodeHostnameRequest, NodeHostnameResponse, NodeLoggingRequest, NodeLoggingResponse,
+            NodeNetworkInterfaceRequest, NodeNetworkInterfaceResponse, NodeObservationRequest,
+            NodeObservationResponse, NodePowerRequest, NodePowerResponse, NodeRemoteAccessRequest,
+            NodeRemoteAccessResponse, NodeServiceRequest, NodeServiceResponse, NodeTimeSyncRequest,
+            NodeTimeSyncResponse, NodeVersionRequest, NodeVersionResponse,
+        },
+    },
 };
 
 /// The server API.
@@ -150,6 +159,138 @@ impl Connection {
             .await
     }
 
+    // ── node feature-family methods ──────────────────────────────
+    //
+    // One method per node feature family. Each accepts the
+    // corresponding typed `Node*Request` and returns the matching
+    // `Node*Response`, routing through the internal `RequestCode`
+    // mapping.
+
+    /// Sends a node service-control request to the agent.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization/deserialization failed or
+    /// communication with the client failed.
+    pub async fn node_service(
+        &self,
+        req: NodeServiceRequest,
+    ) -> anyhow::Result<NodeServiceResponse> {
+        self.send_request(client::RequestCode::NodeService, &req)
+            .await
+    }
+
+    /// Sends a node network-interface management request to the
+    /// agent.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization/deserialization failed or
+    /// communication with the client failed.
+    pub async fn node_network_interface(
+        &self,
+        req: NodeNetworkInterfaceRequest,
+    ) -> anyhow::Result<NodeNetworkInterfaceResponse> {
+        self.send_request(client::RequestCode::NodeNetworkInterface, &req)
+            .await
+    }
+
+    /// Sends a node hostname management request to the agent.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization/deserialization failed or
+    /// communication with the client failed.
+    pub async fn node_hostname(
+        &self,
+        req: NodeHostnameRequest,
+    ) -> anyhow::Result<NodeHostnameResponse> {
+        self.send_request(client::RequestCode::NodeHostname, &req)
+            .await
+    }
+
+    /// Sends a node time-synchronization request to the agent.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization/deserialization failed or
+    /// communication with the client failed.
+    pub async fn node_time_sync(
+        &self,
+        req: NodeTimeSyncRequest,
+    ) -> anyhow::Result<NodeTimeSyncResponse> {
+        self.send_request(client::RequestCode::NodeTimeSync, &req)
+            .await
+    }
+
+    /// Sends a node logging-configuration request to the agent.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization/deserialization failed or
+    /// communication with the client failed.
+    pub async fn node_logging(
+        &self,
+        req: NodeLoggingRequest,
+    ) -> anyhow::Result<NodeLoggingResponse> {
+        self.send_request(client::RequestCode::NodeLogging, &req)
+            .await
+    }
+
+    /// Sends a node remote-access configuration request to the
+    /// agent.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization/deserialization failed or
+    /// communication with the client failed.
+    pub async fn node_remote_access(
+        &self,
+        req: NodeRemoteAccessRequest,
+    ) -> anyhow::Result<NodeRemoteAccessResponse> {
+        self.send_request(client::RequestCode::NodeRemoteAccess, &req)
+            .await
+    }
+
+    /// Sends a node power-control request to the agent.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization/deserialization failed or
+    /// communication with the client failed.
+    pub async fn node_power(&self, req: NodePowerRequest) -> anyhow::Result<NodePowerResponse> {
+        self.send_request(client::RequestCode::NodePower, &req)
+            .await
+    }
+
+    /// Sends a node host-observation request to the agent.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization/deserialization failed or
+    /// communication with the client failed.
+    pub async fn node_observation(
+        &self,
+        req: NodeObservationRequest,
+    ) -> anyhow::Result<NodeObservationResponse> {
+        self.send_request(client::RequestCode::NodeObservation, &req)
+            .await
+    }
+
+    /// Sends a node version-management request to the agent.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization/deserialization failed or
+    /// communication with the client failed.
+    pub async fn node_version(
+        &self,
+        req: NodeVersionRequest,
+    ) -> anyhow::Result<NodeVersionResponse> {
+        self.send_request(client::RequestCode::NodeVersion, &req)
+            .await
+    }
+
     /// Sends the given payload to the client.
     async fn send_request<T: serde::Serialize + ?Sized, S: serde::de::DeserializeOwned>(
         &self,
@@ -200,6 +341,85 @@ mod tests {
     #[cfg(all(feature = "client", feature = "server"))]
     #[async_trait::async_trait]
     impl crate::request::Handler for TestHandler {
+        async fn node_service(
+            &mut self,
+            _req: super::NodeServiceRequest,
+        ) -> Result<super::NodeServiceResponse, String> {
+            Ok(super::NodeServiceResponse::Status { active: true })
+        }
+
+        async fn node_network_interface(
+            &mut self,
+            _req: super::NodeNetworkInterfaceRequest,
+        ) -> Result<super::NodeNetworkInterfaceResponse, String> {
+            Ok(super::NodeNetworkInterfaceResponse::List {
+                devices: vec!["eth0".into(), "eth1".into()],
+            })
+        }
+
+        async fn node_hostname(
+            &mut self,
+            _req: super::NodeHostnameRequest,
+        ) -> Result<super::NodeHostnameResponse, String> {
+            Ok(super::NodeHostnameResponse::Get {
+                hostname: "test-node".into(),
+            })
+        }
+
+        async fn node_time_sync(
+            &mut self,
+            _req: super::NodeTimeSyncRequest,
+        ) -> Result<super::NodeTimeSyncResponse, String> {
+            Ok(super::NodeTimeSyncResponse::Done)
+        }
+
+        async fn node_logging(
+            &mut self,
+            _req: super::NodeLoggingRequest,
+        ) -> Result<super::NodeLoggingResponse, String> {
+            Ok(super::NodeLoggingResponse::Done)
+        }
+
+        async fn node_remote_access(
+            &mut self,
+            _req: super::NodeRemoteAccessRequest,
+        ) -> Result<super::NodeRemoteAccessResponse, String> {
+            Ok(super::NodeRemoteAccessResponse::Done)
+        }
+
+        async fn node_power(
+            &mut self,
+            _req: super::NodePowerRequest,
+        ) -> Result<super::NodePowerResponse, String> {
+            Ok(super::NodePowerResponse::Initiated)
+        }
+
+        async fn node_observation(
+            &mut self,
+            _req: super::NodeObservationRequest,
+        ) -> Result<super::NodeObservationResponse, String> {
+            Ok(super::NodeObservationResponse::ResourceUsage {
+                hostname: "test-node".into(),
+                resource_usage: super::ResourceUsage {
+                    cpu_usage: 10.0,
+                    total_memory: 8_000_000_000,
+                    used_memory: 4_000_000_000,
+                    disk_used_bytes: 50_000_000_000,
+                    disk_available_bytes: 200_000_000_000,
+                },
+            })
+        }
+
+        async fn node_version(
+            &mut self,
+            _req: super::NodeVersionRequest,
+        ) -> Result<super::NodeVersionResponse, String> {
+            Ok(super::NodeVersionResponse::Get {
+                os_version: "22.04".into(),
+                product_version: "1.0.0".into(),
+            })
+        }
+
         async fn allowlist(&mut self, list: HostNetworkGroup) -> Result<(), String> {
             if list.hosts == [IP_ADDR_1] {
                 Ok(())
@@ -654,6 +874,271 @@ mod tests {
         });
         let server_res = server_conn.send_shutdown_cmd().await;
         assert!(server_res.is_ok());
+        let client_res = client_handle.await.unwrap();
+        assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    // ── node feature-family round-trip tests ──────────────────────
+
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn node_service() {
+        use crate::types::node::{NodeServiceRequest, NodeServiceResponse};
+
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let mut handler = TestHandler;
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+            crate::request::handle(&mut handler, &mut send, &mut recv).await
+        });
+
+        let req = NodeServiceRequest::Status {
+            service: "nginx".into(),
+        };
+        let resp = server_conn.node_service(req).await.unwrap();
+        assert_eq!(resp, NodeServiceResponse::Status { active: true });
+
+        let client_res = client_handle.await.unwrap();
+        assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn node_network_interface() {
+        use crate::types::node::{NodeNetworkInterfaceRequest, NodeNetworkInterfaceResponse};
+
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let mut handler = TestHandler;
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+            crate::request::handle(&mut handler, &mut send, &mut recv).await
+        });
+
+        let req = NodeNetworkInterfaceRequest::List {
+            prefix: Some("eth".into()),
+        };
+        let resp = server_conn.node_network_interface(req).await.unwrap();
+        assert_eq!(
+            resp,
+            NodeNetworkInterfaceResponse::List {
+                devices: vec!["eth0".into(), "eth1".into()],
+            }
+        );
+
+        let client_res = client_handle.await.unwrap();
+        assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn node_hostname() {
+        use crate::types::node::{NodeHostnameRequest, NodeHostnameResponse};
+
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let mut handler = TestHandler;
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+            crate::request::handle(&mut handler, &mut send, &mut recv).await
+        });
+
+        let req = NodeHostnameRequest::Get;
+        let resp = server_conn.node_hostname(req).await.unwrap();
+        assert_eq!(
+            resp,
+            NodeHostnameResponse::Get {
+                hostname: "test-node".into(),
+            }
+        );
+
+        let client_res = client_handle.await.unwrap();
+        assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn node_time_sync() {
+        use crate::types::node::{NodeTimeSyncRequest, NodeTimeSyncResponse};
+
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let mut handler = TestHandler;
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+            crate::request::handle(&mut handler, &mut send, &mut recv).await
+        });
+
+        let req = NodeTimeSyncRequest::Set {
+            servers: vec!["0.pool.ntp.org".into()],
+        };
+        let resp = server_conn.node_time_sync(req).await.unwrap();
+        assert_eq!(resp, NodeTimeSyncResponse::Done);
+
+        let client_res = client_handle.await.unwrap();
+        assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn node_logging() {
+        use crate::types::node::{NodeLoggingRequest, NodeLoggingResponse};
+
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let mut handler = TestHandler;
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+            crate::request::handle(&mut handler, &mut send, &mut recv).await
+        });
+
+        let req = NodeLoggingRequest::Get;
+        let resp = server_conn.node_logging(req).await.unwrap();
+        assert_eq!(resp, NodeLoggingResponse::Done);
+
+        let client_res = client_handle.await.unwrap();
+        assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn node_remote_access() {
+        use crate::types::node::{
+            NodeRemoteAccessConfig, NodeRemoteAccessRequest, NodeRemoteAccessResponse,
+        };
+
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let mut handler = TestHandler;
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+            crate::request::handle(&mut handler, &mut send, &mut recv).await
+        });
+
+        let req = NodeRemoteAccessRequest::Set {
+            config: NodeRemoteAccessConfig { port: 22 },
+        };
+        let resp = server_conn.node_remote_access(req).await.unwrap();
+        assert_eq!(resp, NodeRemoteAccessResponse::Done);
+
+        let client_res = client_handle.await.unwrap();
+        assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn node_power() {
+        use crate::types::node::{NodePowerRequest, NodePowerResponse};
+
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let mut handler = TestHandler;
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+            crate::request::handle(&mut handler, &mut send, &mut recv).await
+        });
+
+        let req = NodePowerRequest::GracefulReboot;
+        let resp = server_conn.node_power(req).await.unwrap();
+        assert_eq!(resp, NodePowerResponse::Initiated);
+
+        let client_res = client_handle.await.unwrap();
+        assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn node_observation() {
+        use crate::types::node::{NodeObservationRequest, NodeObservationResponse};
+
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let mut handler = TestHandler;
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+            crate::request::handle(&mut handler, &mut send, &mut recv).await
+        });
+
+        let req = NodeObservationRequest::ResourceUsage;
+        let resp = server_conn.node_observation(req).await.unwrap();
+        assert_eq!(
+            resp,
+            NodeObservationResponse::ResourceUsage {
+                hostname: "test-node".into(),
+                resource_usage: super::ResourceUsage {
+                    cpu_usage: 10.0,
+                    total_memory: 8_000_000_000,
+                    used_memory: 4_000_000_000,
+                    disk_used_bytes: 50_000_000_000,
+                    disk_available_bytes: 200_000_000_000,
+                },
+            }
+        );
+
+        let client_res = client_handle.await.unwrap();
+        assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn node_version() {
+        use crate::types::node::{NodeVersionRequest, NodeVersionResponse};
+
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let mut handler = TestHandler;
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+            crate::request::handle(&mut handler, &mut send, &mut recv).await
+        });
+
+        let req = NodeVersionRequest::Get;
+        let resp = server_conn.node_version(req).await.unwrap();
+        assert_eq!(
+            resp,
+            NodeVersionResponse::Get {
+                os_version: "22.04".into(),
+                product_version: "1.0.0".into(),
+            }
+        );
+
         let client_res = client_handle.await.unwrap();
         assert!(client_res.is_ok());
 

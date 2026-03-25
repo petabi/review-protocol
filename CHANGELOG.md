@@ -20,6 +20,9 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   management. Includes auxiliary types `NodeNetworkInterfaceConfig`,
   `NodeNetworkInterface`, `NodeLoggingProtocol`, `NodeLoggingEndpoint`,
   and `NodeRemoteAccessConfig`.
+- Internal wire mappings (`RequestCode` variants) for each `node`
+  feature family, enabling the transport layer to route typed
+  `node` request and response payloads.
 
 ### Changed
 

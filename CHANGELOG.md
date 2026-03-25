@@ -23,6 +23,17 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - Internal wire mappings (`RequestCode` variants) for each `node`
   feature family, enabling the transport layer to route typed
   `node` request and response payloads.
+- Grouped `node` handler methods on `request::Handler` — one per
+  feature family (`node_service`, `node_network_interface`,
+  `node_hostname`, `node_time_sync`, `node_logging`,
+  `node_remote_access`, `node_power`, `node_observation`,
+  `node_version`). Each accepts the corresponding typed
+  `Node*Request` and returns `Result<Node*Response, String>`.
+  Default implementations return "not supported" for backward
+  compatibility.
+- Request dispatch now routes each `node` request code through
+  the corresponding grouped handler method instead of returning
+  a hardcoded error.
 
 ### Changed
 

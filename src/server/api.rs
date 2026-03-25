@@ -20,25 +20,40 @@ use crate::{
 impl Connection {
     /// Fetches the list of processes running on the agent.
     ///
+    /// This is a compatibility wrapper that routes through
+    /// [`node_observation`](Self::node_observation) internally.
+    ///
     /// # Errors
     ///
     /// Returns an error if serialization/deserialization failed or
     /// communication with the client failed.
     pub async fn get_process_list(&self) -> anyhow::Result<Vec<Process>> {
-        self.send_request(client::RequestCode::ProcessList, &())
-            .await
+        match self
+            .node_observation(NodeObservationRequest::ProcessList)
+            .await?
+        {
+            NodeObservationResponse::ProcessList { processes } => Ok(processes),
+            other => Err(anyhow!("unexpected node_observation response: {other:?}")),
+        }
     }
 
     /// Fetches the resource usage of an agent.
+    ///
+    /// This is a compatibility wrapper that routes through
+    /// [`node_observation`](Self::node_observation) internally.
     ///
     /// # Errors
     ///
     /// Returns an error if serialization/deserialization failed or
     /// communication with the client failed.
     pub async fn get_resource_usage(&self) -> anyhow::Result<ResourceUsage> {
-        self.send_request::<(), (String, ResourceUsage)>(client::RequestCode::ResourceUsage, &())
-            .await
-            .map(|(_, usage)| usage)
+        match self
+            .node_observation(NodeObservationRequest::ResourceUsage)
+            .await?
+        {
+            NodeObservationResponse::ResourceUsage { resource_usage, .. } => Ok(resource_usage),
+            other => Err(anyhow!("unexpected node_observation response: {other:?}")),
+        }
     }
 
     /// Sends the allowlist for network addresses.
@@ -103,11 +118,15 @@ impl Connection {
 
     /// Sends the reboot command.
     ///
+    /// This is a compatibility wrapper that routes through
+    /// [`node_power`](Self::node_power) internally.
+    ///
     /// # Errors
     ///
-    /// Returns an error if serialization failed or communication with the client failed.
+    /// Returns an error if serialization failed or communication
+    /// with the client failed.
     pub async fn send_reboot_cmd(&self) -> anyhow::Result<()> {
-        self.send_request(client::RequestCode::Reboot, &()).await
+        self.node_power(NodePowerRequest::Reboot).await.map(|_| ())
     }
 
     /// Sends the sampling policies.
@@ -122,11 +141,17 @@ impl Connection {
 
     /// Sends the shutdown command.
     ///
+    /// This is a compatibility wrapper that routes through
+    /// [`node_power`](Self::node_power) internally.
+    ///
     /// # Errors
     ///
-    /// Returns an error if serialization failed or communication with the client failed.
+    /// Returns an error if serialization failed or communication
+    /// with the client failed.
     pub async fn send_shutdown_cmd(&self) -> anyhow::Result<()> {
-        self.send_request(client::RequestCode::Shutdown, &()).await
+        self.node_power(NodePowerRequest::Shutdown)
+            .await
+            .map(|_| ())
     }
 
     /// Sends a list of Tor exit nodes to the client.
@@ -396,18 +421,34 @@ mod tests {
 
         async fn node_observation(
             &mut self,
-            _req: super::NodeObservationRequest,
+            req: super::NodeObservationRequest,
         ) -> Result<super::NodeObservationResponse, String> {
-            Ok(super::NodeObservationResponse::ResourceUsage {
-                hostname: "test-node".into(),
-                resource_usage: super::ResourceUsage {
-                    cpu_usage: 10.0,
-                    total_memory: 8_000_000_000,
-                    used_memory: 4_000_000_000,
-                    disk_used_bytes: 50_000_000_000,
-                    disk_available_bytes: 200_000_000_000,
-                },
-            })
+            match req {
+                super::NodeObservationRequest::ProcessList => {
+                    Ok(super::NodeObservationResponse::ProcessList {
+                        processes: vec![super::Process {
+                            user: "test-user".to_string(),
+                            cpu_usage: 10.0,
+                            mem_usage: 20.0,
+                            start_time: 1_234_567_890,
+                            command: "test-command".to_string(),
+                        }],
+                    })
+                }
+                super::NodeObservationRequest::ResourceUsage => {
+                    Ok(super::NodeObservationResponse::ResourceUsage {
+                        hostname: "test-host".into(),
+                        resource_usage: super::ResourceUsage {
+                            cpu_usage: 0.5,
+                            total_memory: 100,
+                            used_memory: 50,
+                            disk_used_bytes: 500,
+                            disk_available_bytes: 500,
+                        },
+                    })
+                }
+                super::NodeObservationRequest::Uptime => Err("not supported".to_string()),
+            }
         }
 
         async fn node_version(
@@ -459,33 +500,6 @@ mod tests {
             }
         }
 
-        async fn process_list(&mut self) -> Result<Vec<super::Process>, String> {
-            Ok(vec![super::Process {
-                user: "test-user".to_string(),
-                cpu_usage: 10.0,
-                mem_usage: 20.0,
-                start_time: 1_234_567_890,
-                command: "test-command".to_string(),
-            }])
-        }
-
-        async fn resource_usage(&mut self) -> Result<(String, super::ResourceUsage), String> {
-            Ok((
-                "test-host".to_string(),
-                super::ResourceUsage {
-                    cpu_usage: 0.5,
-                    total_memory: 100,
-                    used_memory: 50,
-                    disk_used_bytes: 500,
-                    disk_available_bytes: 500,
-                },
-            ))
-        }
-
-        async fn reboot(&mut self) -> Result<(), String> {
-            Ok(())
-        }
-
         async fn sampling_policy_list(
             &mut self,
             policies: &[super::SamplingPolicy],
@@ -495,10 +509,6 @@ mod tests {
             } else {
                 Err("unexpected sampling policies".to_string())
             }
-        }
-
-        async fn shutdown(&mut self) -> Result<(), String> {
-            Ok(())
         }
 
         async fn tor_exit_node_list(&mut self, nodes: &[&str]) -> Result<(), String> {
@@ -1097,13 +1107,13 @@ mod tests {
         assert_eq!(
             resp,
             NodeObservationResponse::ResourceUsage {
-                hostname: "test-node".into(),
+                hostname: "test-host".into(),
                 resource_usage: super::ResourceUsage {
-                    cpu_usage: 10.0,
-                    total_memory: 8_000_000_000,
-                    used_memory: 4_000_000_000,
-                    disk_used_bytes: 50_000_000_000,
-                    disk_available_bytes: 200_000_000_000,
+                    cpu_usage: 0.5,
+                    total_memory: 100,
+                    used_memory: 50,
+                    disk_used_bytes: 500,
+                    disk_available_bytes: 500,
                 },
             }
         );

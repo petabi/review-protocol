@@ -444,13 +444,13 @@ mod tests {
     #[async_trait::async_trait]
     impl super::Handler for NoopHandler {}
 
-    /// Wire round-trip test helper: sends a typed node request through
-    /// the protocol, runs it through `request::handle`, and verifies
-    /// the response frame is received. Since handler methods are not
-    /// yet wired, every node request currently responds with
-    /// `Err("not supported")`.
+    /// Dispatch round-trip test helper: sends a typed node request
+    /// through `request::handle` and verifies that the new request-code
+    /// arm accepts the typed payload and returns the current
+    /// `Err("not supported")` placeholder until grouped handler
+    /// methods are introduced.
     #[cfg(feature = "server")]
-    async fn node_roundtrip<Req, Resp>(code: RequestCode, req: Req)
+    async fn node_dispatch_roundtrip<Req, Resp>(code: RequestCode, req: Req)
     where
         Req: serde::Serialize + std::fmt::Debug,
         Resp: serde::de::DeserializeOwned + std::fmt::Debug,
@@ -486,11 +486,63 @@ mod tests {
         assert!(server_res.is_ok());
     }
 
+    /// Success-path round-trip test helper: sends a typed node request
+    /// through the wire, responds with an `Ok(expected)` payload on
+    /// the server side, and verifies that the client decodes the
+    /// concrete response correctly.
+    #[cfg(feature = "server")]
+    async fn node_success_roundtrip<Req, Resp>(code: RequestCode, req: Req, expected: Resp)
+    where
+        Req: serde::Serialize + std::fmt::Debug,
+        Resp: serde::Serialize
+            + serde::de::DeserializeOwned
+            + std::fmt::Debug
+            + PartialEq
+            + Clone
+            + Send
+            + 'static,
+    {
+        use crate::test::{TOKEN, channel};
+
+        let _lock = TOKEN.lock().await;
+        let channel = channel().await;
+
+        let (mut server_send, mut server_recv) = (channel.server.send, channel.server.recv);
+        let (mut client_send, mut client_recv) = (channel.client.send, channel.client.recv);
+
+        let resp_to_send = expected.clone();
+        let server_task = tokio::spawn(async move {
+            let mut buf = Vec::new();
+            let (_code, _body) = oinq::message::recv_request_raw(&mut server_recv, &mut buf)
+                .await
+                .expect("should receive request");
+            super::send_response(&mut server_send, &mut buf, Ok::<Resp, String>(resp_to_send))
+                .await
+                .expect("should send response");
+        });
+
+        let res: Result<Resp, String> =
+            crate::unary_request(&mut client_send, &mut client_recv, u32::from(code), req)
+                .await
+                .expect("wire transport should succeed");
+
+        assert_eq!(
+            res.expect("response should be Ok"),
+            expected,
+            "decoded response should match the sent payload"
+        );
+
+        drop(client_send);
+        drop(client_recv);
+
+        server_task.await.unwrap();
+    }
+
     #[tokio::test]
     #[cfg(feature = "server")]
     async fn node_service_wire_roundtrip() {
         use crate::types::node::{NodeServiceRequest, NodeServiceResponse};
-        node_roundtrip::<_, NodeServiceResponse>(
+        node_dispatch_roundtrip::<_, NodeServiceResponse>(
             RequestCode::NodeService,
             NodeServiceRequest::Status {
                 service: "nginx".into(),
@@ -503,7 +555,7 @@ mod tests {
     #[cfg(feature = "server")]
     async fn node_network_interface_wire_roundtrip() {
         use crate::types::node::{NodeNetworkInterfaceRequest, NodeNetworkInterfaceResponse};
-        node_roundtrip::<_, NodeNetworkInterfaceResponse>(
+        node_dispatch_roundtrip::<_, NodeNetworkInterfaceResponse>(
             RequestCode::NodeNetworkInterface,
             NodeNetworkInterfaceRequest::List {
                 prefix: Some("eth".into()),
@@ -516,7 +568,7 @@ mod tests {
     #[cfg(feature = "server")]
     async fn node_hostname_wire_roundtrip() {
         use crate::types::node::{NodeHostnameRequest, NodeHostnameResponse};
-        node_roundtrip::<_, NodeHostnameResponse>(
+        node_dispatch_roundtrip::<_, NodeHostnameResponse>(
             RequestCode::NodeHostname,
             NodeHostnameRequest::Get,
         )
@@ -527,7 +579,7 @@ mod tests {
     #[cfg(feature = "server")]
     async fn node_time_sync_wire_roundtrip() {
         use crate::types::node::{NodeTimeSyncRequest, NodeTimeSyncResponse};
-        node_roundtrip::<_, NodeTimeSyncResponse>(
+        node_dispatch_roundtrip::<_, NodeTimeSyncResponse>(
             RequestCode::NodeTimeSync,
             NodeTimeSyncRequest::Set {
                 servers: vec!["0.pool.ntp.org".into()],
@@ -540,8 +592,11 @@ mod tests {
     #[cfg(feature = "server")]
     async fn node_logging_wire_roundtrip() {
         use crate::types::node::{NodeLoggingRequest, NodeLoggingResponse};
-        node_roundtrip::<_, NodeLoggingResponse>(RequestCode::NodeLogging, NodeLoggingRequest::Get)
-            .await;
+        node_dispatch_roundtrip::<_, NodeLoggingResponse>(
+            RequestCode::NodeLogging,
+            NodeLoggingRequest::Get,
+        )
+        .await;
     }
 
     #[tokio::test]
@@ -550,7 +605,7 @@ mod tests {
         use crate::types::node::{
             NodeRemoteAccessConfig, NodeRemoteAccessRequest, NodeRemoteAccessResponse,
         };
-        node_roundtrip::<_, NodeRemoteAccessResponse>(
+        node_dispatch_roundtrip::<_, NodeRemoteAccessResponse>(
             RequestCode::NodeRemoteAccess,
             NodeRemoteAccessRequest::Set {
                 config: NodeRemoteAccessConfig { port: 22 },
@@ -563,7 +618,7 @@ mod tests {
     #[cfg(feature = "server")]
     async fn node_power_wire_roundtrip() {
         use crate::types::node::{NodePowerRequest, NodePowerResponse};
-        node_roundtrip::<_, NodePowerResponse>(
+        node_dispatch_roundtrip::<_, NodePowerResponse>(
             RequestCode::NodePower,
             NodePowerRequest::GracefulReboot,
         )
@@ -574,7 +629,7 @@ mod tests {
     #[cfg(feature = "server")]
     async fn node_observation_wire_roundtrip() {
         use crate::types::node::{NodeObservationRequest, NodeObservationResponse};
-        node_roundtrip::<_, NodeObservationResponse>(
+        node_dispatch_roundtrip::<_, NodeObservationResponse>(
             RequestCode::NodeObservation,
             NodeObservationRequest::ResourceUsage,
         )
@@ -585,11 +640,158 @@ mod tests {
     #[cfg(feature = "server")]
     async fn node_version_wire_roundtrip() {
         use crate::types::node::{NodeVersionRequest, NodeVersionResponse};
-        node_roundtrip::<_, NodeVersionResponse>(
+        node_dispatch_roundtrip::<_, NodeVersionResponse>(
             RequestCode::NodeVersion,
             NodeVersionRequest::SetOsVersion {
                 version: "22.04".into(),
             },
+        )
+        .await;
+    }
+
+    // ── success-path wire round-trip tests ─────────────────────
+    //
+    // These tests verify that a concrete `Ok(response)` payload for
+    // each node family can be framed, sent, and decoded correctly
+    // on the client side.
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn node_service_success_roundtrip() {
+        use crate::types::node::{NodeServiceRequest, NodeServiceResponse};
+        node_success_roundtrip(
+            RequestCode::NodeService,
+            NodeServiceRequest::Status {
+                service: "nginx".into(),
+            },
+            NodeServiceResponse::Status { active: true },
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn node_network_interface_success_roundtrip() {
+        use crate::types::node::{NodeNetworkInterfaceRequest, NodeNetworkInterfaceResponse};
+        node_success_roundtrip(
+            RequestCode::NodeNetworkInterface,
+            NodeNetworkInterfaceRequest::List {
+                prefix: Some("eth".into()),
+            },
+            NodeNetworkInterfaceResponse::List {
+                devices: vec!["eth0".into(), "eth1".into()],
+            },
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn node_hostname_success_roundtrip() {
+        use crate::types::node::{NodeHostnameRequest, NodeHostnameResponse};
+        node_success_roundtrip(
+            RequestCode::NodeHostname,
+            NodeHostnameRequest::Get,
+            NodeHostnameResponse::Get {
+                hostname: "node-1".into(),
+            },
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn node_time_sync_success_roundtrip() {
+        use crate::types::node::{NodeTimeSyncRequest, NodeTimeSyncResponse};
+        node_success_roundtrip(
+            RequestCode::NodeTimeSync,
+            NodeTimeSyncRequest::Set {
+                servers: vec!["0.pool.ntp.org".into()],
+            },
+            NodeTimeSyncResponse::Done,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn node_logging_success_roundtrip() {
+        use crate::types::node::{
+            NodeLoggingEndpoint, NodeLoggingProtocol, NodeLoggingRequest, NodeLoggingResponse,
+        };
+        node_success_roundtrip(
+            RequestCode::NodeLogging,
+            NodeLoggingRequest::Get,
+            NodeLoggingResponse::Get {
+                endpoints: Some(vec![NodeLoggingEndpoint {
+                    protocol: NodeLoggingProtocol::Tcp,
+                    address: "192.168.1.100".into(),
+                    port: 514,
+                }]),
+            },
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn node_remote_access_success_roundtrip() {
+        use crate::types::node::{
+            NodeRemoteAccessConfig, NodeRemoteAccessRequest, NodeRemoteAccessResponse,
+        };
+        node_success_roundtrip(
+            RequestCode::NodeRemoteAccess,
+            NodeRemoteAccessRequest::Set {
+                config: NodeRemoteAccessConfig { port: 22 },
+            },
+            NodeRemoteAccessResponse::Done,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn node_power_success_roundtrip() {
+        use crate::types::node::{NodePowerRequest, NodePowerResponse};
+        node_success_roundtrip(
+            RequestCode::NodePower,
+            NodePowerRequest::GracefulReboot,
+            NodePowerResponse::Initiated,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn node_observation_success_roundtrip() {
+        use crate::types::node::{NodeObservationRequest, NodeObservationResponse};
+        node_success_roundtrip(
+            RequestCode::NodeObservation,
+            NodeObservationRequest::ResourceUsage,
+            NodeObservationResponse::ResourceUsage {
+                hostname: "node-1".into(),
+                resource_usage: crate::types::ResourceUsage {
+                    cpu_usage: 45.2,
+                    total_memory: 16_000_000_000,
+                    used_memory: 8_000_000_000,
+                    disk_used_bytes: 100_000_000_000,
+                    disk_available_bytes: 400_000_000_000,
+                },
+            },
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn node_version_success_roundtrip() {
+        use crate::types::node::{NodeVersionRequest, NodeVersionResponse};
+        node_success_roundtrip(
+            RequestCode::NodeVersion,
+            NodeVersionRequest::SetOsVersion {
+                version: "22.04".into(),
+            },
+            NodeVersionResponse::Done,
         )
         .await;
     }

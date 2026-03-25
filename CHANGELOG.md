@@ -41,6 +41,13 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - Request dispatch now routes each `node` request code through
   the corresponding grouped handler method instead of returning
   a hardcoded error.
+- Default `Handler::node_power` now delegates `Reboot` and
+  `Shutdown` to the flat `reboot`/`shutdown` methods, and
+  default `Handler::node_observation` delegates `ProcessList`
+  and `ResourceUsage` to the flat `process_list`/`resource_usage`
+  methods. This lets agents that only implement the legacy flat
+  handlers accept the new `node` wire requests for the
+  overlapping operations (see #144).
 
 ### Changed
 

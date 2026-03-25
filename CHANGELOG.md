@@ -5,6 +5,23 @@ file is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and
 this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Flat host-control APIs (`send_reboot_cmd`, `send_shutdown_cmd`,
+  `get_process_list`, `get_resource_usage`) now route through the
+  corresponding `node_power` / `node_observation` methods
+  internally. Public signatures and behavior are unchanged.
+- Default `node_power` implementation delegates `Reboot` and
+  `Shutdown` to the flat `reboot` / `shutdown` handler methods,
+  and default `node_observation` delegates `ProcessList` and
+  `ResourceUsage` to `process_list` / `resource_usage`. Agents
+  that implement only the flat methods continue to work.
+- Flat request codes (`Reboot`, `Shutdown`, `ProcessList`,
+  `ResourceUsage`) are now dispatched through the grouped
+  `node_power` / `node_observation` handler methods.
+
 ## [0.17.0] - 2026-03-25
 
 ### Added
@@ -50,19 +67,6 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   overlapping operations (see #144).
 
 ### Changed
-
-- Flat host-control APIs (`send_reboot_cmd`, `send_shutdown_cmd`,
-  `get_process_list`, `get_resource_usage`) now route through the
-  corresponding `node_power` / `node_observation` methods
-  internally. Public signatures and behavior are unchanged.
-- Default `node_power` implementation delegates `Reboot` and
-  `Shutdown` to the flat `reboot` / `shutdown` handler methods,
-  and default `node_observation` delegates `ProcessList` and
-  `ResourceUsage` to `process_list` / `resource_usage`. Agents
-  that implement only the flat methods continue to work.
-- Flat request codes (`Reboot`, `Shutdown`, `ProcessList`,
-  `ResourceUsage`) are now dispatched through the grouped
-  `node_power` / `node_observation` handler methods.
 
 - Renamed `Tidb` references to `LabelDb` (including request codes/handler-client
   methods) and `TiKind`/`TiRule` to `LabelDbKind`/`LabelDbRule` (Breaking Change).
@@ -554,6 +558,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - `client::handshake` implements the application-level handshake process for the
   client after a QUIC connection is established.
 
+[Unreleased]: https://github.com/petabi/review-protocol/compare/0.17.0...HEAD
 [0.17.0]: https://github.com/petabi/review-protocol/compare/0.16.0...0.17.0
 [0.16.0]: https://github.com/petabi/review-protocol/compare/0.15.0...0.16.0
 [0.15.0]: https://github.com/petabi/review-protocol/compare/0.14.0...0.15.0

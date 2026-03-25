@@ -81,6 +81,41 @@ pub(crate) enum RequestCode {
     /// Shutdown the host
     Shutdown = 21,
 
+    // ── node feature-family request codes ──────────────────────
+    //
+    // Each node feature family maps to exactly one request code.
+    // The typed enum payload (e.g. `NodeServiceRequest`) carries
+    // the subcommand; no per-subcommand codes are needed.
+    //
+    // These codes are internal to the crate and must not appear in
+    // the public API.
+    /// Node service-control family.
+    NodeService = 100,
+
+    /// Node network-interface management family.
+    NodeNetworkInterface = 101,
+
+    /// Node hostname management family.
+    NodeHostname = 102,
+
+    /// Node time-synchronization management family.
+    NodeTimeSync = 103,
+
+    /// Node logging-configuration family.
+    NodeLogging = 104,
+
+    /// Node remote-access configuration family.
+    NodeRemoteAccess = 105,
+
+    /// Node power-control family.
+    NodePower = 106,
+
+    /// Node host-observation family.
+    NodeObservation = 107,
+
+    /// Node version-management family.
+    NodeVersion = 108,
+
     /// Unknown request
     #[num_enum(default)]
     Unknown = u32::MAX,

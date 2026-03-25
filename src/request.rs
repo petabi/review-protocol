@@ -9,7 +9,16 @@ use thiserror::Error;
 
 use crate::{
     client::RequestCode,
-    types::{HostNetworkGroup, Process, ResourceUsage, SamplingPolicy, TrafficFilterRule},
+    types::{
+        HostNetworkGroup, Process, ResourceUsage, SamplingPolicy, TrafficFilterRule,
+        node::{
+            NodeHostnameRequest, NodeHostnameResponse, NodeLoggingRequest, NodeLoggingResponse,
+            NodeNetworkInterfaceRequest, NodeNetworkInterfaceResponse, NodeObservationRequest,
+            NodeObservationResponse, NodePowerRequest, NodePowerResponse, NodeRemoteAccessRequest,
+            NodeRemoteAccessResponse, NodeServiceRequest, NodeServiceResponse, NodeTimeSyncRequest,
+            NodeTimeSyncResponse, NodeVersionRequest, NodeVersionResponse,
+        },
+    },
 };
 
 /// The error type for handling a request.
@@ -267,6 +276,112 @@ pub async fn handle<H: Handler>(
                     .await
                     .map_err(HandlerError::SendError)?;
             }
+
+            // ── node feature-family dispatch ───────────────────
+            //
+            // Each arm deserializes the typed request payload to
+            // validate the wire mapping. Handler methods for these
+            // families will be added in a follow-up issue; until
+            // then, every node request responds with "not supported".
+            RequestCode::NodeService => {
+                let _req =
+                    parse_args::<NodeServiceRequest>(body).map_err(HandlerError::RecvError)?;
+                send_response(
+                    send,
+                    &mut buf,
+                    Err::<NodeServiceResponse, String>("not supported".to_string()),
+                )
+                .await
+                .map_err(HandlerError::SendError)?;
+            }
+            RequestCode::NodeNetworkInterface => {
+                let _req = parse_args::<NodeNetworkInterfaceRequest>(body)
+                    .map_err(HandlerError::RecvError)?;
+                send_response(
+                    send,
+                    &mut buf,
+                    Err::<NodeNetworkInterfaceResponse, String>("not supported".to_string()),
+                )
+                .await
+                .map_err(HandlerError::SendError)?;
+            }
+            RequestCode::NodeHostname => {
+                let _req =
+                    parse_args::<NodeHostnameRequest>(body).map_err(HandlerError::RecvError)?;
+                send_response(
+                    send,
+                    &mut buf,
+                    Err::<NodeHostnameResponse, String>("not supported".to_string()),
+                )
+                .await
+                .map_err(HandlerError::SendError)?;
+            }
+            RequestCode::NodeTimeSync => {
+                let _req =
+                    parse_args::<NodeTimeSyncRequest>(body).map_err(HandlerError::RecvError)?;
+                send_response(
+                    send,
+                    &mut buf,
+                    Err::<NodeTimeSyncResponse, String>("not supported".to_string()),
+                )
+                .await
+                .map_err(HandlerError::SendError)?;
+            }
+            RequestCode::NodeLogging => {
+                let _req =
+                    parse_args::<NodeLoggingRequest>(body).map_err(HandlerError::RecvError)?;
+                send_response(
+                    send,
+                    &mut buf,
+                    Err::<NodeLoggingResponse, String>("not supported".to_string()),
+                )
+                .await
+                .map_err(HandlerError::SendError)?;
+            }
+            RequestCode::NodeRemoteAccess => {
+                let _req =
+                    parse_args::<NodeRemoteAccessRequest>(body).map_err(HandlerError::RecvError)?;
+                send_response(
+                    send,
+                    &mut buf,
+                    Err::<NodeRemoteAccessResponse, String>("not supported".to_string()),
+                )
+                .await
+                .map_err(HandlerError::SendError)?;
+            }
+            RequestCode::NodePower => {
+                let _req = parse_args::<NodePowerRequest>(body).map_err(HandlerError::RecvError)?;
+                send_response(
+                    send,
+                    &mut buf,
+                    Err::<NodePowerResponse, String>("not supported".to_string()),
+                )
+                .await
+                .map_err(HandlerError::SendError)?;
+            }
+            RequestCode::NodeObservation => {
+                let _req =
+                    parse_args::<NodeObservationRequest>(body).map_err(HandlerError::RecvError)?;
+                send_response(
+                    send,
+                    &mut buf,
+                    Err::<NodeObservationResponse, String>("not supported".to_string()),
+                )
+                .await
+                .map_err(HandlerError::SendError)?;
+            }
+            RequestCode::NodeVersion => {
+                let _req =
+                    parse_args::<NodeVersionRequest>(body).map_err(HandlerError::RecvError)?;
+                send_response(
+                    send,
+                    &mut buf,
+                    Err::<NodeVersionResponse, String>("not supported".to_string()),
+                )
+                .await
+                .map_err(HandlerError::SendError)?;
+            }
+
             RequestCode::Unknown => {
                 let err_msg = format!("unknown request code: {code}");
                 oinq::message::send_err(send, &mut buf, err_msg)
@@ -288,5 +403,194 @@ mod tests {
     fn request_code_serde() {
         assert_eq!(7u32, u32::from(RequestCode::ResourceUsage));
         assert_eq!(RequestCode::ResourceUsage, RequestCode::from_primitive(7));
+    }
+
+    /// Verify that every node feature-family request code maps to a
+    /// stable numeric value and round-trips through `FromPrimitive`.
+    #[test]
+    fn node_request_code_mapping() {
+        let cases: &[(RequestCode, u32)] = &[
+            (RequestCode::NodeService, 100),
+            (RequestCode::NodeNetworkInterface, 101),
+            (RequestCode::NodeHostname, 102),
+            (RequestCode::NodeTimeSync, 103),
+            (RequestCode::NodeLogging, 104),
+            (RequestCode::NodeRemoteAccess, 105),
+            (RequestCode::NodePower, 106),
+            (RequestCode::NodeObservation, 107),
+            (RequestCode::NodeVersion, 108),
+        ];
+        for &(code, num) in cases {
+            assert_eq!(u32::from(code), num);
+            assert_eq!(RequestCode::from_primitive(num), code);
+        }
+    }
+
+    /// Verify that node request codes do not collide with existing
+    /// (non-node) codes and that unknown values still map to `Unknown`.
+    #[test]
+    fn node_request_codes_no_collision() {
+        // All existing non-node codes live in 0..=21; node codes
+        // start at 100. Verify that the gap maps to Unknown.
+        assert_eq!(RequestCode::from_primitive(50), RequestCode::Unknown);
+        assert_eq!(RequestCode::from_primitive(99), RequestCode::Unknown);
+        assert_eq!(RequestCode::from_primitive(109), RequestCode::Unknown);
+    }
+
+    #[cfg(feature = "server")]
+    struct NoopHandler;
+
+    #[cfg(feature = "server")]
+    #[async_trait::async_trait]
+    impl super::Handler for NoopHandler {}
+
+    /// Wire round-trip test helper: sends a typed node request through
+    /// the protocol, runs it through `request::handle`, and verifies
+    /// the response frame is received. Since handler methods are not
+    /// yet wired, every node request currently responds with
+    /// `Err("not supported")`.
+    #[cfg(feature = "server")]
+    async fn node_roundtrip<Req, Resp>(code: RequestCode, req: Req)
+    where
+        Req: serde::Serialize + std::fmt::Debug,
+        Resp: serde::de::DeserializeOwned + std::fmt::Debug,
+    {
+        use crate::test::{TOKEN, channel};
+
+        let _lock = TOKEN.lock().await;
+        let channel = channel().await;
+
+        let (mut server_send, mut server_recv) = (channel.server.send, channel.server.recv);
+        let (mut client_send, mut client_recv) = (channel.client.send, channel.client.recv);
+
+        let server_task = tokio::spawn(async move {
+            let mut handler = NoopHandler;
+            super::handle(&mut handler, &mut server_send, &mut server_recv).await
+        });
+
+        let res: Result<Resp, String> =
+            crate::unary_request(&mut client_send, &mut client_recv, u32::from(code), req)
+                .await
+                .expect("wire transport should succeed");
+
+        assert_eq!(
+            res.unwrap_err(),
+            "not supported",
+            "node handler should respond with 'not supported'"
+        );
+
+        drop(client_send);
+        drop(client_recv);
+
+        let server_res = server_task.await.unwrap();
+        assert!(server_res.is_ok());
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn node_service_wire_roundtrip() {
+        use crate::types::node::{NodeServiceRequest, NodeServiceResponse};
+        node_roundtrip::<_, NodeServiceResponse>(
+            RequestCode::NodeService,
+            NodeServiceRequest::Status {
+                service: "nginx".into(),
+            },
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn node_network_interface_wire_roundtrip() {
+        use crate::types::node::{NodeNetworkInterfaceRequest, NodeNetworkInterfaceResponse};
+        node_roundtrip::<_, NodeNetworkInterfaceResponse>(
+            RequestCode::NodeNetworkInterface,
+            NodeNetworkInterfaceRequest::List {
+                prefix: Some("eth".into()),
+            },
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn node_hostname_wire_roundtrip() {
+        use crate::types::node::{NodeHostnameRequest, NodeHostnameResponse};
+        node_roundtrip::<_, NodeHostnameResponse>(
+            RequestCode::NodeHostname,
+            NodeHostnameRequest::Get,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn node_time_sync_wire_roundtrip() {
+        use crate::types::node::{NodeTimeSyncRequest, NodeTimeSyncResponse};
+        node_roundtrip::<_, NodeTimeSyncResponse>(
+            RequestCode::NodeTimeSync,
+            NodeTimeSyncRequest::Set {
+                servers: vec!["0.pool.ntp.org".into()],
+            },
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn node_logging_wire_roundtrip() {
+        use crate::types::node::{NodeLoggingRequest, NodeLoggingResponse};
+        node_roundtrip::<_, NodeLoggingResponse>(RequestCode::NodeLogging, NodeLoggingRequest::Get)
+            .await;
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn node_remote_access_wire_roundtrip() {
+        use crate::types::node::{
+            NodeRemoteAccessConfig, NodeRemoteAccessRequest, NodeRemoteAccessResponse,
+        };
+        node_roundtrip::<_, NodeRemoteAccessResponse>(
+            RequestCode::NodeRemoteAccess,
+            NodeRemoteAccessRequest::Set {
+                config: NodeRemoteAccessConfig { port: 22 },
+            },
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn node_power_wire_roundtrip() {
+        use crate::types::node::{NodePowerRequest, NodePowerResponse};
+        node_roundtrip::<_, NodePowerResponse>(
+            RequestCode::NodePower,
+            NodePowerRequest::GracefulReboot,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn node_observation_wire_roundtrip() {
+        use crate::types::node::{NodeObservationRequest, NodeObservationResponse};
+        node_roundtrip::<_, NodeObservationResponse>(
+            RequestCode::NodeObservation,
+            NodeObservationRequest::ResourceUsage,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn node_version_wire_roundtrip() {
+        use crate::types::node::{NodeVersionRequest, NodeVersionResponse};
+        node_roundtrip::<_, NodeVersionResponse>(
+            RequestCode::NodeVersion,
+            NodeVersionRequest::SetOsVersion {
+                version: "22.04".into(),
+            },
+        )
+        .await;
     }
 }

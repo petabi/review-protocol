@@ -9,6 +9,13 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Typed `server::Connection` methods for each `node` feature
+  family (`node_service`, `node_network_interface`,
+  `node_hostname`, `node_time_sync`, `node_logging`,
+  `node_remote_access`, `node_power`, `node_observation`,
+  `node_version`). Each accepts the corresponding
+  `Node*Request` and returns `Node*Response`, keeping internal
+  request-code mappings hidden from callers.
 - `Connection::get_sampling_policy_list` to retrieve the sampling
   policy list from the server.
 - `Handler::get_sampling_policy_list` to handle sampling policy list

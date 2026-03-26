@@ -147,6 +147,13 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   `ResourceUsage`) are now dispatched through the grouped
   `node_power` / `node_observation` handler methods.
 
+### Fixed
+
+- `ConnectionBuilder` now preserves full client certificate chains
+  (leaf + intermediates) instead of using only the first certificate.
+- `ConnectionBuilder::root_certs` now loads all certificates from
+  each PEM blob instead of only the first one.
+
 ## [0.17.0] - 2026-03-25
 
 ### Added
@@ -195,13 +202,6 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Renamed `Tidb` references to `LabelDb` (including request codes/handler-client
   methods) and `TiKind`/`TiRule` to `LabelDbKind`/`LabelDbRule` (Breaking Change).
-
-### Fixed
-
-- `ConnectionBuilder` now preserves full client certificate chains
-  (leaf + intermediates) instead of using only the first certificate.
-- `ConnectionBuilder::root_certs` now loads all certificates from
-  each PEM blob instead of only the first one.
 
 ## [0.16.0] - 2025-12-22
 

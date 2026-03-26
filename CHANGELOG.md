@@ -7,6 +7,14 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `service_id` module with stable logical service identifiers
+  (`ServiceId`) independent of wire `RequestCode` values. Covers
+  all nine node feature families and legacy common operations.
+  Includes `from_request_code` mapping and an `all()` helper for
+  capability reporting.
+
 ### Changed
 
 - Flat host-control APIs (`send_reboot_cmd`, `send_shutdown_cmd`,

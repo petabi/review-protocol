@@ -4,6 +4,8 @@ pub mod frame;
 #[cfg(feature = "client")]
 pub mod request;
 pub mod server;
+#[cfg(any(feature = "client", feature = "server"))]
+pub mod service_id;
 #[cfg(all(test, any(feature = "client", feature = "server")))]
 mod test;
 pub mod types;

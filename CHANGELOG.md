@@ -11,9 +11,11 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 - `service_id` module with stable logical service identifiers
   (`ServiceId`) independent of wire `RequestCode` values. Covers
-  all nine node feature families and legacy common operations.
-  Includes `from_request_code` mapping and an `all()` helper for
-  capability reporting.
+  all nine node feature families (with both family-level and
+  method-level identifiers), legacy common operations, and
+  server-side request operations. Includes
+  `from_client_request_code` and `from_server_request_code`
+  mappings and an `all()` helper for capability reporting.
 
 ### Changed
 

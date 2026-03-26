@@ -2,33 +2,47 @@
 //! codes.
 //!
 //! This module defines a semantic naming layer for the protocol's
-//! service families and methods.  Each [`ServiceId`] represents a
-//! logical API operation (e.g. `"node.power.reboot"`) that remains
-//! stable even if the underlying wire [`RequestCode`](super::client::RequestCode)
-//! values are renumbered or reorganized.
+//! service families and methods.  Each [`ServiceId`] represents
+//! either a logical API operation (e.g. `"node.power.reboot"`) or
+//! a service family (e.g. `"node.power"`) that remains stable even
+//! if the underlying wire `RequestCode` values are renumbered or
+//! reorganized.
 //!
 //! # Relationship to `RequestCode`
 //!
-//! `RequestCode` remains the transport dispatch mechanism.  The
-//! identifiers defined here are **not** a replacement for request
-//! codes — they are a higher-level abstraction suitable for:
+//! Both [`client::RequestCode`](super::client::RequestCode) and
+//! [`server::RequestCode`](super::server::RequestCode) remain the
+//! transport dispatch mechanisms.  The identifiers defined here are
+//! **not** a replacement for request codes — they are a
+//! higher-level abstraction suitable for:
 //!
 //! - authorization decisions
 //! - capability reporting
 //! - service-family organization
 //! - public-facing API documentation
 //!
-//! Use [`from_request_code`] to map a wire request code to its
-//! logical identifier when needed.
+//! Use [`from_client_request_code`] or [`from_server_request_code`]
+//! to map a wire request code to its logical identifier.
+//!
+//! # Family-level vs method-level identifiers
+//!
+//! Some wire request codes identify only a service family (e.g.
+//! `client::RequestCode::NodePower`); the specific method is
+//! determined later by deserializing the request payload.  For
+//! these, the mapping functions return a **family-level**
+//! `ServiceId` whose `method` field is empty.  Family-level
+//! identifiers display as `"{family}"` (e.g. `"node.power"`),
+//! while method-level identifiers display as
+//! `"{family}.{method}"` (e.g. `"node.power.reboot"`).
 //!
 //! # Naming conventions
 //!
 //! - **Family** components are separated by `.`
-//!   (e.g. `"node.power"`, `"common"`).
+//!   (e.g. `"node.power"`, `"common"`, `"server.model"`).
 //! - **Method** names use stable `lower_snake_case`
 //!   (e.g. `"reboot"`, `"process_list"`).
-//! - The canonical string form is `"{family}.{method}"`
-//!   (e.g. `"node.power.reboot"`).
+//! - The canonical string form is `"{family}.{method}"` for
+//!   method-level or `"{family}"` for family-level identifiers.
 
 use std::fmt;
 
@@ -51,15 +65,43 @@ impl ServiceId {
     pub const fn new(family: &'static str, method: &'static str) -> Self {
         Self { family, method }
     }
+
+    /// Returns `true` if this is a family-level identifier (no
+    /// specific method).
+    #[must_use]
+    pub const fn is_family(&self) -> bool {
+        self.method.is_empty()
+    }
 }
 
 impl fmt::Display for ServiceId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}.{}", self.family, self.method)
+        if self.method.is_empty() {
+            write!(f, "{}", self.family)
+        } else {
+            write!(f, "{}.{}", self.family, self.method)
+        }
     }
 }
 
-// ── node.service ───────────────────────────────────────────────
+// ── Node family-level identifiers ─────────────────────────────
+//
+// These represent a node service family without specifying a
+// particular method.  They are returned by `from_client_request_code`
+// for the `Node*` family request codes, where the specific method
+// is only known after payload deserialization.
+
+pub const NODE_SERVICE: ServiceId = ServiceId::new("node.service", "");
+pub const NODE_NETWORK_INTERFACE: ServiceId = ServiceId::new("node.network_interface", "");
+pub const NODE_HOSTNAME: ServiceId = ServiceId::new("node.hostname", "");
+pub const NODE_TIME_SYNC: ServiceId = ServiceId::new("node.time_sync", "");
+pub const NODE_LOGGING: ServiceId = ServiceId::new("node.logging", "");
+pub const NODE_REMOTE_ACCESS: ServiceId = ServiceId::new("node.remote_access", "");
+pub const NODE_POWER: ServiceId = ServiceId::new("node.power", "");
+pub const NODE_OBSERVATION: ServiceId = ServiceId::new("node.observation", "");
+pub const NODE_VERSION: ServiceId = ServiceId::new("node.version", "");
+
+// ── node.service (method-level) ───────────────────────────────
 
 pub const NODE_SERVICE_START: ServiceId = ServiceId::new("node.service", "start");
 pub const NODE_SERVICE_STOP: ServiceId = ServiceId::new("node.service", "stop");
@@ -152,6 +194,81 @@ pub const COMMON_SEMI_SUPERVISED_MODELS: ServiceId =
     ServiceId::new("common", "semi_supervised_models");
 pub const COMMON_RENEW_CERTIFICATE: ServiceId = ServiceId::new("common", "renew_certificate");
 
+// ── server.data_source ────────────────────────────────────────
+
+pub const SERVER_DATA_SOURCE_GET: ServiceId = ServiceId::new("server.data_source", "get");
+pub const SERVER_DATA_SOURCE_LIST: ServiceId = ServiceId::new("server.data_source", "list");
+pub const SERVER_DATA_SOURCE_INSERT: ServiceId = ServiceId::new("server.data_source", "insert");
+
+// ── server.model ──────────────────────────────────────────────
+
+pub const SERVER_MODEL_GET: ServiceId = ServiceId::new("server.model", "get");
+pub const SERVER_MODEL_GET_NAMES: ServiceId = ServiceId::new("server.model", "get_names");
+pub const SERVER_MODEL_INSERT: ServiceId = ServiceId::new("server.model", "insert");
+pub const SERVER_MODEL_REMOVE: ServiceId = ServiceId::new("server.model", "remove");
+pub const SERVER_MODEL_UPDATE: ServiceId = ServiceId::new("server.model", "update");
+pub const SERVER_MODEL_GET_PRETRAINED: ServiceId = ServiceId::new("server.model", "get_pretrained");
+
+// ── server.indicator ──────────────────────────────────────────
+
+pub const SERVER_INDICATOR_GET: ServiceId = ServiceId::new("server.indicator", "get");
+
+// ── server.event ──────────────────────────────────────────────
+
+pub const SERVER_EVENT_GET_MAX_ID_NUM: ServiceId = ServiceId::new("server.event", "get_max_id_num");
+pub const SERVER_EVENT_INSERT_LABELS: ServiceId = ServiceId::new("server.event", "insert_labels");
+
+// ── server.statistics ─────────────────────────────────────────
+
+pub const SERVER_STATISTICS_INSERT_COLUMN: ServiceId =
+    ServiceId::new("server.statistics", "insert_column");
+pub const SERVER_STATISTICS_INSERT_TIME_SERIES: ServiceId =
+    ServiceId::new("server.statistics", "insert_time_series");
+
+// ── server.outlier ────────────────────────────────────────────
+
+pub const SERVER_OUTLIER_GET: ServiceId = ServiceId::new("server.outlier", "get");
+pub const SERVER_OUTLIER_REMOVE: ServiceId = ServiceId::new("server.outlier", "remove");
+pub const SERVER_OUTLIER_UPDATE: ServiceId = ServiceId::new("server.outlier", "update");
+
+// ── server.cluster ────────────────────────────────────────────
+
+pub const SERVER_CLUSTER_UPDATE: ServiceId = ServiceId::new("server.cluster", "update");
+
+// ── server.label ──────────────────────────────────────────────
+
+pub const SERVER_LABEL_GET_DB_PATTERNS: ServiceId =
+    ServiceId::new("server.label", "get_db_patterns");
+
+// ── server.certificate ────────────────────────────────────────
+
+pub const SERVER_CERTIFICATE_RENEW: ServiceId = ServiceId::new("server.certificate", "renew");
+
+// ── server.config ─────────────────────────────────────────────
+
+pub const SERVER_CONFIG_GET: ServiceId = ServiceId::new("server.config", "get");
+
+// ── server.host ───────────────────────────────────────────────
+
+pub const SERVER_HOST_UPDATE_OPENED_PORTS: ServiceId =
+    ServiceId::new("server.host", "update_opened_ports");
+pub const SERVER_HOST_UPDATE_OS_AGENTS: ServiceId =
+    ServiceId::new("server.host", "update_os_agents");
+
+// ── server.list ───────────────────────────────────────────────
+//
+// Server-side query operations for lists that the client pushes.
+
+pub const SERVER_LIST_TRUSTED_DOMAIN: ServiceId = ServiceId::new("server.list", "trusted_domain");
+pub const SERVER_LIST_TOR_EXIT_NODE: ServiceId = ServiceId::new("server.list", "tor_exit_node");
+pub const SERVER_LIST_INTERNAL_NETWORK: ServiceId =
+    ServiceId::new("server.list", "internal_network");
+pub const SERVER_LIST_ALLOWLIST: ServiceId = ServiceId::new("server.list", "allowlist");
+pub const SERVER_LIST_BLOCKLIST: ServiceId = ServiceId::new("server.list", "blocklist");
+pub const SERVER_LIST_TRUSTED_USER_AGENT: ServiceId =
+    ServiceId::new("server.list", "trusted_user_agent");
+pub const SERVER_LIST_SAMPLING_POLICY: ServiceId = ServiceId::new("server.list", "sampling_policy");
+
 // ── RequestCode → ServiceId mapping ────────────────────────────
 //
 // Maps wire request codes to their logical service identifiers.
@@ -159,69 +276,125 @@ pub const COMMON_RENEW_CERTIFICATE: ServiceId = ServiceId::new("common", "renew_
 // depend on numeric request-code values.
 
 #[cfg(any(feature = "client", feature = "server"))]
-use crate::client::RequestCode;
+use crate::client::RequestCode as ClientRequestCode;
+#[cfg(any(feature = "client", feature = "server"))]
+use crate::server::RequestCode as ServerRequestCode;
 
-/// Maps a client-side wire [`RequestCode`] to its logical
-/// [`ServiceId`].
+/// Maps a client-side wire [`ClientRequestCode`](crate::client::RequestCode)
+/// to its logical [`ServiceId`].
 ///
 /// Returns `None` for `RequestCode::Unknown` or any code that does
-/// not have a defined logical identifier.  Node family codes map to
-/// the family-level identifier (method resolution requires the
-/// deserialized request payload).
+/// not have a defined logical identifier.
+///
+/// Legacy flat codes that identify a specific operation map to a
+/// **method-level** identifier.  Node family codes (e.g.
+/// `NodePower`) map to a **family-level** identifier because the
+/// specific method is only known after payload deserialization.
 #[cfg(any(feature = "client", feature = "server"))]
 #[must_use]
-#[allow(clippy::match_same_arms)] // intentional: legacy flat codes
-// and node family codes carry
-// different semantic intent
-pub(crate) fn from_request_code(code: RequestCode) -> Option<ServiceId> {
+pub(crate) fn from_client_request_code(code: ClientRequestCode) -> Option<ServiceId> {
     match code {
-        // Legacy flat codes
-        RequestCode::DnsStart => Some(COMMON_DNS_START),
-        RequestCode::DnsStop => Some(COMMON_DNS_STOP),
-        RequestCode::Reboot => Some(NODE_POWER_REBOOT),
-        RequestCode::ReloadConfig => Some(COMMON_RELOAD_CONFIG),
-        RequestCode::ReloadTi => Some(COMMON_RELOAD_TI),
-        RequestCode::ResourceUsage => Some(NODE_OBSERVATION_RESOURCE_USAGE),
-        RequestCode::TorExitNodeList => Some(COMMON_TOR_EXIT_NODE_LIST),
-        RequestCode::SamplingPolicyList => Some(COMMON_SAMPLING_POLICY_LIST),
-        RequestCode::ReloadFilterRule => Some(COMMON_RELOAD_FILTER_RULE),
-        RequestCode::UpdateConfig => Some(COMMON_UPDATE_CONFIG),
-        RequestCode::DeleteSamplingPolicy => Some(COMMON_DELETE_SAMPLING_POLICY),
-        RequestCode::InternalNetworkList => Some(COMMON_INTERNAL_NETWORK_LIST),
-        RequestCode::Allowlist => Some(COMMON_ALLOWLIST),
-        RequestCode::Blocklist => Some(COMMON_BLOCKLIST),
-        RequestCode::EchoRequest => Some(COMMON_ECHO),
-        RequestCode::TrustedUserAgentList => Some(COMMON_TRUSTED_USER_AGENT_LIST),
-        RequestCode::TrustedDomainList => Some(COMMON_TRUSTED_DOMAIN_LIST),
-        RequestCode::ProcessList => Some(NODE_OBSERVATION_PROCESS_LIST),
-        RequestCode::SemiSupervisedModels => Some(COMMON_SEMI_SUPERVISED_MODELS),
-        RequestCode::Shutdown => Some(NODE_POWER_SHUTDOWN),
+        // Legacy flat codes — these identify a specific operation.
+        ClientRequestCode::DnsStart => Some(COMMON_DNS_START),
+        ClientRequestCode::DnsStop => Some(COMMON_DNS_STOP),
+        ClientRequestCode::Reboot => Some(NODE_POWER_REBOOT),
+        ClientRequestCode::ReloadConfig => Some(COMMON_RELOAD_CONFIG),
+        ClientRequestCode::ReloadTi => Some(COMMON_RELOAD_TI),
+        ClientRequestCode::ResourceUsage => Some(NODE_OBSERVATION_RESOURCE_USAGE),
+        ClientRequestCode::TorExitNodeList => Some(COMMON_TOR_EXIT_NODE_LIST),
+        ClientRequestCode::SamplingPolicyList => Some(COMMON_SAMPLING_POLICY_LIST),
+        ClientRequestCode::ReloadFilterRule => Some(COMMON_RELOAD_FILTER_RULE),
+        ClientRequestCode::UpdateConfig => Some(COMMON_UPDATE_CONFIG),
+        ClientRequestCode::DeleteSamplingPolicy => Some(COMMON_DELETE_SAMPLING_POLICY),
+        ClientRequestCode::InternalNetworkList => Some(COMMON_INTERNAL_NETWORK_LIST),
+        ClientRequestCode::Allowlist => Some(COMMON_ALLOWLIST),
+        ClientRequestCode::Blocklist => Some(COMMON_BLOCKLIST),
+        ClientRequestCode::EchoRequest => Some(COMMON_ECHO),
+        ClientRequestCode::TrustedUserAgentList => Some(COMMON_TRUSTED_USER_AGENT_LIST),
+        ClientRequestCode::TrustedDomainList => Some(COMMON_TRUSTED_DOMAIN_LIST),
+        ClientRequestCode::ProcessList => Some(NODE_OBSERVATION_PROCESS_LIST),
+        ClientRequestCode::SemiSupervisedModels => Some(COMMON_SEMI_SUPERVISED_MODELS),
+        ClientRequestCode::Shutdown => Some(NODE_POWER_SHUTDOWN),
 
         // Node feature-family codes.  These map to the family
         // level; the specific method is determined by deserializing
-        // the request payload, not by the wire code alone.  We use
-        // the first method in the family as a representative; call
-        // site code should refine further if needed.
-        RequestCode::NodeService => Some(NODE_SERVICE_START),
-        RequestCode::NodeNetworkInterface => Some(NODE_NETWORK_INTERFACE_LIST),
-        RequestCode::NodeHostname => Some(NODE_HOSTNAME_GET),
-        RequestCode::NodeTimeSync => Some(NODE_TIME_SYNC_GET),
-        RequestCode::NodeLogging => Some(NODE_LOGGING_GET),
-        RequestCode::NodeRemoteAccess => Some(NODE_REMOTE_ACCESS_GET),
-        RequestCode::NodePower => Some(NODE_POWER_REBOOT),
-        RequestCode::NodeObservation => Some(NODE_OBSERVATION_PROCESS_LIST),
-        RequestCode::NodeVersion => Some(NODE_VERSION_GET),
+        // the request payload, not by the wire code alone.
+        ClientRequestCode::NodeService => Some(NODE_SERVICE),
+        ClientRequestCode::NodeNetworkInterface => Some(NODE_NETWORK_INTERFACE),
+        ClientRequestCode::NodeHostname => Some(NODE_HOSTNAME),
+        ClientRequestCode::NodeTimeSync => Some(NODE_TIME_SYNC),
+        ClientRequestCode::NodeLogging => Some(NODE_LOGGING),
+        ClientRequestCode::NodeRemoteAccess => Some(NODE_REMOTE_ACCESS),
+        ClientRequestCode::NodePower => Some(NODE_POWER),
+        ClientRequestCode::NodeObservation => Some(NODE_OBSERVATION),
+        ClientRequestCode::NodeVersion => Some(NODE_VERSION),
 
-        RequestCode::Unknown => None,
+        ClientRequestCode::Unknown => None,
+    }
+}
+
+/// Maps a server-side wire [`ServerRequestCode`](crate::server::RequestCode)
+/// to its logical [`ServiceId`].
+///
+/// Returns `None` for `RequestCode::Unknown` or any code that does
+/// not have a defined logical identifier.  Each server request code
+/// maps to a specific method-level identifier.
+#[cfg(any(feature = "client", feature = "server"))]
+#[must_use]
+pub(crate) fn from_server_request_code(code: ServerRequestCode) -> Option<ServiceId> {
+    match code {
+        ServerRequestCode::GetDataSource => Some(SERVER_DATA_SOURCE_GET),
+        ServerRequestCode::GetDataSourceList => Some(SERVER_DATA_SOURCE_LIST),
+        ServerRequestCode::InsertDataSource => Some(SERVER_DATA_SOURCE_INSERT),
+        ServerRequestCode::GetModel => Some(SERVER_MODEL_GET),
+        ServerRequestCode::GetModelNames => Some(SERVER_MODEL_GET_NAMES),
+        ServerRequestCode::InsertModel => Some(SERVER_MODEL_INSERT),
+        ServerRequestCode::RemoveModel => Some(SERVER_MODEL_REMOVE),
+        ServerRequestCode::UpdateModel => Some(SERVER_MODEL_UPDATE),
+        ServerRequestCode::GetPretrainedModel => Some(SERVER_MODEL_GET_PRETRAINED),
+        ServerRequestCode::GetIndicator => Some(SERVER_INDICATOR_GET),
+        ServerRequestCode::GetMaxEventIdNum => Some(SERVER_EVENT_GET_MAX_ID_NUM),
+        ServerRequestCode::InsertEventLabels => Some(SERVER_EVENT_INSERT_LABELS),
+        ServerRequestCode::InsertColumnStatistics => Some(SERVER_STATISTICS_INSERT_COLUMN),
+        ServerRequestCode::InsertTimeSeries => Some(SERVER_STATISTICS_INSERT_TIME_SERIES),
+        ServerRequestCode::RemoveOutliers => Some(SERVER_OUTLIER_REMOVE),
+        ServerRequestCode::UpdateOutliers => Some(SERVER_OUTLIER_UPDATE),
+        ServerRequestCode::GetOutliers => Some(SERVER_OUTLIER_GET),
+        ServerRequestCode::UpdateClusters => Some(SERVER_CLUSTER_UPDATE),
+        ServerRequestCode::GetLabelDbPatterns => Some(SERVER_LABEL_GET_DB_PATTERNS),
+        ServerRequestCode::RenewCertificate => Some(SERVER_CERTIFICATE_RENEW),
+        ServerRequestCode::GetConfig => Some(SERVER_CONFIG_GET),
+        ServerRequestCode::UpdateHostOpenedPorts => Some(SERVER_HOST_UPDATE_OPENED_PORTS),
+        ServerRequestCode::UpdateHostOsAgents => Some(SERVER_HOST_UPDATE_OS_AGENTS),
+        ServerRequestCode::GetTrustedDomainList => Some(SERVER_LIST_TRUSTED_DOMAIN),
+        ServerRequestCode::GetTorExitNodeList => Some(SERVER_LIST_TOR_EXIT_NODE),
+        ServerRequestCode::GetInternalNetworkList => Some(SERVER_LIST_INTERNAL_NETWORK),
+        ServerRequestCode::GetAllowlist => Some(SERVER_LIST_ALLOWLIST),
+        ServerRequestCode::GetBlocklist => Some(SERVER_LIST_BLOCKLIST),
+        ServerRequestCode::GetTrustedUserAgentList => Some(SERVER_LIST_TRUSTED_USER_AGENT),
+        ServerRequestCode::GetSamplingPolicyList => Some(SERVER_LIST_SAMPLING_POLICY),
+        ServerRequestCode::Unknown => None,
     }
 }
 
 /// Returns an iterator over all known [`ServiceId`] constants.
 ///
-/// Useful for capability reporting and testing coverage.
+/// Useful for capability reporting and testing coverage.  Includes
+/// family-level identifiers, method-level identifiers for both
+/// client (node/common) and server surfaces.
 #[must_use]
 pub fn all() -> &'static [ServiceId] {
     &[
+        // node family-level
+        NODE_SERVICE,
+        NODE_NETWORK_INTERFACE,
+        NODE_HOSTNAME,
+        NODE_TIME_SYNC,
+        NODE_LOGGING,
+        NODE_REMOTE_ACCESS,
+        NODE_POWER,
+        NODE_OBSERVATION,
+        NODE_VERSION,
         // node.service
         NODE_SERVICE_START,
         NODE_SERVICE_STOP,
@@ -282,6 +455,48 @@ pub fn all() -> &'static [ServiceId] {
         COMMON_TRUSTED_USER_AGENT_LIST,
         COMMON_SEMI_SUPERVISED_MODELS,
         COMMON_RENEW_CERTIFICATE,
+        // server.data_source
+        SERVER_DATA_SOURCE_GET,
+        SERVER_DATA_SOURCE_LIST,
+        SERVER_DATA_SOURCE_INSERT,
+        // server.model
+        SERVER_MODEL_GET,
+        SERVER_MODEL_GET_NAMES,
+        SERVER_MODEL_INSERT,
+        SERVER_MODEL_REMOVE,
+        SERVER_MODEL_UPDATE,
+        SERVER_MODEL_GET_PRETRAINED,
+        // server.indicator
+        SERVER_INDICATOR_GET,
+        // server.event
+        SERVER_EVENT_GET_MAX_ID_NUM,
+        SERVER_EVENT_INSERT_LABELS,
+        // server.statistics
+        SERVER_STATISTICS_INSERT_COLUMN,
+        SERVER_STATISTICS_INSERT_TIME_SERIES,
+        // server.outlier
+        SERVER_OUTLIER_GET,
+        SERVER_OUTLIER_REMOVE,
+        SERVER_OUTLIER_UPDATE,
+        // server.cluster
+        SERVER_CLUSTER_UPDATE,
+        // server.label
+        SERVER_LABEL_GET_DB_PATTERNS,
+        // server.certificate
+        SERVER_CERTIFICATE_RENEW,
+        // server.config
+        SERVER_CONFIG_GET,
+        // server.host
+        SERVER_HOST_UPDATE_OPENED_PORTS,
+        SERVER_HOST_UPDATE_OS_AGENTS,
+        // server.list
+        SERVER_LIST_TRUSTED_DOMAIN,
+        SERVER_LIST_TOR_EXIT_NODE,
+        SERVER_LIST_INTERNAL_NETWORK,
+        SERVER_LIST_ALLOWLIST,
+        SERVER_LIST_BLOCKLIST,
+        SERVER_LIST_TRUSTED_USER_AGENT,
+        SERVER_LIST_SAMPLING_POLICY,
     ]
 }
 
@@ -303,6 +518,23 @@ mod tests {
             "common.renew_certificate"
         );
         assert_eq!(COMMON_ECHO.to_string(), "common.echo");
+        assert_eq!(SERVER_MODEL_GET.to_string(), "server.model.get");
+    }
+
+    #[test]
+    fn display_format_family_level() {
+        assert_eq!(NODE_POWER.to_string(), "node.power");
+        assert_eq!(NODE_SERVICE.to_string(), "node.service");
+        assert_eq!(NODE_OBSERVATION.to_string(), "node.observation");
+    }
+
+    #[test]
+    fn is_family() {
+        assert!(NODE_POWER.is_family());
+        assert!(NODE_SERVICE.is_family());
+        assert!(!NODE_POWER_REBOOT.is_family());
+        assert!(!COMMON_ECHO.is_family());
+        assert!(!SERVER_MODEL_GET.is_family());
     }
 
     #[test]
@@ -316,92 +548,194 @@ mod tests {
     }
 
     #[test]
-    fn from_request_code_legacy() {
+    fn client_from_request_code_legacy() {
         assert_eq!(
-            from_request_code(RequestCode::DnsStart),
+            from_client_request_code(ClientRequestCode::DnsStart),
             Some(COMMON_DNS_START)
         );
         assert_eq!(
-            from_request_code(RequestCode::Reboot),
+            from_client_request_code(ClientRequestCode::Reboot),
             Some(NODE_POWER_REBOOT)
         );
         assert_eq!(
-            from_request_code(RequestCode::Shutdown),
+            from_client_request_code(ClientRequestCode::Shutdown),
             Some(NODE_POWER_SHUTDOWN)
         );
         assert_eq!(
-            from_request_code(RequestCode::ResourceUsage),
+            from_client_request_code(ClientRequestCode::ResourceUsage),
             Some(NODE_OBSERVATION_RESOURCE_USAGE)
         );
         assert_eq!(
-            from_request_code(RequestCode::ProcessList),
+            from_client_request_code(ClientRequestCode::ProcessList),
             Some(NODE_OBSERVATION_PROCESS_LIST)
         );
         assert_eq!(
-            from_request_code(RequestCode::EchoRequest),
+            from_client_request_code(ClientRequestCode::EchoRequest),
             Some(COMMON_ECHO)
         );
     }
 
     #[test]
-    fn from_request_code_node_families() {
-        assert!(from_request_code(RequestCode::NodeService).is_some());
-        assert!(from_request_code(RequestCode::NodeNetworkInterface).is_some());
-        assert!(from_request_code(RequestCode::NodeHostname).is_some());
-        assert!(from_request_code(RequestCode::NodeTimeSync).is_some());
-        assert!(from_request_code(RequestCode::NodeLogging).is_some());
-        assert!(from_request_code(RequestCode::NodeRemoteAccess).is_some());
-        assert!(from_request_code(RequestCode::NodePower).is_some());
-        assert!(from_request_code(RequestCode::NodeObservation).is_some());
-        assert!(from_request_code(RequestCode::NodeVersion).is_some());
+    fn client_from_request_code_node_families() {
+        // Node family codes should map to family-level identifiers.
+        assert_eq!(
+            from_client_request_code(ClientRequestCode::NodePower),
+            Some(NODE_POWER)
+        );
+        assert!(
+            from_client_request_code(ClientRequestCode::NodePower)
+                .unwrap()
+                .is_family()
+        );
+        assert_eq!(
+            from_client_request_code(ClientRequestCode::NodeService),
+            Some(NODE_SERVICE)
+        );
+        assert_eq!(
+            from_client_request_code(ClientRequestCode::NodeNetworkInterface),
+            Some(NODE_NETWORK_INTERFACE)
+        );
+        assert_eq!(
+            from_client_request_code(ClientRequestCode::NodeHostname),
+            Some(NODE_HOSTNAME)
+        );
+        assert_eq!(
+            from_client_request_code(ClientRequestCode::NodeTimeSync),
+            Some(NODE_TIME_SYNC)
+        );
+        assert_eq!(
+            from_client_request_code(ClientRequestCode::NodeLogging),
+            Some(NODE_LOGGING)
+        );
+        assert_eq!(
+            from_client_request_code(ClientRequestCode::NodeRemoteAccess),
+            Some(NODE_REMOTE_ACCESS)
+        );
+        assert_eq!(
+            from_client_request_code(ClientRequestCode::NodeObservation),
+            Some(NODE_OBSERVATION)
+        );
+        assert_eq!(
+            from_client_request_code(ClientRequestCode::NodeVersion),
+            Some(NODE_VERSION)
+        );
     }
 
     #[test]
-    fn from_request_code_unknown() {
-        assert_eq!(from_request_code(RequestCode::Unknown), None);
+    fn client_from_request_code_unknown() {
+        assert_eq!(from_client_request_code(ClientRequestCode::Unknown), None);
     }
 
-    /// Every non-`Unknown` `RequestCode` variant should have a
-    /// logical identifier mapping.
+    /// Every non-`Unknown` client `RequestCode` variant should have
+    /// a logical identifier mapping.
     #[test]
-    fn all_known_request_codes_are_mapped() {
-        let codes: &[RequestCode] = &[
-            RequestCode::DnsStart,
-            RequestCode::DnsStop,
-            RequestCode::Reboot,
-            RequestCode::ReloadConfig,
-            RequestCode::ReloadTi,
-            RequestCode::ResourceUsage,
-            RequestCode::TorExitNodeList,
-            RequestCode::SamplingPolicyList,
-            RequestCode::ReloadFilterRule,
-            RequestCode::UpdateConfig,
-            RequestCode::DeleteSamplingPolicy,
-            RequestCode::InternalNetworkList,
-            RequestCode::Allowlist,
-            RequestCode::Blocklist,
-            RequestCode::EchoRequest,
-            RequestCode::TrustedUserAgentList,
-            RequestCode::TrustedDomainList,
-            RequestCode::ProcessList,
-            RequestCode::SemiSupervisedModels,
-            RequestCode::Shutdown,
-            RequestCode::NodeService,
-            RequestCode::NodeNetworkInterface,
-            RequestCode::NodeHostname,
-            RequestCode::NodeTimeSync,
-            RequestCode::NodeLogging,
-            RequestCode::NodeRemoteAccess,
-            RequestCode::NodePower,
-            RequestCode::NodeObservation,
-            RequestCode::NodeVersion,
+    fn all_known_client_request_codes_are_mapped() {
+        let codes: &[ClientRequestCode] = &[
+            ClientRequestCode::DnsStart,
+            ClientRequestCode::DnsStop,
+            ClientRequestCode::Reboot,
+            ClientRequestCode::ReloadConfig,
+            ClientRequestCode::ReloadTi,
+            ClientRequestCode::ResourceUsage,
+            ClientRequestCode::TorExitNodeList,
+            ClientRequestCode::SamplingPolicyList,
+            ClientRequestCode::ReloadFilterRule,
+            ClientRequestCode::UpdateConfig,
+            ClientRequestCode::DeleteSamplingPolicy,
+            ClientRequestCode::InternalNetworkList,
+            ClientRequestCode::Allowlist,
+            ClientRequestCode::Blocklist,
+            ClientRequestCode::EchoRequest,
+            ClientRequestCode::TrustedUserAgentList,
+            ClientRequestCode::TrustedDomainList,
+            ClientRequestCode::ProcessList,
+            ClientRequestCode::SemiSupervisedModels,
+            ClientRequestCode::Shutdown,
+            ClientRequestCode::NodeService,
+            ClientRequestCode::NodeNetworkInterface,
+            ClientRequestCode::NodeHostname,
+            ClientRequestCode::NodeTimeSync,
+            ClientRequestCode::NodeLogging,
+            ClientRequestCode::NodeRemoteAccess,
+            ClientRequestCode::NodePower,
+            ClientRequestCode::NodeObservation,
+            ClientRequestCode::NodeVersion,
         ];
         for &code in codes {
             assert!(
-                from_request_code(code).is_some(),
-                "RequestCode::{code:?} should map to a ServiceId"
+                from_client_request_code(code).is_some(),
+                "client::RequestCode::{code:?} should map to a ServiceId"
             );
         }
+    }
+
+    /// Every non-`Unknown` server `RequestCode` variant should have
+    /// a logical identifier mapping.
+    #[test]
+    fn all_known_server_request_codes_are_mapped() {
+        let codes: &[ServerRequestCode] = &[
+            ServerRequestCode::GetDataSource,
+            ServerRequestCode::GetIndicator,
+            ServerRequestCode::GetMaxEventIdNum,
+            ServerRequestCode::GetModel,
+            ServerRequestCode::GetModelNames,
+            ServerRequestCode::InsertColumnStatistics,
+            ServerRequestCode::InsertModel,
+            ServerRequestCode::InsertTimeSeries,
+            ServerRequestCode::RemoveModel,
+            ServerRequestCode::RemoveOutliers,
+            ServerRequestCode::UpdateClusters,
+            ServerRequestCode::UpdateModel,
+            ServerRequestCode::UpdateOutliers,
+            ServerRequestCode::InsertEventLabels,
+            ServerRequestCode::GetDataSourceList,
+            ServerRequestCode::GetLabelDbPatterns,
+            ServerRequestCode::InsertDataSource,
+            ServerRequestCode::RenewCertificate,
+            ServerRequestCode::GetTrustedDomainList,
+            ServerRequestCode::GetOutliers,
+            ServerRequestCode::GetTorExitNodeList,
+            ServerRequestCode::GetInternalNetworkList,
+            ServerRequestCode::GetAllowlist,
+            ServerRequestCode::GetBlocklist,
+            ServerRequestCode::GetPretrainedModel,
+            ServerRequestCode::GetTrustedUserAgentList,
+            ServerRequestCode::GetConfig,
+            ServerRequestCode::UpdateHostOpenedPorts,
+            ServerRequestCode::UpdateHostOsAgents,
+            ServerRequestCode::GetSamplingPolicyList,
+        ];
+        for &code in codes {
+            assert!(
+                from_server_request_code(code).is_some(),
+                "server::RequestCode::{code:?} should map to a ServiceId"
+            );
+        }
+    }
+
+    #[test]
+    fn server_from_request_code_unknown() {
+        assert_eq!(from_server_request_code(ServerRequestCode::Unknown), None);
+    }
+
+    #[test]
+    fn server_from_request_code_samples() {
+        assert_eq!(
+            from_server_request_code(ServerRequestCode::GetDataSource),
+            Some(SERVER_DATA_SOURCE_GET)
+        );
+        assert_eq!(
+            from_server_request_code(ServerRequestCode::InsertModel),
+            Some(SERVER_MODEL_INSERT)
+        );
+        assert_eq!(
+            from_server_request_code(ServerRequestCode::GetConfig),
+            Some(SERVER_CONFIG_GET)
+        );
+        assert_eq!(
+            from_server_request_code(ServerRequestCode::RenewCertificate),
+            Some(SERVER_CERTIFICATE_RENEW)
+        );
     }
 
     /// All service identifiers returned by [`all()`] should have
@@ -418,13 +752,21 @@ mod tests {
     }
 
     /// The `all()` list should not be empty and should include
-    /// identifiers from both node families and common operations.
+    /// identifiers from node families, common operations, and
+    /// server operations.
     #[test]
     fn all_covers_families() {
         let ids = all();
         assert!(!ids.is_empty());
+        // Family-level
+        assert!(ids.contains(&NODE_POWER));
+        // Node method-level
         assert!(ids.contains(&NODE_POWER_REBOOT));
+        // Common
         assert!(ids.contains(&COMMON_RENEW_CERTIFICATE));
         assert!(ids.contains(&NODE_OBSERVATION_PROCESS_LIST));
+        // Server
+        assert!(ids.contains(&SERVER_MODEL_GET));
+        assert!(ids.contains(&SERVER_DATA_SOURCE_LIST));
     }
 }

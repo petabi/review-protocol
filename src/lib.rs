@@ -1,3 +1,62 @@
+//! # review-protocol
+//!
+//! This crate defines the wire and API surface used to interact with
+//! review nodes and services. It focuses on a small set of long-lived
+//! abstractions that embedding applications should rely on when
+//! integrating with the review protocol.
+//!
+//! ## Public modules
+//!
+//! - [`client`] – Client-side utilities and typed clients for calling
+//!   review services.
+//! - [`server`] – Server-side helpers and service wiring for
+//!   implementing review-protocol endpoints.
+//! - [`types`] – Shared types used across the protocol surface.
+//! - [`service_id`] – Definitions and helpers for [`ServiceId`], the
+//!   key used to scope authorization and identify services.
+//! - [`auth`] – Authorization-related types and helpers.
+//!
+//! ## Node API family
+//!
+//! The preferred public terminology for the APIs that operate on an
+//! agent/node is **node**. The node API family groups the endpoints and
+//! types that model long-lived interactions with a managed node.
+//! Embedding applications should treat the node APIs as the stable
+//! surface for node-centric operations. Item-level docs on the
+//! node-related modules provide concrete guidance and examples.
+//!
+//! ## Compatibility with legacy flat APIs
+//!
+//! Historically some functionality was exposed through legacy, flatter
+//! endpoints (for example: reboot or resource-usage endpoints). Those
+//! legacy endpoints remain available for compatibility and may overlap
+//! with the node API family. For new integrations prefer the node APIs,
+//! but be aware the compatibility surface exists and may be relied upon
+//! by existing consumers.
+//!
+//! ## Authorization model
+//!
+//! Authorization in this crate assumes certificate-backed peer identity
+//! is available at request time and is provided to server code via
+//! `PeerContext`. The crate does not embed a policy engine:
+//! authorization decisions are made by the embedding application using
+//! the identity and the [`ServiceId`] to scope policies. In short:
+//!
+//! 1. Peer identity is certificate-backed and surfaced as
+//!    `PeerContext`.
+//! 2. Policy is supplied and enforced by the embedding application
+//!    outside this crate.
+//! 3. Authorization is keyed by [`ServiceId`] so policies can be
+//!    targeted to individual services.
+//!
+//! ## Further reading
+//!
+//! Release-specific rollout choreography and sequencing are documented
+//! in `CHANGELOG.md`. Item-level docs on each module contain
+//! implementation detail.
+//!
+//! [`ServiceId`]: crate::service_id::ServiceId
+
 #[cfg(any(feature = "client", feature = "server"))]
 pub mod auth;
 pub mod client;

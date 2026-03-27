@@ -26,7 +26,13 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   `node_logging_authorized`, `node_remote_access_authorized`,
   `node_power_authorized`, `node_observation_authorized`,
   `node_version_authorized`) that check the `Authorizer` before
-  sending REview-to-agent node requests.
+  sending REview-to-agent node requests. Each authorized method
+  resolves the **method-level** `ServiceId` from the typed request
+  (e.g. `node.power.reboot`, not just `node.power`), enabling
+  fine-grained per-operation authorization within a family.
+- `service_id()` method on each node request enum
+  (`NodePowerRequest`, `NodeObservationRequest`, etc.) that returns
+  the method-level `ServiceId` for the specific variant.
 - `service_id` module with stable logical service identifiers
   (`ServiceId`) independent of wire `RequestCode` values. Covers
   all nine node feature families (with both family-level and

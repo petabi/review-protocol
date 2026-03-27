@@ -269,6 +269,132 @@ pub const SERVER_LIST_TRUSTED_USER_AGENT: ServiceId =
     ServiceId::new("server.list", "trusted_user_agent");
 pub const SERVER_LIST_SAMPLING_POLICY: ServiceId = ServiceId::new("server.list", "sampling_policy");
 
+// ── Node request → method-level ServiceId ──────────────────────
+//
+// Each node request enum variant maps to the specific method-level
+// `ServiceId`, enabling fine-grained authorization when the typed
+// request is available (e.g. on the REview-to-agent path).
+
+use crate::types::node::{
+    NodeHostnameRequest, NodeLoggingRequest, NodeNetworkInterfaceRequest,
+    NodeObservationRequest, NodePowerRequest, NodeRemoteAccessRequest, NodeServiceRequest,
+    NodeTimeSyncRequest, NodeVersionRequest,
+};
+
+impl NodeServiceRequest {
+    /// Returns the method-level [`ServiceId`] for this request.
+    #[must_use]
+    pub fn service_id(&self) -> ServiceId {
+        match self {
+            Self::Start { .. } => NODE_SERVICE_START,
+            Self::Stop { .. } => NODE_SERVICE_STOP,
+            Self::Status { .. } => NODE_SERVICE_STATUS,
+            Self::Restart { .. } => NODE_SERVICE_RESTART,
+        }
+    }
+}
+
+impl NodeNetworkInterfaceRequest {
+    /// Returns the method-level [`ServiceId`] for this request.
+    #[must_use]
+    pub fn service_id(&self) -> ServiceId {
+        match self {
+            Self::List { .. } => NODE_NETWORK_INTERFACE_LIST,
+            Self::Get { .. } => NODE_NETWORK_INTERFACE_GET,
+            Self::Set { .. } => NODE_NETWORK_INTERFACE_SET,
+            Self::ResetConfig { .. } => NODE_NETWORK_INTERFACE_RESET_CONFIG,
+            Self::Remove { .. } => NODE_NETWORK_INTERFACE_REMOVE,
+        }
+    }
+}
+
+impl NodeHostnameRequest {
+    /// Returns the method-level [`ServiceId`] for this request.
+    #[must_use]
+    pub fn service_id(&self) -> ServiceId {
+        match self {
+            Self::Get => NODE_HOSTNAME_GET,
+            Self::Set { .. } => NODE_HOSTNAME_SET,
+        }
+    }
+}
+
+impl NodeTimeSyncRequest {
+    /// Returns the method-level [`ServiceId`] for this request.
+    #[must_use]
+    pub fn service_id(&self) -> ServiceId {
+        match self {
+            Self::Get => NODE_TIME_SYNC_GET,
+            Self::Set { .. } => NODE_TIME_SYNC_SET,
+            Self::Enable => NODE_TIME_SYNC_ENABLE,
+            Self::Disable => NODE_TIME_SYNC_DISABLE,
+            Self::Status => NODE_TIME_SYNC_STATUS,
+        }
+    }
+}
+
+impl NodeLoggingRequest {
+    /// Returns the method-level [`ServiceId`] for this request.
+    #[must_use]
+    pub fn service_id(&self) -> ServiceId {
+        match self {
+            Self::Get => NODE_LOGGING_GET,
+            Self::Set { .. } => NODE_LOGGING_SET,
+            Self::Clear => NODE_LOGGING_CLEAR,
+            Self::Restart => NODE_LOGGING_RESTART,
+        }
+    }
+}
+
+impl NodeRemoteAccessRequest {
+    /// Returns the method-level [`ServiceId`] for this request.
+    #[must_use]
+    pub fn service_id(&self) -> ServiceId {
+        match self {
+            Self::Get => NODE_REMOTE_ACCESS_GET,
+            Self::Set { .. } => NODE_REMOTE_ACCESS_SET,
+            Self::Restart => NODE_REMOTE_ACCESS_RESTART,
+        }
+    }
+}
+
+impl NodePowerRequest {
+    /// Returns the method-level [`ServiceId`] for this request.
+    #[must_use]
+    pub fn service_id(&self) -> ServiceId {
+        match self {
+            Self::Reboot => NODE_POWER_REBOOT,
+            Self::Shutdown => NODE_POWER_SHUTDOWN,
+            Self::GracefulReboot => NODE_POWER_GRACEFUL_REBOOT,
+            Self::GracefulShutdown => NODE_POWER_GRACEFUL_SHUTDOWN,
+        }
+    }
+}
+
+impl NodeObservationRequest {
+    /// Returns the method-level [`ServiceId`] for this request.
+    #[must_use]
+    pub fn service_id(&self) -> ServiceId {
+        match self {
+            Self::ProcessList => NODE_OBSERVATION_PROCESS_LIST,
+            Self::ResourceUsage => NODE_OBSERVATION_RESOURCE_USAGE,
+            Self::Uptime => NODE_OBSERVATION_UPTIME,
+        }
+    }
+}
+
+impl NodeVersionRequest {
+    /// Returns the method-level [`ServiceId`] for this request.
+    #[must_use]
+    pub fn service_id(&self) -> ServiceId {
+        match self {
+            Self::Get => NODE_VERSION_GET,
+            Self::SetOsVersion { .. } => NODE_VERSION_SET_OS,
+            Self::SetProductVersion { .. } => NODE_VERSION_SET_PRODUCT,
+        }
+    }
+}
+
 // ── RequestCode → ServiceId mapping ────────────────────────────
 //
 // Maps wire request codes to their logical service identifiers.
@@ -292,6 +418,7 @@ use crate::server::RequestCode as ServerRequestCode;
 /// specific method is only known after payload deserialization.
 #[cfg(any(feature = "client", feature = "server"))]
 #[must_use]
+#[allow(dead_code)] // used by tests; retained for symmetry with from_server_request_code
 pub(crate) fn from_client_request_code(code: ClientRequestCode) -> Option<ServiceId> {
     match code {
         // Legacy flat codes — these identify a specific operation.
@@ -768,5 +895,101 @@ mod tests {
         // Server
         assert!(ids.contains(&SERVER_MODEL_GET));
         assert!(ids.contains(&SERVER_DATA_SOURCE_LIST));
+    }
+
+    #[test]
+    fn node_request_service_ids() {
+        use crate::types::node::*;
+
+        // node.power
+        assert_eq!(NodePowerRequest::Reboot.service_id(), NODE_POWER_REBOOT);
+        assert_eq!(NodePowerRequest::Shutdown.service_id(), NODE_POWER_SHUTDOWN);
+        assert_eq!(
+            NodePowerRequest::GracefulReboot.service_id(),
+            NODE_POWER_GRACEFUL_REBOOT
+        );
+        assert_eq!(
+            NodePowerRequest::GracefulShutdown.service_id(),
+            NODE_POWER_GRACEFUL_SHUTDOWN
+        );
+
+        // node.observation
+        assert_eq!(
+            NodeObservationRequest::ProcessList.service_id(),
+            NODE_OBSERVATION_PROCESS_LIST
+        );
+        assert_eq!(
+            NodeObservationRequest::ResourceUsage.service_id(),
+            NODE_OBSERVATION_RESOURCE_USAGE
+        );
+        assert_eq!(
+            NodeObservationRequest::Uptime.service_id(),
+            NODE_OBSERVATION_UPTIME
+        );
+
+        // node.service
+        assert_eq!(
+            NodeServiceRequest::Start {
+                service: "x".into()
+            }
+            .service_id(),
+            NODE_SERVICE_START
+        );
+        assert_eq!(
+            NodeServiceRequest::Stop {
+                service: "x".into()
+            }
+            .service_id(),
+            NODE_SERVICE_STOP
+        );
+
+        // node.hostname
+        assert_eq!(NodeHostnameRequest::Get.service_id(), NODE_HOSTNAME_GET);
+        assert_eq!(
+            NodeHostnameRequest::Set {
+                hostname: "h".into()
+            }
+            .service_id(),
+            NODE_HOSTNAME_SET
+        );
+
+        // node.version
+        assert_eq!(NodeVersionRequest::Get.service_id(), NODE_VERSION_GET);
+        assert_eq!(
+            NodeVersionRequest::SetOsVersion {
+                version: "v".into()
+            }
+            .service_id(),
+            NODE_VERSION_SET_OS
+        );
+        assert_eq!(
+            NodeVersionRequest::SetProductVersion {
+                version: "v".into()
+            }
+            .service_id(),
+            NODE_VERSION_SET_PRODUCT
+        );
+    }
+
+    /// Every `service_id()` return value should be method-level
+    /// (not family-level).
+    #[test]
+    fn node_request_service_ids_are_method_level() {
+        use crate::types::node::*;
+
+        assert!(!NodePowerRequest::Reboot.service_id().is_family());
+        assert!(!NodeObservationRequest::ProcessList.service_id().is_family());
+        assert!(
+            !NodeServiceRequest::Start {
+                service: "x".into()
+            }
+            .service_id()
+            .is_family()
+        );
+        assert!(!NodeHostnameRequest::Get.service_id().is_family());
+        assert!(!NodeTimeSyncRequest::Get.service_id().is_family());
+        assert!(!NodeLoggingRequest::Get.service_id().is_family());
+        assert!(!NodeRemoteAccessRequest::Get.service_id().is_family());
+        assert!(!NodeVersionRequest::Get.service_id().is_family());
     }
 }

@@ -201,9 +201,9 @@ impl std::error::Error for AuthorizationError {}
 /// incoming request, after resolving the wire request code to a
 /// logical [`ServiceId`].  The two integration points are:
 ///
-/// - **[`server::handler::handle_authorized`](crate::server::handler::handle_authorized)**
+/// - **[`server::handler::handle_authorized`](crate::server::handle_authorized)**
 ///   — checks every incoming request before dispatching it to
-///   the [`Handler`](crate::server::handler::Handler).
+///   the [`Handler`](crate::server::Handler).
 /// - **`Connection::node_*_authorized` methods** (e.g.
 ///   [`node_power_authorized`](crate::server::Connection::node_power_authorized))
 ///   — checks authorization before sending an outgoing request
@@ -262,11 +262,11 @@ impl std::error::Error for AuthorizationError {}
 /// ```
 ///
 /// To register the authorizer with the server, pass it to
-/// [`handle_authorized`](crate::server::handler::handle_authorized):
+/// [`handle_authorized`](crate::server::handle_authorized):
 ///
 /// ```ignore
 /// use review_protocol::auth::PeerContext;
-/// use review_protocol::server::handler::handle_authorized;
+/// use review_protocol::server::handle_authorized;
 ///
 /// // Inside a connection handler:
 /// let peer = PeerContext::new("agent-1")
@@ -292,7 +292,7 @@ pub trait Authorizer: Send + Sync {
 /// `NoopAuthorizer` always returns `Ok(())`, allowing every
 /// request regardless of peer identity or target service.  It is
 /// used internally by
-/// [`handle`](crate::server::handler::handle) to preserve
+/// [`handle`](crate::server::handle) to preserve
 /// backward compatibility when no authorization policy is
 /// configured.
 ///

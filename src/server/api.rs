@@ -339,8 +339,14 @@ impl Connection {
         authorizer: &dyn crate::auth::Authorizer,
     ) -> anyhow::Result<NodeServiceResponse> {
         let sid = req.service_id();
-        self.send_request_authorized(client::RequestCode::NodeService, &req, &sid, peer, authorizer)
-            .await
+        self.send_request_authorized(
+            client::RequestCode::NodeService,
+            &req,
+            &sid,
+            peer,
+            authorizer,
+        )
+        .await
     }
 
     /// Sends a node network-interface management request to the
@@ -389,8 +395,14 @@ impl Connection {
         authorizer: &dyn crate::auth::Authorizer,
     ) -> anyhow::Result<NodeHostnameResponse> {
         let sid = req.service_id();
-        self.send_request_authorized(client::RequestCode::NodeHostname, &req, &sid, peer, authorizer)
-            .await
+        self.send_request_authorized(
+            client::RequestCode::NodeHostname,
+            &req,
+            &sid,
+            peer,
+            authorizer,
+        )
+        .await
     }
 
     /// Sends a node time-synchronization request to the agent with
@@ -411,8 +423,14 @@ impl Connection {
         authorizer: &dyn crate::auth::Authorizer,
     ) -> anyhow::Result<NodeTimeSyncResponse> {
         let sid = req.service_id();
-        self.send_request_authorized(client::RequestCode::NodeTimeSync, &req, &sid, peer, authorizer)
-            .await
+        self.send_request_authorized(
+            client::RequestCode::NodeTimeSync,
+            &req,
+            &sid,
+            peer,
+            authorizer,
+        )
+        .await
     }
 
     /// Sends a node logging-configuration request to the agent with
@@ -433,8 +451,14 @@ impl Connection {
         authorizer: &dyn crate::auth::Authorizer,
     ) -> anyhow::Result<NodeLoggingResponse> {
         let sid = req.service_id();
-        self.send_request_authorized(client::RequestCode::NodeLogging, &req, &sid, peer, authorizer)
-            .await
+        self.send_request_authorized(
+            client::RequestCode::NodeLogging,
+            &req,
+            &sid,
+            peer,
+            authorizer,
+        )
+        .await
     }
 
     /// Sends a node remote-access configuration request to the
@@ -505,8 +529,14 @@ impl Connection {
         authorizer: &dyn crate::auth::Authorizer,
     ) -> anyhow::Result<NodeObservationResponse> {
         let sid = req.service_id();
-        self.send_request_authorized(client::RequestCode::NodeObservation, &req, &sid, peer, authorizer)
-            .await
+        self.send_request_authorized(
+            client::RequestCode::NodeObservation,
+            &req,
+            &sid,
+            peer,
+            authorizer,
+        )
+        .await
     }
 
     /// Sends a node version-management request to the agent with
@@ -527,8 +557,14 @@ impl Connection {
         authorizer: &dyn crate::auth::Authorizer,
     ) -> anyhow::Result<NodeVersionResponse> {
         let sid = req.service_id();
-        self.send_request_authorized(client::RequestCode::NodeVersion, &req, &sid, peer, authorizer)
-            .await
+        self.send_request_authorized(
+            client::RequestCode::NodeVersion,
+            &req,
+            &sid,
+            peer,
+            authorizer,
+        )
+        .await
     }
 
     /// Sends the given payload to the client.

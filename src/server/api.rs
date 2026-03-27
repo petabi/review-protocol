@@ -338,7 +338,8 @@ impl Connection {
         peer: &crate::auth::PeerContext,
         authorizer: &dyn crate::auth::Authorizer,
     ) -> anyhow::Result<NodeServiceResponse> {
-        self.send_request_authorized(client::RequestCode::NodeService, &req, peer, authorizer)
+        let sid = req.service_id();
+        self.send_request_authorized(client::RequestCode::NodeService, &req, &sid, peer, authorizer)
             .await
     }
 
@@ -359,9 +360,11 @@ impl Connection {
         peer: &crate::auth::PeerContext,
         authorizer: &dyn crate::auth::Authorizer,
     ) -> anyhow::Result<NodeNetworkInterfaceResponse> {
+        let sid = req.service_id();
         self.send_request_authorized(
             client::RequestCode::NodeNetworkInterface,
             &req,
+            &sid,
             peer,
             authorizer,
         )
@@ -385,7 +388,8 @@ impl Connection {
         peer: &crate::auth::PeerContext,
         authorizer: &dyn crate::auth::Authorizer,
     ) -> anyhow::Result<NodeHostnameResponse> {
-        self.send_request_authorized(client::RequestCode::NodeHostname, &req, peer, authorizer)
+        let sid = req.service_id();
+        self.send_request_authorized(client::RequestCode::NodeHostname, &req, &sid, peer, authorizer)
             .await
     }
 
@@ -406,7 +410,8 @@ impl Connection {
         peer: &crate::auth::PeerContext,
         authorizer: &dyn crate::auth::Authorizer,
     ) -> anyhow::Result<NodeTimeSyncResponse> {
-        self.send_request_authorized(client::RequestCode::NodeTimeSync, &req, peer, authorizer)
+        let sid = req.service_id();
+        self.send_request_authorized(client::RequestCode::NodeTimeSync, &req, &sid, peer, authorizer)
             .await
     }
 
@@ -427,7 +432,8 @@ impl Connection {
         peer: &crate::auth::PeerContext,
         authorizer: &dyn crate::auth::Authorizer,
     ) -> anyhow::Result<NodeLoggingResponse> {
-        self.send_request_authorized(client::RequestCode::NodeLogging, &req, peer, authorizer)
+        let sid = req.service_id();
+        self.send_request_authorized(client::RequestCode::NodeLogging, &req, &sid, peer, authorizer)
             .await
     }
 
@@ -448,9 +454,11 @@ impl Connection {
         peer: &crate::auth::PeerContext,
         authorizer: &dyn crate::auth::Authorizer,
     ) -> anyhow::Result<NodeRemoteAccessResponse> {
+        let sid = req.service_id();
         self.send_request_authorized(
             client::RequestCode::NodeRemoteAccess,
             &req,
+            &sid,
             peer,
             authorizer,
         )
@@ -474,7 +482,8 @@ impl Connection {
         peer: &crate::auth::PeerContext,
         authorizer: &dyn crate::auth::Authorizer,
     ) -> anyhow::Result<NodePowerResponse> {
-        self.send_request_authorized(client::RequestCode::NodePower, &req, peer, authorizer)
+        let sid = req.service_id();
+        self.send_request_authorized(client::RequestCode::NodePower, &req, &sid, peer, authorizer)
             .await
     }
 
@@ -495,7 +504,8 @@ impl Connection {
         peer: &crate::auth::PeerContext,
         authorizer: &dyn crate::auth::Authorizer,
     ) -> anyhow::Result<NodeObservationResponse> {
-        self.send_request_authorized(client::RequestCode::NodeObservation, &req, peer, authorizer)
+        let sid = req.service_id();
+        self.send_request_authorized(client::RequestCode::NodeObservation, &req, &sid, peer, authorizer)
             .await
     }
 
@@ -516,7 +526,8 @@ impl Connection {
         peer: &crate::auth::PeerContext,
         authorizer: &dyn crate::auth::Authorizer,
     ) -> anyhow::Result<NodeVersionResponse> {
-        self.send_request_authorized(client::RequestCode::NodeVersion, &req, peer, authorizer)
+        let sid = req.service_id();
+        self.send_request_authorized(client::RequestCode::NodeVersion, &req, &sid, peer, authorizer)
             .await
     }
 
@@ -552,14 +563,13 @@ impl Connection {
         &self,
         request_code: client::RequestCode,
         payload: &T,
+        service_id: &crate::service_id::ServiceId,
         peer: &crate::auth::PeerContext,
         authorizer: &dyn crate::auth::Authorizer,
     ) -> anyhow::Result<S> {
-        if let Some(service_id) = crate::service_id::from_client_request_code(request_code) {
-            authorizer
-                .authorize(peer, &service_id)
-                .map_err(|e| anyhow!(e))?;
-        }
+        authorizer
+            .authorize(peer, service_id)
+            .map_err(|e| anyhow!(e))?;
         self.send_request(request_code, payload).await
     }
 }
@@ -1481,6 +1491,76 @@ mod tests {
         // Power should be denied.
         let result = server_conn
             .node_power_authorized(NodePowerRequest::Reboot, &peer, &authorizer)
+            .await;
+        assert!(result.is_err());
+
+        test_env.teardown(&server_conn);
+    }
+
+    /// Verifies that authorized node methods discriminate at the
+    /// method level within a single family.  For example, an
+    /// authorizer can allow `node.power.reboot` while denying
+    /// `node.power.shutdown`.
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn node_power_authorization_method_level() {
+        use crate::auth::{AuthorizationError, Authorizer, PeerContext};
+        use crate::service_id::{self, ServiceId};
+        use crate::types::node::{NodePowerRequest, NodePowerResponse};
+
+        /// Allows only `node.power.reboot`, denies everything else.
+        struct RebootOnly;
+        impl Authorizer for RebootOnly {
+            fn authorize(
+                &self,
+                _peer: &PeerContext,
+                service: &ServiceId,
+            ) -> Result<(), AuthorizationError> {
+                if *service == service_id::NODE_POWER_REBOOT {
+                    Ok(())
+                } else {
+                    Err(AuthorizationError::new("only reboot allowed"))
+                }
+            }
+        }
+
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let peer = PeerContext::new("test-agent");
+        let authorizer = RebootOnly;
+
+        // Reboot should be allowed.
+        let mut handler = TestHandler;
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+            crate::request::handle(&mut handler, &mut send, &mut recv).await
+        });
+
+        let resp = server_conn
+            .node_power_authorized(NodePowerRequest::Reboot, &peer, &authorizer)
+            .await
+            .unwrap();
+        assert_eq!(resp, NodePowerResponse::Initiated);
+        let client_res = client_handle.await.unwrap();
+        assert!(client_res.is_ok());
+
+        // Shutdown (same family, different method) should be denied.
+        let result = server_conn
+            .node_power_authorized(NodePowerRequest::Shutdown, &peer, &authorizer)
+            .await;
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("only reboot allowed")
+        );
+
+        // GracefulReboot should also be denied.
+        let result = server_conn
+            .node_power_authorized(NodePowerRequest::GracefulReboot, &peer, &authorizer)
             .await;
         assert!(result.is_err());
 

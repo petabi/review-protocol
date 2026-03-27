@@ -296,13 +296,7 @@ pub struct EventMessage {
 /// Callers construct a request variant, send it through the protocol
 /// layer, and receive the corresponding response variant.
 ///
-/// # API compatibility
-///
-/// The public fields and enum variants exposed in this module form
-/// the stable API surface.  New **optional** fields or new enum
-/// variants may be added in minor releases; callers should tolerate
-/// unknown variants when deserializing (e.g. by using a wildcard arm
-/// in `match` expressions).
+/// # Stability
 ///
 /// Low-level wire-format details such as field layout, byte order, or
 /// serialization encoding are **not** part of the public contract and
@@ -629,8 +623,7 @@ pub mod node {
 
     /// Remote-access (SSH) configuration for a node.
     ///
-    /// Currently exposes only the listen port; additional fields may
-    /// be added in future minor releases.
+    /// Currently exposes only the listen port.
     #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
     pub struct NodeRemoteAccessConfig {
         /// SSH listen port.

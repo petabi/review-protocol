@@ -131,7 +131,29 @@ pub(crate) enum RequestCode {
 }
 
 #[cfg(any(feature = "server", test))]
-/// A connection from a client.
+/// A connection to a single agent (node).
+///
+/// Each `Connection` wraps an underlying QUIC connection and
+/// provides methods for sending requests to the agent on the other
+/// end.  Because a `Connection` is bound to exactly one agent,
+/// there is no additional node-selection parameter — calling any
+/// method on this type sends the request to that agent.
+///
+/// The API is organized in two layers:
+///
+/// - **`node_*` methods** — typed, per-feature-family methods that
+///   accept a `Node*Request` enum and return a `Node*Response`.
+///   Each request variant carries a
+///   [`ServiceId`](crate::service_id::ServiceId) suitable for
+///   fine-grained authorization.  **Prefer these for new code.**
+/// - **Legacy flat methods** — simpler, backward-compatible
+///   wrappers (e.g. [`send_reboot_cmd`](Self::send_reboot_cmd)).
+///   They do not expose `ServiceId` and cannot participate in
+///   [`Authorizer`](crate::auth::Authorizer)-based access
+///   control.
+///
+/// See the [`impl` block documentation](Self#node-api-vs-legacy-flat-api)
+/// for migration guidance.
 #[derive(Clone, Debug)]
 pub struct Connection {
     conn: quinn::Connection,

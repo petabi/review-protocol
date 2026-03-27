@@ -17,11 +17,54 @@ use crate::{
 };
 
 /// The server API.
+///
+/// # Node API vs legacy flat API
+///
+/// `Connection` exposes two styles of methods for managing the
+/// connected agent (node):
+///
+/// - **`node_*` methods** (e.g. [`node_power`](Self::node_power),
+///   [`node_observation`](Self::node_observation)) accept a typed
+///   `Node*Request` enum and return the corresponding
+///   `Node*Response`.  Each request variant carries a method-level
+///   [`ServiceId`](crate::service_id::ServiceId) that can be used
+///   for fine-grained authorization via the `_authorized` variants
+///   (e.g.
+///   [`node_power_authorized`](Self::node_power_authorized)).
+///   **Prefer these for all new code.**
+///
+/// - **Legacy flat methods** (e.g.
+///   [`send_reboot_cmd`](Self::send_reboot_cmd),
+///   [`get_process_list`](Self::get_process_list)) provide a
+///   simpler, backward-compatible surface.  They do not expose
+///   `ServiceId` and cannot participate in `Authorizer`-based
+///   access control.  Where possible they delegate to a `node_*`
+///   method internally, but some (e.g.
+///   [`send_allowlist`](Self::send_allowlist)) still use their own
+///   request path.
+///
+/// ## Migrating from flat to `node_*`
+///
+/// When migrating, note the following differences:
+///
+/// - `node_*` methods return the full `Node*Response` enum; you
+///   must match the expected variant.  Legacy methods return
+///   unwrapped convenience types (e.g. `Vec<Process>`).
+/// - `node_*_authorized` methods require a
+///   [`PeerContext`](crate::auth::PeerContext) and an
+///   [`Authorizer`](crate::auth::Authorizer).  Legacy methods
+///   perform no authorization check.
+/// - Some legacy methods have no `node_*` equivalent (e.g.
+///   [`send_allowlist`](Self::send_allowlist),
+///   [`send_ping`](Self::send_ping)); continue using them as-is.
 impl Connection {
     /// Fetches the list of processes running on the agent.
     ///
-    /// This is a compatibility wrapper that routes through
+    /// This is a legacy compatibility wrapper that delegates to
     /// [`node_observation`](Self::node_observation) internally.
+    /// Prefer `node_observation` for new code — it exposes the
+    /// full response enum and supports authorization via
+    /// [`node_observation_authorized`](Self::node_observation_authorized).
     ///
     /// # Errors
     ///
@@ -39,8 +82,11 @@ impl Connection {
 
     /// Fetches the resource usage of an agent.
     ///
-    /// This is a compatibility wrapper that routes through
+    /// This is a legacy compatibility wrapper that delegates to
     /// [`node_observation`](Self::node_observation) internally.
+    /// Prefer `node_observation` for new code — it exposes the
+    /// full response enum and supports authorization via
+    /// [`node_observation_authorized`](Self::node_observation_authorized).
     ///
     /// # Errors
     ///
@@ -118,8 +164,11 @@ impl Connection {
 
     /// Sends the reboot command.
     ///
-    /// This is a compatibility wrapper that routes through
-    /// [`node_power`](Self::node_power) internally.
+    /// This is a legacy compatibility wrapper that delegates to
+    /// [`node_power`](Self::node_power) internally.  Prefer
+    /// `node_power` for new code — it exposes the full set of
+    /// power operations and supports authorization via
+    /// [`node_power_authorized`](Self::node_power_authorized).
     ///
     /// # Errors
     ///
@@ -141,8 +190,11 @@ impl Connection {
 
     /// Sends the shutdown command.
     ///
-    /// This is a compatibility wrapper that routes through
-    /// [`node_power`](Self::node_power) internally.
+    /// This is a legacy compatibility wrapper that delegates to
+    /// [`node_power`](Self::node_power) internally.  Prefer
+    /// `node_power` for new code — it exposes the full set of
+    /// power operations and supports authorization via
+    /// [`node_power_authorized`](Self::node_power_authorized).
     ///
     /// # Errors
     ///
@@ -190,8 +242,57 @@ impl Connection {
     // corresponding typed `Node*Request` and returns the matching
     // `Node*Response`, routing through the internal `RequestCode`
     // mapping.
+    //
+    // ## Targeting
+    //
+    // Each `Connection` represents a single QUIC connection to one
+    // agent (node).  Calling a `node_*` method sends the request to
+    // the agent on the other end of *this* connection — there is no
+    // additional node-selection parameter.  If you need to reach a
+    // different node, use the `Connection` that corresponds to that
+    // node.
+    //
+    // ## ServiceId and authorization
+    //
+    // Every `Node*Request` variant carries a method-level
+    // `ServiceId` (e.g. `"node.power.reboot"`).  The `_authorized`
+    // variants of these methods extract the `ServiceId` from the
+    // request and pass it, together with the `PeerContext`, to the
+    // caller-supplied `Authorizer` **before** the request is sent.
+    // See the `_authorized` methods below and the `auth` module for
+    // details.
+    //
+    // ## Legacy flat API compatibility
+    //
+    // Older "flat" methods on `Connection` (e.g. `send_reboot_cmd`,
+    // `get_process_list`) provide a simpler, backward-compatible
+    // interface for common operations.  Where possible they delegate
+    // to the corresponding `node_*` method internally.  The key
+    // differences:
+    //
+    //   - Flat methods do not expose `ServiceId` and cannot be
+    //     used with `Authorizer`-based access control.
+    //   - Flat methods return simplified types (e.g. `Vec<Process>`)
+    //     rather than the full `Node*Response` enum.
+    //
+    // **Prefer `node_*` methods for new code** — they offer typed
+    // request/response enums, explicit `ServiceId` scoping, and
+    // authorization support.  Use the flat methods only when
+    // backward compatibility with older callers is required.
 
     /// Sends a node service-control request to the agent.
+    ///
+    /// The request targets the agent on this connection.  The
+    /// specific operation is determined by the
+    /// [`NodeServiceRequest`] variant (e.g. `Start`, `Stop`,
+    /// `Status`, `Restart`).
+    ///
+    /// Each variant carries a distinct
+    /// [`ServiceId`](crate::service_id::ServiceId) (e.g.
+    /// `"node.service.start"`).  To enforce authorization based on
+    /// this identifier, use
+    /// [`node_service_authorized`](Self::node_service_authorized)
+    /// instead.
     ///
     /// # Errors
     ///
@@ -208,6 +309,17 @@ impl Connection {
     /// Sends a node network-interface management request to the
     /// agent.
     ///
+    /// The request targets the agent on this connection.  The
+    /// specific operation is determined by the
+    /// [`NodeNetworkInterfaceRequest`] variant (e.g. `List`, `Get`,
+    /// `Set`).
+    ///
+    /// Each variant carries a distinct
+    /// [`ServiceId`](crate::service_id::ServiceId).  To enforce
+    /// authorization, use
+    /// [`node_network_interface_authorized`](Self::node_network_interface_authorized)
+    /// instead.
+    ///
     /// # Errors
     ///
     /// Returns an error if serialization/deserialization failed or
@@ -221,6 +333,16 @@ impl Connection {
     }
 
     /// Sends a node hostname management request to the agent.
+    ///
+    /// The request targets the agent on this connection.  The
+    /// specific operation is determined by the
+    /// [`NodeHostnameRequest`] variant (e.g. `Get`, `Set`).
+    ///
+    /// Each variant carries a distinct
+    /// [`ServiceId`](crate::service_id::ServiceId).  To enforce
+    /// authorization, use
+    /// [`node_hostname_authorized`](Self::node_hostname_authorized)
+    /// instead.
     ///
     /// # Errors
     ///
@@ -236,6 +358,17 @@ impl Connection {
 
     /// Sends a node time-synchronization request to the agent.
     ///
+    /// The request targets the agent on this connection.  The
+    /// specific operation is determined by the
+    /// [`NodeTimeSyncRequest`] variant (e.g. `Get`, `Set`,
+    /// `Enable`, `Disable`, `Status`).
+    ///
+    /// Each variant carries a distinct
+    /// [`ServiceId`](crate::service_id::ServiceId).  To enforce
+    /// authorization, use
+    /// [`node_time_sync_authorized`](Self::node_time_sync_authorized)
+    /// instead.
+    ///
     /// # Errors
     ///
     /// Returns an error if serialization/deserialization failed or
@@ -249,6 +382,17 @@ impl Connection {
     }
 
     /// Sends a node logging-configuration request to the agent.
+    ///
+    /// The request targets the agent on this connection.  The
+    /// specific operation is determined by the
+    /// [`NodeLoggingRequest`] variant (e.g. `Get`, `Set`, `Clear`,
+    /// `Restart`).
+    ///
+    /// Each variant carries a distinct
+    /// [`ServiceId`](crate::service_id::ServiceId).  To enforce
+    /// authorization, use
+    /// [`node_logging_authorized`](Self::node_logging_authorized)
+    /// instead.
     ///
     /// # Errors
     ///
@@ -265,6 +409,17 @@ impl Connection {
     /// Sends a node remote-access configuration request to the
     /// agent.
     ///
+    /// The request targets the agent on this connection.  The
+    /// specific operation is determined by the
+    /// [`NodeRemoteAccessRequest`] variant (e.g. `Get`, `Set`,
+    /// `Restart`).
+    ///
+    /// Each variant carries a distinct
+    /// [`ServiceId`](crate::service_id::ServiceId).  To enforce
+    /// authorization, use
+    /// [`node_remote_access_authorized`](Self::node_remote_access_authorized)
+    /// instead.
+    ///
     /// # Errors
     ///
     /// Returns an error if serialization/deserialization failed or
@@ -279,6 +434,25 @@ impl Connection {
 
     /// Sends a node power-control request to the agent.
     ///
+    /// The request targets the agent on this connection.  The
+    /// specific operation is determined by the
+    /// [`NodePowerRequest`] variant (e.g. `Reboot`, `Shutdown`,
+    /// `GracefulReboot`, `GracefulShutdown`).
+    ///
+    /// Each variant carries a distinct
+    /// [`ServiceId`](crate::service_id::ServiceId) (e.g.
+    /// `"node.power.reboot"`).  To enforce authorization, use
+    /// [`node_power_authorized`](Self::node_power_authorized)
+    /// instead.
+    ///
+    /// # Legacy compatibility
+    ///
+    /// The flat methods [`send_reboot_cmd`](Self::send_reboot_cmd)
+    /// and [`send_shutdown_cmd`](Self::send_shutdown_cmd) delegate
+    /// to this method internally.  Prefer `node_power` for new
+    /// code — it exposes the full set of power operations and
+    /// supports authorization via the `_authorized` variant.
+    ///
     /// # Errors
     ///
     /// Returns an error if serialization/deserialization failed or
@@ -289,6 +463,27 @@ impl Connection {
     }
 
     /// Sends a node host-observation request to the agent.
+    ///
+    /// The request targets the agent on this connection.  The
+    /// specific operation is determined by the
+    /// [`NodeObservationRequest`] variant (e.g. `ProcessList`,
+    /// `ResourceUsage`, `Uptime`).
+    ///
+    /// Each variant carries a distinct
+    /// [`ServiceId`](crate::service_id::ServiceId) (e.g.
+    /// `"node.observation.process_list"`).  To enforce
+    /// authorization, use
+    /// [`node_observation_authorized`](Self::node_observation_authorized)
+    /// instead.
+    ///
+    /// # Legacy compatibility
+    ///
+    /// The flat methods
+    /// [`get_process_list`](Self::get_process_list) and
+    /// [`get_resource_usage`](Self::get_resource_usage) delegate to
+    /// this method internally.  Prefer `node_observation` for new
+    /// code — it exposes the full set of observation queries and
+    /// supports authorization via the `_authorized` variant.
     ///
     /// # Errors
     ///
@@ -303,6 +498,17 @@ impl Connection {
     }
 
     /// Sends a node version-management request to the agent.
+    ///
+    /// The request targets the agent on this connection.  The
+    /// specific operation is determined by the
+    /// [`NodeVersionRequest`] variant (e.g. `Get`,
+    /// `SetOsVersion`, `SetProductVersion`).
+    ///
+    /// Each variant carries a distinct
+    /// [`ServiceId`](crate::service_id::ServiceId).  To enforce
+    /// authorization, use
+    /// [`node_version_authorized`](Self::node_version_authorized)
+    /// instead.
     ///
     /// # Errors
     ///
@@ -320,12 +526,23 @@ impl Connection {
     //
     // Like the un-authorized node methods above, but each checks
     // the provided `Authorizer` before sending the request.
+    //
+    // The method-level `ServiceId` is extracted from the request
+    // (via `req.service_id()`) and passed together with the
+    // `PeerContext` to `authorizer.authorize(...)`.  If
+    // authorization is denied, the request is never sent and an
+    // error is returned immediately.
 
     /// Sends a node service-control request to the agent with
     /// authorization.
     ///
-    /// Like [`node_service`](Self::node_service), but checks the
-    /// `Authorizer` before sending.
+    /// Behaves like [`node_service`](Self::node_service), but
+    /// first checks authorization.  The method-level
+    /// [`ServiceId`](crate::service_id::ServiceId) is extracted
+    /// from `req` (e.g. `"node.service.start"`) and passed to
+    /// `authorizer` together with `peer`.  If the authorizer
+    /// denies the request, an error is returned and the request is
+    /// not sent.
     ///
     /// # Errors
     ///
@@ -352,8 +569,10 @@ impl Connection {
     /// Sends a node network-interface management request to the
     /// agent with authorization.
     ///
-    /// Like [`node_network_interface`](Self::node_network_interface),
-    /// but checks the `Authorizer` before sending.
+    /// Behaves like
+    /// [`node_network_interface`](Self::node_network_interface),
+    /// but first checks authorization using the method-level
+    /// [`ServiceId`](crate::service_id::ServiceId) from `req`.
     ///
     /// # Errors
     ///
@@ -380,8 +599,9 @@ impl Connection {
     /// Sends a node hostname management request to the agent with
     /// authorization.
     ///
-    /// Like [`node_hostname`](Self::node_hostname), but checks the
-    /// `Authorizer` before sending.
+    /// Behaves like [`node_hostname`](Self::node_hostname), but
+    /// first checks authorization using the method-level
+    /// [`ServiceId`](crate::service_id::ServiceId) from `req`.
     ///
     /// # Errors
     ///
@@ -408,8 +628,9 @@ impl Connection {
     /// Sends a node time-synchronization request to the agent with
     /// authorization.
     ///
-    /// Like [`node_time_sync`](Self::node_time_sync), but checks
-    /// the `Authorizer` before sending.
+    /// Behaves like [`node_time_sync`](Self::node_time_sync), but
+    /// first checks authorization using the method-level
+    /// [`ServiceId`](crate::service_id::ServiceId) from `req`.
     ///
     /// # Errors
     ///
@@ -436,8 +657,9 @@ impl Connection {
     /// Sends a node logging-configuration request to the agent with
     /// authorization.
     ///
-    /// Like [`node_logging`](Self::node_logging), but checks the
-    /// `Authorizer` before sending.
+    /// Behaves like [`node_logging`](Self::node_logging), but
+    /// first checks authorization using the method-level
+    /// [`ServiceId`](crate::service_id::ServiceId) from `req`.
     ///
     /// # Errors
     ///
@@ -464,8 +686,10 @@ impl Connection {
     /// Sends a node remote-access configuration request to the
     /// agent with authorization.
     ///
-    /// Like [`node_remote_access`](Self::node_remote_access), but
-    /// checks the `Authorizer` before sending.
+    /// Behaves like
+    /// [`node_remote_access`](Self::node_remote_access), but first
+    /// checks authorization using the method-level
+    /// [`ServiceId`](crate::service_id::ServiceId) from `req`.
     ///
     /// # Errors
     ///
@@ -492,8 +716,10 @@ impl Connection {
     /// Sends a node power-control request to the agent with
     /// authorization.
     ///
-    /// Like [`node_power`](Self::node_power), but checks the
-    /// `Authorizer` before sending.
+    /// Behaves like [`node_power`](Self::node_power), but first
+    /// checks authorization using the method-level
+    /// [`ServiceId`](crate::service_id::ServiceId) from `req`
+    /// (e.g. `"node.power.reboot"`).
     ///
     /// # Errors
     ///
@@ -514,8 +740,10 @@ impl Connection {
     /// Sends a node host-observation request to the agent with
     /// authorization.
     ///
-    /// Like [`node_observation`](Self::node_observation), but
-    /// checks the `Authorizer` before sending.
+    /// Behaves like
+    /// [`node_observation`](Self::node_observation), but first
+    /// checks authorization using the method-level
+    /// [`ServiceId`](crate::service_id::ServiceId) from `req`.
     ///
     /// # Errors
     ///
@@ -542,8 +770,9 @@ impl Connection {
     /// Sends a node version-management request to the agent with
     /// authorization.
     ///
-    /// Like [`node_version`](Self::node_version), but checks the
-    /// `Authorizer` before sending.
+    /// Behaves like [`node_version`](Self::node_version), but
+    /// first checks authorization using the method-level
+    /// [`ServiceId`](crate::service_id::ServiceId) from `req`.
     ///
     /// # Errors
     ///

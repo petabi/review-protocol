@@ -9,8 +9,9 @@
 //!
 //! - [`client`] – Client-side utilities and typed clients for calling
 //!   review services.
-//! - [`server`] – Server-side helpers and service wiring for
-//!   implementing review-protocol endpoints.
+//! - [`server`] – Server-side helpers, service wiring, and the
+//!   `server::Connection` API used to issue requests to agents
+//!   (including the `node_*` methods).
 //! - [`types`] – Shared types used across the protocol surface.
 //! - [`service_id`] – Definitions and helpers for [`ServiceId`], the
 //!   key used to scope authorization and identify services.
@@ -37,8 +38,11 @@
 //! ## Authorization model
 //!
 //! Authorization in this crate assumes certificate-backed peer identity
-//! is available at request time and is provided to server code via
-//! `PeerContext`. The crate does not embed a policy engine:
+//! is available at request time. The embedding application provides
+//! `PeerContext` at each authorization decision point—both when
+//! handling incoming requests and when issuing authorized calls to
+//! agents (e.g., the `node_*_authorized` methods on
+//! `server::Connection`). The crate does not embed a policy engine:
 //! authorization decisions are made by the embedding application using
 //! the identity and the [`ServiceId`] to scope policies. In short:
 //!

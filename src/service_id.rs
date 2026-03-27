@@ -276,9 +276,9 @@ pub const SERVER_LIST_SAMPLING_POLICY: ServiceId = ServiceId::new("server.list",
 // request is available (e.g. on the REview-to-agent path).
 
 use crate::types::node::{
-    NodeHostnameRequest, NodeLoggingRequest, NodeNetworkInterfaceRequest,
-    NodeObservationRequest, NodePowerRequest, NodeRemoteAccessRequest, NodeServiceRequest,
-    NodeTimeSyncRequest, NodeVersionRequest,
+    NodeHostnameRequest, NodeLoggingRequest, NodeNetworkInterfaceRequest, NodeObservationRequest,
+    NodePowerRequest, NodeRemoteAccessRequest, NodeServiceRequest, NodeTimeSyncRequest,
+    NodeVersionRequest,
 };
 
 impl NodeServiceRequest {

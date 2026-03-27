@@ -5,6 +5,24 @@ file is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and
 this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
+### Rollout and migration guidance
+
+This changelog is the canonical place for release-specific rollout
+and migration notes. When a release requires a particular sequencing
+of steps (for example, database migrations, cross-crate
+coordination, or staged feature rollouts), those transient
+instructions should be recorded here under the relevant release
+entry. That ensures anyone upgrading can follow the exact sequence
+intended for that version.
+
+Crate-level documentation (README, crate docs, and long-lived
+guides) describes the stable, long-term behaviour, APIs, and
+migration concepts, but does not permanently duplicate ephemeral,
+release-specific sequencing instructions. If certain migration steps
+become permanent or part of the supported upgrade path, they are
+summarised in crate docs with a link back to the specific changelog
+entry for the exact, time-bound rollout steps.
+
 ## [Unreleased]
 
 ### Added

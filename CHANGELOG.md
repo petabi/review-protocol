@@ -9,6 +9,16 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `auth` module with authorization hooks for request dispatch.
+  Provides `PeerContext` (certificate-backed peer identity),
+  `Authorizer` trait (allow/deny hook keyed by `ServiceId`),
+  `NoopAuthorizer` (default allow-all), and
+  `AuthorizationError`. Policy decisions remain outside the
+  crate; only the dispatch plumbing is included.
+- `server::handle_authorized` function that checks each request
+  against an `Authorizer` before dispatching. Denied requests
+  receive a stable `"authorization denied"` error response and
+  the handler returns `io::ErrorKind::PermissionDenied`.
 - `service_id` module with stable logical service identifiers
   (`ServiceId`) independent of wire `RequestCode` values. Covers
   all nine node feature families (with both family-level and

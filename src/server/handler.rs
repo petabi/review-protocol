@@ -174,13 +174,16 @@ pub trait Handler {
 /// This handles only a subset of the requests that the server can receive. If
 /// the request is not supported, the request code is returned to the caller.
 ///
+/// No authorization checks are performed; all requests are
+/// dispatched directly.  Use [`handle_authorized`] to gate
+/// requests through an [`Authorizer`](crate::auth::Authorizer).
+///
 /// # Errors
 ///
 /// - There was an error reading from the stream.
 /// - There was an error writing to the stream.
 /// - An unknown request code was received.
 /// - The arguments to the request were invalid.
-#[allow(clippy::too_many_lines)]
 pub async fn handle<H>(
     handler: &mut H,
     send: &mut quinn::SendStream,
@@ -190,6 +193,40 @@ pub async fn handle<H>(
 where
     H: Handler + Sync,
 {
+    let peer_ctx = crate::auth::PeerContext::new(peer);
+    handle_authorized(handler, send, recv, &peer_ctx, &crate::auth::NoopAuthorizer).await
+}
+
+/// Handles requests to the server with authorization.
+///
+/// Like [`handle`], but checks each request against the provided
+/// [`Authorizer`](crate::auth::Authorizer) before dispatching.
+/// The authorizer receives the authenticated
+/// [`PeerContext`](crate::auth::PeerContext) and the logical
+/// [`ServiceId`](crate::service_id::ServiceId) for every
+/// request.  If authorization is denied, an error response is
+/// sent to the client and an `io::ErrorKind::PermissionDenied`
+/// error is returned.
+///
+/// # Errors
+///
+/// - There was an error reading from the stream.
+/// - There was an error writing to the stream.
+/// - An unknown request code was received.
+/// - The arguments to the request were invalid.
+/// - Authorization was denied for a request.
+#[allow(clippy::too_many_lines)]
+pub async fn handle_authorized<H>(
+    handler: &mut H,
+    send: &mut quinn::SendStream,
+    recv: &mut quinn::RecvStream,
+    peer: &crate::auth::PeerContext,
+    authorizer: &dyn crate::auth::Authorizer,
+) -> io::Result<Option<(u32, Vec<u8>)>>
+where
+    H: Handler + Sync,
+{
+    let peer_name = peer.name();
     let mut buf = Vec::new();
     loop {
         let (code, body) = match oinq::message::recv_request_raw(recv, &mut buf).await {
@@ -198,15 +235,34 @@ where
             Err(e) => return Err(e),
         };
 
-        match RequestCode::from_primitive(code) {
+        let req_code = RequestCode::from_primitive(code);
+
+        // Authorization check: compute the logical ServiceId and
+        // ask the authorizer before dispatching the request.
+        if let Some(service_id) = crate::service_id::from_server_request_code(req_code)
+            && let Err(e) = authorizer.authorize(peer, &service_id)
+        {
+            oinq::request::send_response(
+                send,
+                &mut buf,
+                Err::<(), String>("authorization denied".to_string()),
+            )
+            .await?;
+            return Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                e.to_string(),
+            ));
+        }
+
+        match req_code {
             RequestCode::GetAllowlist => {
                 parse_args::<()>(body)?;
-                let result = handler.get_allowlist(peer).await;
+                let result = handler.get_allowlist(peer_name).await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::GetBlocklist => {
                 parse_args::<()>(body)?;
-                let result = handler.get_blocklist(peer).await;
+                let result = handler.get_blocklist(peer_name).await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::GetDataSource => {
@@ -251,12 +307,12 @@ where
             }
             RequestCode::GetConfig => {
                 parse_args::<()>(body)?;
-                let result = handler.get_config(peer).await;
+                let result = handler.get_config(peer_name).await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::GetInternalNetworkList => {
                 parse_args::<()>(body)?;
-                let result = handler.get_internal_network_list(peer).await;
+                let result = handler.get_internal_network_list(peer_name).await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::GetOutliers => {
@@ -271,7 +327,7 @@ where
             }
             RequestCode::GetSamplingPolicyList => {
                 parse_args::<()>(body)?;
-                let result = handler.get_sampling_policy_list(peer).await;
+                let result = handler.get_sampling_policy_list(peer_name).await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::InsertColumnStatistics => {
@@ -314,7 +370,7 @@ where
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::RenewCertificate => {
-                let result = handler.renew_certificate(peer).await;
+                let result = handler.renew_certificate(peer_name).await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::UpdateClusters => {
@@ -337,12 +393,12 @@ where
             }
             RequestCode::UpdateHostOpenedPorts => {
                 let hosts = parse_args::<HashMap<IpAddr, HashMap<(u16, u8), u32>>>(body)?;
-                let result = handler.update_host_ports(peer, &hosts).await;
+                let result = handler.update_host_ports(peer_name, &hosts).await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::UpdateHostOsAgents => {
                 let hosts = parse_args::<Vec<(IpAddr, Vec<UserAgent>, Vec<String>)>>(body)?;
-                let result = handler.update_host_user_agents(peer, &hosts).await;
+                let result = handler.update_host_user_agents(peer_name, &hosts).await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::Unknown => {
@@ -450,5 +506,201 @@ mod tests {
         }
         assert_eq!(*insert_model_payload.lock().unwrap(), Some(insert_payload));
         assert_eq!(*update_model_payload.lock().unwrap(), Some(update_payload));
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn authorization_allowed() {
+        let _lock = TOKEN.lock().await;
+        let channel = channel().await;
+
+        let insert_model_payload = Arc::new(Mutex::new(None));
+
+        let mut handler = ModelHandler {
+            insert_model_payload: Arc::clone(&insert_model_payload),
+            update_model_payload: Arc::new(Mutex::new(None)),
+        };
+
+        let (mut server_send, mut server_recv) = (channel.server.send, channel.server.recv);
+        let (mut client_send, mut client_recv) = (channel.client.send, channel.client.recv);
+
+        let peer = crate::auth::PeerContext::new("test-peer");
+        let authorizer = crate::auth::NoopAuthorizer;
+
+        let server_task = tokio::spawn(async move {
+            super::handle_authorized(
+                &mut handler,
+                &mut server_send,
+                &mut server_recv,
+                &peer,
+                &authorizer,
+            )
+            .await
+        });
+
+        let payload = vec![0x10, 0x20];
+        let res: Result<u32, String> = crate::unary_request(
+            &mut client_send,
+            &mut client_recv,
+            u32::from(RequestCode::InsertModel),
+            payload,
+        )
+        .await
+        .unwrap();
+        assert_eq!(res.unwrap(), 42);
+
+        drop(client_send);
+        drop(client_recv);
+
+        let server_res = server_task.await.unwrap();
+        match server_res {
+            Ok(_) => {}
+            Err(e) if e.kind() == io::ErrorKind::NotConnected => {}
+            Err(e) => panic!("unexpected server error: {e:?}"),
+        }
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn authorization_denied() {
+        use crate::auth::{AuthorizationError, Authorizer, PeerContext};
+
+        struct DenyAll;
+        impl Authorizer for DenyAll {
+            fn authorize(
+                &self,
+                _peer: &PeerContext,
+                _service: &crate::service_id::ServiceId,
+            ) -> Result<(), AuthorizationError> {
+                Err(AuthorizationError::new("test denial"))
+            }
+        }
+
+        let _lock = TOKEN.lock().await;
+        let channel = channel().await;
+
+        let mut handler = ModelHandler {
+            insert_model_payload: Arc::new(Mutex::new(None)),
+            update_model_payload: Arc::new(Mutex::new(None)),
+        };
+
+        let (mut server_send, mut server_recv) = (channel.server.send, channel.server.recv);
+        let (mut client_send, mut client_recv) = (channel.client.send, channel.client.recv);
+
+        let peer = PeerContext::new("test-peer");
+        let authorizer = DenyAll;
+
+        let server_task = tokio::spawn(async move {
+            super::handle_authorized(
+                &mut handler,
+                &mut server_send,
+                &mut server_recv,
+                &peer,
+                &authorizer,
+            )
+            .await
+        });
+
+        // Client sends InsertModel — should be denied
+        let res: Result<u32, String> = crate::unary_request(
+            &mut client_send,
+            &mut client_recv,
+            u32::from(RequestCode::InsertModel),
+            vec![0x10, 0x20],
+        )
+        .await
+        .unwrap();
+        assert_eq!(res, Err("authorization denied".to_string()));
+
+        // Server should return PermissionDenied error
+        let server_res = server_task.await.unwrap();
+        assert!(server_res.is_err());
+        assert_eq!(
+            server_res.unwrap_err().kind(),
+            io::ErrorKind::PermissionDenied
+        );
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn authorization_selective() {
+        use crate::auth::{AuthorizationError, Authorizer, PeerContext};
+
+        /// Allows model operations but denies config access.
+        struct AllowModelsOnly;
+        impl Authorizer for AllowModelsOnly {
+            fn authorize(
+                &self,
+                _peer: &PeerContext,
+                service: &crate::service_id::ServiceId,
+            ) -> Result<(), AuthorizationError> {
+                if service.family == "server.model" {
+                    Ok(())
+                } else {
+                    Err(AuthorizationError::new("only model APIs allowed"))
+                }
+            }
+        }
+
+        let _lock = TOKEN.lock().await;
+        let channel = channel().await;
+
+        let insert_model_payload = Arc::new(Mutex::new(None));
+
+        let mut handler = ModelHandler {
+            insert_model_payload: Arc::clone(&insert_model_payload),
+            update_model_payload: Arc::new(Mutex::new(None)),
+        };
+
+        let (mut server_send, mut server_recv) = (channel.server.send, channel.server.recv);
+        let (mut client_send, mut client_recv) = (channel.client.send, channel.client.recv);
+
+        let peer = PeerContext::new("test-peer");
+        let authorizer = AllowModelsOnly;
+
+        let server_task = tokio::spawn(async move {
+            super::handle_authorized(
+                &mut handler,
+                &mut server_send,
+                &mut server_recv,
+                &peer,
+                &authorizer,
+            )
+            .await
+        });
+
+        // InsertModel is in server.model family — should be allowed
+        let res: Result<u32, String> = crate::unary_request(
+            &mut client_send,
+            &mut client_recv,
+            u32::from(RequestCode::InsertModel),
+            vec![0xAA, 0xBB],
+        )
+        .await
+        .unwrap();
+        assert_eq!(res.unwrap(), 42);
+
+        // GetConfig is in server.config family — should be denied
+        let res: Result<String, String> = crate::unary_request(
+            &mut client_send,
+            &mut client_recv,
+            u32::from(RequestCode::GetConfig),
+            (),
+        )
+        .await
+        .unwrap();
+        assert_eq!(res, Err("authorization denied".to_string()));
+
+        // Server should return PermissionDenied for the denied
+        // request.
+        let server_res = server_task.await.unwrap();
+        assert!(server_res.is_err());
+        assert_eq!(
+            server_res.unwrap_err().kind(),
+            io::ErrorKind::PermissionDenied
+        );
+
+        // Verify the allowed request was actually processed
+        assert!(insert_model_payload.lock().unwrap().is_some());
     }
 }

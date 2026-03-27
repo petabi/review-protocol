@@ -5,7 +5,7 @@ file is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and
 this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
-### Rollout and migration guidance
+## Rollout and migration guidance
 
 This changelog is the canonical place for release-specific rollout
 and migration notes. When a release requires a particular sequencing

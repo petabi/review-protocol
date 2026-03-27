@@ -8,10 +8,49 @@
 //! if the underlying wire `RequestCode` values are renumbered or
 //! reorganized.
 //!
+//! `ServiceId` is the public, logical identifier for a service —
+//! what the service *is* from the caller's viewpoint.  Callers use
+//! it to make authorization decisions, select request handlers, and
+//! produce meaningful log entries.  It deliberately abstracts away
+//! transport-level details so that authorization rules and routing
+//! logic remain valid across protocol revisions.
+//!
+//! # Stability
+//!
+//! `ServiceId` values are treated as public identifiers and callers
+//! may rely on them for long-lived authorization rules and routing
+//! tables.  If this policy changes it will be documented in a
+//! compatibility notice in this crate's README or CHANGELOG.
+//!
+//! # Typical uses
+//!
+//! - **Authorization keying** – map a `ServiceId` to an ACL entry
+//!   to decide whether a caller may invoke a particular service.
+//! - **Routing decisions** – match on a `ServiceId` to choose
+//!   which handler or endpoint processes the request.
+//! - **Logging / tracing** – include the `ServiceId` in log lines
+//!   so that operators can filter by logical service name.
+//! - **Capability reporting** – use [`all()`] to enumerate every
+//!   known service identifier for discovery or audit purposes.
+//!
+//! ```
+//! use std::collections::HashMap;
+//! use review_protocol::service_id::{self, ServiceId};
+//!
+//! // Build an authorization table keyed by ServiceId.
+//! let mut acl: HashMap<ServiceId, bool> = HashMap::new();
+//! acl.insert(service_id::NODE_POWER_REBOOT, true);
+//! acl.insert(service_id::NODE_POWER_SHUTDOWN, false);
+//!
+//! // Check whether the caller is authorized.
+//! let id = service_id::NODE_POWER_REBOOT;
+//! let allowed = acl.get(&id).copied().unwrap_or(false);
+//! assert!(allowed);
+//! ```
+//!
 //! # Relationship to `RequestCode`
 //!
-//! Both [`client::RequestCode`](super::client::RequestCode) and
-//! [`server::RequestCode`](super::server::RequestCode) remain the
+//! Both `client::RequestCode` and `server::RequestCode` remain the
 //! transport dispatch mechanisms.  The identifiers defined here are
 //! **not** a replacement for request codes — they are a
 //! higher-level abstraction suitable for:
@@ -21,8 +60,16 @@
 //! - service-family organization
 //! - public-facing API documentation
 //!
-//! Use [`from_client_request_code`] or [`from_server_request_code`]
-//! to map a wire request code to its logical identifier.
+//! Do **not** conflate `ServiceId` with internal `RequestCode`
+//! values.  `RequestCode` is an internal numeric code used to
+//! indicate message types within the transport layer; `ServiceId`
+//! is the public logical identity.  Reasoning in terms of
+//! `RequestCode` for authorization or public routing is
+//! discouraged — always prefer `ServiceId`.
+//!
+//! Use `from_client_request_code` or `from_server_request_code`
+//! (crate-internal) to map a wire request code to its logical
+//! identifier.
 //!
 //! # Family-level vs method-level identifiers
 //!
@@ -48,19 +95,76 @@ use std::fmt;
 
 /// A logical service identifier.
 ///
-/// Represents a specific API operation as a `(family, method)` pair
-/// using static strings.  The identifier is independent of the
-/// numeric wire request code used for transport.
+/// `ServiceId` names a specific API operation or service family as a
+/// `(family, method)` pair of static strings.  It is the public
+/// identity used by callers to make authorization decisions, to
+/// select request/interaction handlers, and to produce
+/// human-meaningful log entries.
+///
+/// `ServiceId` is **not** a transport identifier.  Do not confuse it
+/// with `RequestCode`, which is the internal numeric code carried on
+/// the wire.  Authorization rules, routing tables, and capability
+/// reports should always be expressed in terms of `ServiceId`.
+///
+/// The type is `Copy`, `Clone`, `Hash`, `Eq`, and `Send + Sync`, so
+/// it can be used freely as a key in hash maps and sets, passed
+/// across threads, and compared with `==`.
+///
+/// # Examples
+///
+/// Constructing a `ServiceId` and comparing it to a well-known
+/// constant:
+///
+/// ```
+/// use review_protocol::service_id::{self, ServiceId};
+///
+/// let id = ServiceId::new("node.power", "reboot");
+/// assert_eq!(id, service_id::NODE_POWER_REBOOT);
+/// assert_eq!(id.to_string(), "node.power.reboot");
+/// ```
+///
+/// Using `ServiceId` in a routing match:
+///
+/// ```
+/// use review_protocol::service_id::{self, ServiceId};
+///
+/// fn handle(id: ServiceId) -> &'static str {
+///     match id {
+///         service_id::NODE_POWER_REBOOT => "rebooting",
+///         service_id::NODE_POWER_SHUTDOWN => "shutting down",
+///         _ => "unknown",
+///     }
+/// }
+///
+/// assert_eq!(handle(service_id::NODE_POWER_REBOOT), "rebooting");
+/// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct ServiceId {
     /// The service family (e.g. `"node.power"`, `"common"`).
     pub family: &'static str,
     /// The method within the family (e.g. `"reboot"`).
+    ///
+    /// An empty string indicates a family-level identifier; see
+    /// [`is_family`](Self::is_family).
     pub method: &'static str,
 }
 
 impl ServiceId {
-    /// Creates a new `ServiceId`.
+    /// Creates a new `ServiceId` from a family name and a method
+    /// name.
+    ///
+    /// Pass an empty string for `method` to create a family-level
+    /// identifier.
+    ///
+    /// ```
+    /// use review_protocol::service_id::ServiceId;
+    ///
+    /// let method_level = ServiceId::new("node.power", "reboot");
+    /// assert!(!method_level.is_family());
+    ///
+    /// let family_level = ServiceId::new("node.power", "");
+    /// assert!(family_level.is_family());
+    /// ```
     #[must_use]
     pub const fn new(family: &'static str, method: &'static str) -> Self {
         Self { family, method }
@@ -68,6 +172,16 @@ impl ServiceId {
 
     /// Returns `true` if this is a family-level identifier (no
     /// specific method).
+    ///
+    /// Family-level identifiers have an empty `method` field and
+    /// display as just the family name (e.g. `"node.power"`).
+    ///
+    /// ```
+    /// use review_protocol::service_id;
+    ///
+    /// assert!(service_id::NODE_POWER.is_family());
+    /// assert!(!service_id::NODE_POWER_REBOOT.is_family());
+    /// ```
     #[must_use]
     pub const fn is_family(&self) -> bool {
         self.method.is_empty()
@@ -75,6 +189,8 @@ impl ServiceId {
 }
 
 impl fmt::Display for ServiceId {
+    /// Formats the identifier as `"{family}.{method}"` for
+    /// method-level or `"{family}"` for family-level identifiers.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.method.is_empty() {
             write!(f, "{}", self.family)
@@ -86,10 +202,10 @@ impl fmt::Display for ServiceId {
 
 // ── Node family-level identifiers ─────────────────────────────
 //
-// These represent a node service family without specifying a
-// particular method.  They are returned by `from_client_request_code`
-// for the `Node*` family request codes, where the specific method
-// is only known after payload deserialization.
+// Family-level constants represent a node service family without
+// specifying a particular method.  Use the corresponding
+// method-level constant (e.g. [`NODE_SERVICE_START`]) when the
+// exact operation is known.
 
 pub const NODE_SERVICE: ServiceId = ServiceId::new("node.service", "");
 pub const NODE_NETWORK_INTERFACE: ServiceId = ServiceId::new("node.network_interface", "");
@@ -504,11 +620,19 @@ pub(crate) fn from_server_request_code(code: ServerRequestCode) -> Option<Servic
     }
 }
 
-/// Returns an iterator over all known [`ServiceId`] constants.
+/// Returns a slice of all known [`ServiceId`] constants.
 ///
-/// Useful for capability reporting and testing coverage.  Includes
-/// family-level identifiers, method-level identifiers for both
-/// client (node/common) and server surfaces.
+/// Useful for capability reporting, audit, and testing coverage.
+/// The slice includes both family-level and method-level
+/// identifiers for all client (node/common) and server surfaces.
+///
+/// ```
+/// use review_protocol::service_id;
+///
+/// let ids = service_id::all();
+/// assert!(ids.contains(&service_id::NODE_POWER_REBOOT));
+/// assert!(ids.contains(&service_id::NODE_POWER)); // family
+/// ```
 #[must_use]
 pub fn all() -> &'static [ServiceId] {
     &[

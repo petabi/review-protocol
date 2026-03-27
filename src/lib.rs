@@ -1,3 +1,5 @@
+#[cfg(any(feature = "client", feature = "server"))]
+pub mod auth;
 pub mod client;
 #[cfg(feature = "client")]
 pub mod frame;

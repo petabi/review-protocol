@@ -15,10 +15,18 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   `NoopAuthorizer` (default allow-all), and
   `AuthorizationError`. Policy decisions remain outside the
   crate; only the dispatch plumbing is included.
-- `server::handle_authorized` function that checks each request
-  against an `Authorizer` before dispatching. Denied requests
-  receive a stable `"authorization denied"` error response and
-  the handler returns `io::ErrorKind::PermissionDenied`.
+- `server::handle_authorized` function that checks each incoming
+  request against an `Authorizer` before dispatching. Denied
+  requests receive a stable `"authorization denied"` error
+  response and the handler returns
+  `io::ErrorKind::PermissionDenied`.
+- Authorized variants of each `server::Connection` node method
+  (`node_service_authorized`, `node_network_interface_authorized`,
+  `node_hostname_authorized`, `node_time_sync_authorized`,
+  `node_logging_authorized`, `node_remote_access_authorized`,
+  `node_power_authorized`, `node_observation_authorized`,
+  `node_version_authorized`) that check the `Authorizer` before
+  sending REview-to-agent node requests.
 - `service_id` module with stable logical service identifiers
   (`ServiceId`) independent of wire `RequestCode` values. Covers
   all nine node feature families (with both family-level and

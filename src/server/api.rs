@@ -316,6 +316,210 @@ impl Connection {
             .await
     }
 
+    // ── authorized node feature-family methods ───────────────────
+    //
+    // Like the un-authorized node methods above, but each checks
+    // the provided `Authorizer` before sending the request.
+
+    /// Sends a node service-control request to the agent with
+    /// authorization.
+    ///
+    /// Like [`node_service`](Self::node_service), but checks the
+    /// `Authorizer` before sending.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authorization was denied,
+    /// serialization/deserialization failed, or communication with
+    /// the client failed.
+    pub async fn node_service_authorized(
+        &self,
+        req: NodeServiceRequest,
+        peer: &crate::auth::PeerContext,
+        authorizer: &dyn crate::auth::Authorizer,
+    ) -> anyhow::Result<NodeServiceResponse> {
+        self.send_request_authorized(client::RequestCode::NodeService, &req, peer, authorizer)
+            .await
+    }
+
+    /// Sends a node network-interface management request to the
+    /// agent with authorization.
+    ///
+    /// Like [`node_network_interface`](Self::node_network_interface),
+    /// but checks the `Authorizer` before sending.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authorization was denied,
+    /// serialization/deserialization failed, or communication with
+    /// the client failed.
+    pub async fn node_network_interface_authorized(
+        &self,
+        req: NodeNetworkInterfaceRequest,
+        peer: &crate::auth::PeerContext,
+        authorizer: &dyn crate::auth::Authorizer,
+    ) -> anyhow::Result<NodeNetworkInterfaceResponse> {
+        self.send_request_authorized(
+            client::RequestCode::NodeNetworkInterface,
+            &req,
+            peer,
+            authorizer,
+        )
+        .await
+    }
+
+    /// Sends a node hostname management request to the agent with
+    /// authorization.
+    ///
+    /// Like [`node_hostname`](Self::node_hostname), but checks the
+    /// `Authorizer` before sending.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authorization was denied,
+    /// serialization/deserialization failed, or communication with
+    /// the client failed.
+    pub async fn node_hostname_authorized(
+        &self,
+        req: NodeHostnameRequest,
+        peer: &crate::auth::PeerContext,
+        authorizer: &dyn crate::auth::Authorizer,
+    ) -> anyhow::Result<NodeHostnameResponse> {
+        self.send_request_authorized(client::RequestCode::NodeHostname, &req, peer, authorizer)
+            .await
+    }
+
+    /// Sends a node time-synchronization request to the agent with
+    /// authorization.
+    ///
+    /// Like [`node_time_sync`](Self::node_time_sync), but checks
+    /// the `Authorizer` before sending.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authorization was denied,
+    /// serialization/deserialization failed, or communication with
+    /// the client failed.
+    pub async fn node_time_sync_authorized(
+        &self,
+        req: NodeTimeSyncRequest,
+        peer: &crate::auth::PeerContext,
+        authorizer: &dyn crate::auth::Authorizer,
+    ) -> anyhow::Result<NodeTimeSyncResponse> {
+        self.send_request_authorized(client::RequestCode::NodeTimeSync, &req, peer, authorizer)
+            .await
+    }
+
+    /// Sends a node logging-configuration request to the agent with
+    /// authorization.
+    ///
+    /// Like [`node_logging`](Self::node_logging), but checks the
+    /// `Authorizer` before sending.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authorization was denied,
+    /// serialization/deserialization failed, or communication with
+    /// the client failed.
+    pub async fn node_logging_authorized(
+        &self,
+        req: NodeLoggingRequest,
+        peer: &crate::auth::PeerContext,
+        authorizer: &dyn crate::auth::Authorizer,
+    ) -> anyhow::Result<NodeLoggingResponse> {
+        self.send_request_authorized(client::RequestCode::NodeLogging, &req, peer, authorizer)
+            .await
+    }
+
+    /// Sends a node remote-access configuration request to the
+    /// agent with authorization.
+    ///
+    /// Like [`node_remote_access`](Self::node_remote_access), but
+    /// checks the `Authorizer` before sending.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authorization was denied,
+    /// serialization/deserialization failed, or communication with
+    /// the client failed.
+    pub async fn node_remote_access_authorized(
+        &self,
+        req: NodeRemoteAccessRequest,
+        peer: &crate::auth::PeerContext,
+        authorizer: &dyn crate::auth::Authorizer,
+    ) -> anyhow::Result<NodeRemoteAccessResponse> {
+        self.send_request_authorized(
+            client::RequestCode::NodeRemoteAccess,
+            &req,
+            peer,
+            authorizer,
+        )
+        .await
+    }
+
+    /// Sends a node power-control request to the agent with
+    /// authorization.
+    ///
+    /// Like [`node_power`](Self::node_power), but checks the
+    /// `Authorizer` before sending.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authorization was denied,
+    /// serialization/deserialization failed, or communication with
+    /// the client failed.
+    pub async fn node_power_authorized(
+        &self,
+        req: NodePowerRequest,
+        peer: &crate::auth::PeerContext,
+        authorizer: &dyn crate::auth::Authorizer,
+    ) -> anyhow::Result<NodePowerResponse> {
+        self.send_request_authorized(client::RequestCode::NodePower, &req, peer, authorizer)
+            .await
+    }
+
+    /// Sends a node host-observation request to the agent with
+    /// authorization.
+    ///
+    /// Like [`node_observation`](Self::node_observation), but
+    /// checks the `Authorizer` before sending.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authorization was denied,
+    /// serialization/deserialization failed, or communication with
+    /// the client failed.
+    pub async fn node_observation_authorized(
+        &self,
+        req: NodeObservationRequest,
+        peer: &crate::auth::PeerContext,
+        authorizer: &dyn crate::auth::Authorizer,
+    ) -> anyhow::Result<NodeObservationResponse> {
+        self.send_request_authorized(client::RequestCode::NodeObservation, &req, peer, authorizer)
+            .await
+    }
+
+    /// Sends a node version-management request to the agent with
+    /// authorization.
+    ///
+    /// Like [`node_version`](Self::node_version), but checks the
+    /// `Authorizer` before sending.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authorization was denied,
+    /// serialization/deserialization failed, or communication with
+    /// the client failed.
+    pub async fn node_version_authorized(
+        &self,
+        req: NodeVersionRequest,
+        peer: &crate::auth::PeerContext,
+        authorizer: &dyn crate::auth::Authorizer,
+    ) -> anyhow::Result<NodeVersionResponse> {
+        self.send_request_authorized(client::RequestCode::NodeVersion, &req, peer, authorizer)
+            .await
+    }
+
     /// Sends the given payload to the client.
     async fn send_request<T: serde::Serialize + ?Sized, S: serde::de::DeserializeOwned>(
         &self,
@@ -337,6 +541,26 @@ impl Connection {
         frame::recv::<Result<S, String>>(&mut recv, &mut buf)
             .await?
             .map_err(|e| anyhow!(e))
+    }
+
+    /// Checks authorization then sends the given payload to the
+    /// client.
+    async fn send_request_authorized<
+        T: serde::Serialize + ?Sized,
+        S: serde::de::DeserializeOwned,
+    >(
+        &self,
+        request_code: client::RequestCode,
+        payload: &T,
+        peer: &crate::auth::PeerContext,
+        authorizer: &dyn crate::auth::Authorizer,
+    ) -> anyhow::Result<S> {
+        if let Some(service_id) = crate::service_id::from_client_request_code(request_code) {
+            authorizer
+                .authorize(peer, &service_id)
+                .map_err(|e| anyhow!(e))?;
+        }
+        self.send_request(request_code, payload).await
     }
 }
 
@@ -1120,6 +1344,145 @@ mod tests {
 
         let client_res = client_handle.await.unwrap();
         assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn node_power_authorization_allowed() {
+        use crate::auth::{NoopAuthorizer, PeerContext};
+        use crate::types::node::{NodePowerRequest, NodePowerResponse};
+
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let mut handler = TestHandler;
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+            crate::request::handle(&mut handler, &mut send, &mut recv).await
+        });
+
+        let peer = PeerContext::new("test-agent");
+        let authorizer = NoopAuthorizer;
+        let req = NodePowerRequest::Reboot;
+        let resp = server_conn
+            .node_power_authorized(req, &peer, &authorizer)
+            .await
+            .unwrap();
+        assert_eq!(resp, NodePowerResponse::Initiated);
+
+        let client_res = client_handle.await.unwrap();
+        assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn node_power_authorization_denied() {
+        use crate::auth::{AuthorizationError, Authorizer, PeerContext};
+        use crate::service_id::ServiceId;
+        use crate::types::node::NodePowerRequest;
+
+        struct DenyAll;
+        impl Authorizer for DenyAll {
+            fn authorize(
+                &self,
+                _peer: &PeerContext,
+                _service: &ServiceId,
+            ) -> Result<(), AuthorizationError> {
+                Err(AuthorizationError::new("denied"))
+            }
+        }
+
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let peer = PeerContext::new("test-agent");
+        let authorizer = DenyAll;
+        let req = NodePowerRequest::Reboot;
+        let result = server_conn
+            .node_power_authorized(req, &peer, &authorizer)
+            .await;
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("authorization denied")
+        );
+
+        // No client handler needed — request should not be sent.
+        drop(client_conn);
+        test_env.teardown(&server_conn);
+    }
+
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn node_observation_authorization_selective() {
+        use crate::auth::{AuthorizationError, Authorizer, PeerContext};
+        use crate::service_id::ServiceId;
+        use crate::types::node::{
+            NodeObservationRequest, NodeObservationResponse, NodePowerRequest,
+        };
+
+        /// Allows observation but denies power operations.
+        struct ObservationOnly;
+        impl Authorizer for ObservationOnly {
+            fn authorize(
+                &self,
+                _peer: &PeerContext,
+                service: &ServiceId,
+            ) -> Result<(), AuthorizationError> {
+                if service.family == "node.observation" {
+                    Ok(())
+                } else {
+                    Err(AuthorizationError::new("only observation allowed"))
+                }
+            }
+        }
+
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let peer = PeerContext::new("test-agent");
+        let authorizer = ObservationOnly;
+
+        // Observation should be allowed.
+        let mut handler = TestHandler;
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+            crate::request::handle(&mut handler, &mut send, &mut recv).await
+        });
+
+        let resp = server_conn
+            .node_observation_authorized(NodeObservationRequest::ResourceUsage, &peer, &authorizer)
+            .await
+            .unwrap();
+        assert_eq!(
+            resp,
+            NodeObservationResponse::ResourceUsage {
+                hostname: "test-host".into(),
+                resource_usage: super::ResourceUsage {
+                    cpu_usage: 0.5,
+                    total_memory: 100,
+                    used_memory: 50,
+                    disk_used_bytes: 500,
+                    disk_available_bytes: 500,
+                },
+            }
+        );
+        let client_res = client_handle.await.unwrap();
+        assert!(client_res.is_ok());
+
+        // Power should be denied.
+        let result = server_conn
+            .node_power_authorized(NodePowerRequest::Reboot, &peer, &authorizer)
+            .await;
+        assert!(result.is_err());
 
         test_env.teardown(&server_conn);
     }

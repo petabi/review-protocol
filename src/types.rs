@@ -291,6 +291,22 @@ pub struct EventMessage {
 
 /// Types for the `node` agent family, grouping host-control and
 /// host-observation functionality under stable feature families.
+///
+/// Each feature family is represented by a request/response enum pair.
+/// Callers construct a request variant, send it through the protocol
+/// layer, and receive the corresponding response variant.
+///
+/// # API compatibility
+///
+/// The public fields and enum variants exposed in this module form
+/// the stable API surface.  New **optional** fields or new enum
+/// variants may be added in minor releases; callers should tolerate
+/// unknown variants when deserializing (e.g. by using a wildcard arm
+/// in `match` expressions).
+///
+/// Low-level wire-format details such as field layout, byte order, or
+/// serialization encoding are **not** part of the public contract and
+/// may change without notice.
 pub mod node {
     use std::time::Duration;
 
@@ -301,6 +317,23 @@ pub mod node {
     // ── service control ─────────────────────────────────────────
 
     /// Request for managing system services on a node.
+    ///
+    /// Send one of the variants to start, stop, restart, or query the
+    /// status of a named service on the target node.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use review_protocol::types::node::NodeServiceRequest;
+    ///
+    /// let req = NodeServiceRequest::Start {
+    ///     service: "nginx".into(),
+    /// };
+    /// assert_eq!(
+    ///     format!("{req:?}"),
+    ///     r#"Start { service: "nginx" }"#,
+    /// );
+    /// ```
     #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
     pub enum NodeServiceRequest {
         /// Start a service by name.
@@ -314,6 +347,24 @@ pub mod node {
     }
 
     /// Response from a service-control operation.
+    ///
+    /// A [`Status`](Self::Status) variant is returned for
+    /// [`NodeServiceRequest::Status`]; all other operations return
+    /// [`Done`](Self::Done) on success.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use review_protocol::types::node::NodeServiceResponse;
+    ///
+    /// let resp = NodeServiceResponse::Status { active: true };
+    /// match resp {
+    ///     NodeServiceResponse::Status { active } => {
+    ///         assert!(active);
+    ///     }
+    ///     NodeServiceResponse::Done => {}
+    /// }
+    /// ```
     #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
     pub enum NodeServiceResponse {
         /// Status of the queried service.
@@ -325,6 +376,35 @@ pub mod node {
     // ── network interface management ────────────────────────────
 
     /// Request for managing network interfaces on a node.
+    ///
+    /// Use this type to list, inspect, configure, or reset network
+    /// devices on the target node.  [`Set`](Self::Set) applies a
+    /// partial configuration (only the fields present in
+    /// [`NodeNetworkInterfaceConfig`] are changed), while
+    /// [`Remove`](Self::Remove) removes the specified settings.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use review_protocol::types::node::{
+    ///     NodeNetworkInterfaceConfig, NodeNetworkInterfaceRequest,
+    /// };
+    ///
+    /// // Enable DHCP on eth0 without changing other settings.
+    /// let req = NodeNetworkInterfaceRequest::Set {
+    ///     device: "eth0".into(),
+    ///     config: NodeNetworkInterfaceConfig {
+    ///         addresses: None,
+    ///         dhcp4: Some(true),
+    ///         gateway4: None,
+    ///         nameservers: None,
+    ///     },
+    /// };
+    /// assert!(matches!(
+    ///     req,
+    ///     NodeNetworkInterfaceRequest::Set { .. },
+    /// ));
+    /// ```
     #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
     pub enum NodeNetworkInterfaceRequest {
         /// List network interface names, optionally filtered by a
@@ -347,6 +427,11 @@ pub mod node {
     }
 
     /// Response from a network-interface operation.
+    ///
+    /// [`List`](Self::List) is returned for
+    /// [`NodeNetworkInterfaceRequest::List`], [`Get`](Self::Get) for
+    /// [`NodeNetworkInterfaceRequest::Get`], and [`Done`](Self::Done)
+    /// for mutating operations.
     #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
     pub enum NodeNetworkInterfaceResponse {
         /// A list of device names.
@@ -363,7 +448,9 @@ pub mod node {
     ///
     /// All fields are optional so that partial updates can be
     /// expressed (e.g. changing only `dhcp4` without touching
-    /// `addresses`).
+    /// `addresses`).  When used in a
+    /// [`NodeNetworkInterfaceRequest::Set`], only the present fields
+    /// are applied; `None` fields are left unchanged on the node.
     #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
     pub struct NodeNetworkInterfaceConfig {
         /// IP addresses to assign (as strings to support CIDR
@@ -389,6 +476,17 @@ pub mod node {
     // ── hostname management ─────────────────────────────────────
 
     /// Request for reading or setting the node hostname.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use review_protocol::types::node::NodeHostnameRequest;
+    ///
+    /// let req = NodeHostnameRequest::Set {
+    ///     hostname: "sensor-01".into(),
+    /// };
+    /// assert!(matches!(req, NodeHostnameRequest::Set { .. }));
+    /// ```
     #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
     pub enum NodeHostnameRequest {
         /// Retrieve the current hostname.
@@ -398,6 +496,10 @@ pub mod node {
     }
 
     /// Response from a hostname operation.
+    ///
+    /// [`Get`](Self::Get) is returned for
+    /// [`NodeHostnameRequest::Get`]; [`Done`](Self::Done) is returned
+    /// after a successful [`NodeHostnameRequest::Set`].
     #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
     pub enum NodeHostnameResponse {
         /// The current hostname.
@@ -409,6 +511,12 @@ pub mod node {
     // ── time synchronization management ─────────────────────────
 
     /// Request for managing NTP / time-synchronization settings.
+    ///
+    /// Use [`Get`](Self::Get) and [`Status`](Self::Status) for
+    /// read-only queries.  [`Set`](Self::Set) replaces the entire NTP
+    /// server list, while [`Enable`](Self::Enable) and
+    /// [`Disable`](Self::Disable) control whether synchronization is
+    /// active.
     #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
     pub enum NodeTimeSyncRequest {
         /// Retrieve the current time-sync configuration.
@@ -424,6 +532,11 @@ pub mod node {
     }
 
     /// Response from a time-synchronization operation.
+    ///
+    /// [`Get`](Self::Get) returns the current NTP server list,
+    /// [`Status`](Self::Status) indicates whether synchronization is
+    /// enabled, and [`Done`](Self::Done) confirms a mutating
+    /// operation succeeded.
     #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
     pub enum NodeTimeSyncResponse {
         /// Current NTP server list, or `None` if not configured.
@@ -437,6 +550,9 @@ pub mod node {
     // ── logging configuration ───────────────────────────────────
 
     /// Transport protocol for a logging endpoint.
+    ///
+    /// Used as part of [`NodeLoggingEndpoint`] to select the
+    /// transport layer for forwarding log messages.
     #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
     pub enum NodeLoggingProtocol {
         /// TCP transport.
@@ -446,6 +562,25 @@ pub mod node {
     }
 
     /// A remote logging endpoint.
+    ///
+    /// Describes a single destination to which the node forwards log
+    /// messages.  Combine one or more endpoints in a
+    /// [`NodeLoggingRequest::Set`] to configure forwarding.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use review_protocol::types::node::{
+    ///     NodeLoggingEndpoint, NodeLoggingProtocol,
+    /// };
+    ///
+    /// let ep = NodeLoggingEndpoint {
+    ///     protocol: NodeLoggingProtocol::Tcp,
+    ///     address: "192.168.1.100".into(),
+    ///     port: 514,
+    /// };
+    /// assert_eq!(ep.port, 514);
+    /// ```
     #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
     pub struct NodeLoggingEndpoint {
         /// Transport protocol to use.
@@ -457,6 +592,11 @@ pub mod node {
     }
 
     /// Request for managing logging configuration on a node.
+    ///
+    /// [`Set`](Self::Set) replaces the entire endpoint list;
+    /// [`Clear`](Self::Clear) removes all endpoints; and
+    /// [`Restart`](Self::Restart) restarts the logging subsystem
+    /// without changing its configuration.
     #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
     pub enum NodeLoggingRequest {
         /// Retrieve the current logging endpoint configuration.
@@ -470,6 +610,10 @@ pub mod node {
     }
 
     /// Response from a logging-configuration operation.
+    ///
+    /// [`Get`](Self::Get) returns the current endpoint list (or
+    /// `None` if no endpoints are configured); [`Done`](Self::Done)
+    /// confirms a mutating operation succeeded.
     #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
     pub enum NodeLoggingResponse {
         /// The current logging endpoint list, or `None` if not
@@ -484,6 +628,9 @@ pub mod node {
     // ── remote access configuration ─────────────────────────────
 
     /// Remote-access (SSH) configuration for a node.
+    ///
+    /// Currently exposes only the listen port; additional fields may
+    /// be added in future minor releases.
     #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
     pub struct NodeRemoteAccessConfig {
         /// SSH listen port.
@@ -491,6 +638,10 @@ pub mod node {
     }
 
     /// Request for managing remote-access (e.g. SSH) settings.
+    ///
+    /// [`Get`](Self::Get) retrieves the current configuration,
+    /// [`Set`](Self::Set) replaces it, and [`Restart`](Self::Restart)
+    /// restarts the remote-access service with the current settings.
     #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
     pub enum NodeRemoteAccessRequest {
         /// Retrieve the current remote-access configuration.
@@ -502,6 +653,10 @@ pub mod node {
     }
 
     /// Response from a remote-access operation.
+    ///
+    /// [`Get`](Self::Get) is returned for
+    /// [`NodeRemoteAccessRequest::Get`]; [`Done`](Self::Done)
+    /// confirms a mutating operation succeeded.
     #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
     pub enum NodeRemoteAccessResponse {
         /// The current remote-access configuration.
@@ -514,8 +669,19 @@ pub mod node {
 
     /// Request for node power-control operations.
     ///
-    /// Maps the existing flat `reboot` and `shutdown` APIs into the
-    /// `node` domain.
+    /// The immediate variants ([`Reboot`](Self::Reboot),
+    /// [`Shutdown`](Self::Shutdown)) take effect right away, while
+    /// the graceful variants allow running services to drain before
+    /// the operation proceeds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use review_protocol::types::node::NodePowerRequest;
+    ///
+    /// let req = NodePowerRequest::GracefulReboot;
+    /// assert!(matches!(req, NodePowerRequest::GracefulReboot));
+    /// ```
     #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
     pub enum NodePowerRequest {
         /// Reboot the node immediately.
@@ -529,6 +695,10 @@ pub mod node {
     }
 
     /// Response from a power-control operation.
+    ///
+    /// [`Initiated`](Self::Initiated) confirms that the node has
+    /// accepted the power command.  The node may become unreachable
+    /// shortly after this response is received.
     #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
     pub enum NodePowerResponse {
         /// The power operation has been initiated.
@@ -537,10 +707,22 @@ pub mod node {
 
     // ── host observation ────────────────────────────────────────
 
-    /// Request for observing host state.
+    /// Request for observing host state (read-only).
     ///
-    /// Maps the existing flat `process_list` and `resource_usage`
-    /// APIs into the `node` domain.
+    /// All variants are side-effect-free queries that inspect the
+    /// current state of the node without modifying it.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use review_protocol::types::node::NodeObservationRequest;
+    ///
+    /// let req = NodeObservationRequest::ResourceUsage;
+    /// assert!(matches!(
+    ///     req,
+    ///     NodeObservationRequest::ResourceUsage,
+    /// ));
+    /// ```
     #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
     pub enum NodeObservationRequest {
         /// List all running processes.
@@ -553,7 +735,9 @@ pub mod node {
 
     /// Response from a host-observation operation.
     ///
-    /// Reuses the existing [`Process`] and [`ResourceUsage`] types.
+    /// Each variant corresponds to the identically named request
+    /// variant.  The payload reuses the existing [`Process`] and
+    /// [`ResourceUsage`] types defined in the parent module.
     #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
     pub enum NodeObservationResponse {
         /// List of running processes.
@@ -570,6 +754,10 @@ pub mod node {
     // ── version management ──────────────────────────────────────
 
     /// Request for querying or updating the node version strings.
+    ///
+    /// [`Get`](Self::Get) retrieves both the OS and product version
+    /// strings in a single call.  The two `Set*` variants update
+    /// each string independently.
     #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
     pub enum NodeVersionRequest {
         /// Get the current OS and product version strings.
@@ -581,6 +769,9 @@ pub mod node {
     }
 
     /// Response from a version-management operation.
+    ///
+    /// [`Get`](Self::Get) returns both version strings;
+    /// [`Done`](Self::Done) confirms a `Set*` operation succeeded.
     #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
     pub enum NodeVersionResponse {
         /// The current version strings.

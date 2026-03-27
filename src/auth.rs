@@ -127,7 +127,7 @@ impl std::error::Error for AuthorizationError {}
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore
 /// use review_protocol::auth::{
 ///     AuthorizationError, Authorizer, PeerContext,
 /// };

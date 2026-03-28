@@ -112,23 +112,24 @@ impl From<crate::HandshakeError> for ProtocolErrorKind {
     }
 }
 
-/// An error from the dispatch loop that carries a
+/// An error from a dispatch loop that carries a
 /// [`ProtocolErrorKind`] classification.
 ///
 /// Used as the inner error of [`io::Error`](std::io::Error) values
-/// produced by
-/// [`handle_authorized`](crate::server::handle_authorized) for
-/// authorization denials and unknown request codes.  Callers can
-/// recover the classification via
+/// produced by request-dispatch functions (e.g.
+/// [`server::handle_authorized`](crate::server::handle_authorized)
+/// and [`request::handle`](crate::request::handle)) for
+/// authorization denials, unknown request codes, and argument
+/// parse failures.  Callers can recover the classification via
 /// [`ProtocolErrorKind::of_io_error`].
-#[cfg(feature = "server")]
+#[cfg(any(feature = "client", feature = "server"))]
 #[derive(Debug)]
 pub(crate) struct DispatchError {
     kind: ProtocolErrorKind,
     message: String,
 }
 
-#[cfg(feature = "server")]
+#[cfg(any(feature = "client", feature = "server"))]
 impl DispatchError {
     /// Creates a new dispatch error with the given classification
     /// and human-readable message.
@@ -143,19 +144,26 @@ impl DispatchError {
     pub(crate) fn protocol_kind(&self) -> ProtocolErrorKind {
         self.kind
     }
+
+    /// Wraps an existing [`io::Error`] with a
+    /// [`ProtocolErrorKind`] classification, preserving the
+    /// original `ErrorKind` and message.
+    pub(crate) fn from_io(kind: ProtocolErrorKind, err: &std::io::Error) -> std::io::Error {
+        std::io::Error::new(err.kind(), Self::new(kind, err.to_string()))
+    }
 }
 
-#[cfg(feature = "server")]
+#[cfg(any(feature = "client", feature = "server"))]
 impl fmt::Display for DispatchError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.message)
     }
 }
 
-#[cfg(feature = "server")]
+#[cfg(any(feature = "client", feature = "server"))]
 impl std::error::Error for DispatchError {}
 
-#[cfg(feature = "server")]
+#[cfg(any(feature = "client", feature = "server"))]
 impl ProtocolErrorKind {
     /// Extracts the [`ProtocolErrorKind`] from an
     /// [`io::Error`](std::io::Error).
@@ -286,7 +294,7 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "server")]
+    #[cfg(any(feature = "client", feature = "server"))]
     #[test]
     fn of_io_error_with_dispatch_error() {
         use std::io;
@@ -313,7 +321,7 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "server")]
+    #[cfg(any(feature = "client", feature = "server"))]
     #[test]
     fn of_io_error_fallback_mappings() {
         use std::io;
@@ -344,6 +352,26 @@ mod tests {
         assert_eq!(
             ProtocolErrorKind::of_io_error(&err),
             ProtocolErrorKind::Other,
+        );
+    }
+
+    #[cfg(any(feature = "client", feature = "server"))]
+    #[test]
+    fn from_io_preserves_kind_and_classifies() {
+        use std::io;
+
+        use super::DispatchError;
+
+        let orig = io::Error::new(io::ErrorKind::InvalidData, "bad payload");
+        let wrapped = DispatchError::from_io(ProtocolErrorKind::InvalidArgs, &orig);
+
+        // The outer io::ErrorKind is preserved from the original.
+        assert_eq!(wrapped.kind(), io::ErrorKind::InvalidData);
+        // The semantic classification is InvalidArgs, not the
+        // fallback mapping for InvalidData (which is NotSupported).
+        assert_eq!(
+            ProtocolErrorKind::of_io_error(&wrapped),
+            ProtocolErrorKind::InvalidArgs,
         );
     }
 }

@@ -1,4 +1,16 @@
 //! Request handling for the agent.
+//!
+//! This module provides two handler traits:
+//!
+//! - [`Handler`] – the full agent-side handler covering both
+//!   shared/common flat methods and grouped node methods.
+//! - [`NodeHandler`] – the narrower, service-family-specific trait
+//!   for node operations only.
+//!
+//! A blanket `impl<T: Handler> NodeHandler for T` ensures that
+//! existing `Handler` implementations satisfy `NodeHandler`
+//! automatically. New node-only agents may implement `NodeHandler`
+//! directly.
 
 use std::io;
 
@@ -30,7 +42,155 @@ pub enum HandlerError {
     SendError(io::Error),
 }
 
+/// The agent-side handler trait for the **node** service family.
+///
+/// This trait groups the nine node feature-family methods that were
+/// previously part of [`Handler`]. It represents the narrower,
+/// service-family-specific handler surface for node operations such
+/// as power control, hostname management, and service lifecycle.
+///
+/// ## Transition strategy
+///
+/// A blanket implementation forwards every `NodeHandler` method to
+/// the corresponding method on [`Handler`], so existing `Handler`
+/// implementations continue to work without changes. New agent code
+/// can choose to implement `NodeHandler` directly for a cleaner,
+/// focused interface.
+///
+/// In a future breaking release, `Handler` may be composed from
+/// smaller family traits like this one rather than carrying all
+/// methods directly.
+#[async_trait]
+pub trait NodeHandler: Send {
+    /// Handles a node service-control request.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error message if the request is not supported or
+    /// the underlying operation fails.
+    async fn node_service(
+        &mut self,
+        _req: NodeServiceRequest,
+    ) -> Result<NodeServiceResponse, String> {
+        Err("not supported".to_string())
+    }
+
+    /// Handles a node network-interface management request.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error message if the request is not supported or
+    /// the underlying operation fails.
+    async fn node_network_interface(
+        &mut self,
+        _req: NodeNetworkInterfaceRequest,
+    ) -> Result<NodeNetworkInterfaceResponse, String> {
+        Err("not supported".to_string())
+    }
+
+    /// Handles a node hostname management request.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error message if the request is not supported or
+    /// the underlying operation fails.
+    async fn node_hostname(
+        &mut self,
+        _req: NodeHostnameRequest,
+    ) -> Result<NodeHostnameResponse, String> {
+        Err("not supported".to_string())
+    }
+
+    /// Handles a node time-synchronization request.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error message if the request is not supported or
+    /// the underlying operation fails.
+    async fn node_time_sync(
+        &mut self,
+        _req: NodeTimeSyncRequest,
+    ) -> Result<NodeTimeSyncResponse, String> {
+        Err("not supported".to_string())
+    }
+
+    /// Handles a node logging-configuration request.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error message if the request is not supported or
+    /// the underlying operation fails.
+    async fn node_logging(
+        &mut self,
+        _req: NodeLoggingRequest,
+    ) -> Result<NodeLoggingResponse, String> {
+        Err("not supported".to_string())
+    }
+
+    /// Handles a node remote-access configuration request.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error message if the request is not supported or
+    /// the underlying operation fails.
+    async fn node_remote_access(
+        &mut self,
+        _req: NodeRemoteAccessRequest,
+    ) -> Result<NodeRemoteAccessResponse, String> {
+        Err("not supported".to_string())
+    }
+
+    /// Handles a node power-control request.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error message if the request is not supported or
+    /// the underlying operation fails.
+    async fn node_power(&mut self, _req: NodePowerRequest) -> Result<NodePowerResponse, String> {
+        Err("not supported".to_string())
+    }
+
+    /// Handles a node host-observation request.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error message if the request is not supported or
+    /// the underlying operation fails.
+    async fn node_observation(
+        &mut self,
+        _req: NodeObservationRequest,
+    ) -> Result<NodeObservationResponse, String> {
+        Err("not supported".to_string())
+    }
+
+    /// Handles a node version-management request.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error message if the request is not supported or
+    /// the underlying operation fails.
+    async fn node_version(
+        &mut self,
+        _req: NodeVersionRequest,
+    ) -> Result<NodeVersionResponse, String> {
+        Err("not supported".to_string())
+    }
+}
+
 /// A request handler that can handle a request to an agent.
+///
+/// This trait covers all agent-side request handling, including both
+/// the shared/common flat methods and the node service-family methods.
+/// The node methods are also available through the narrower
+/// [`NodeHandler`] trait; a blanket implementation ensures that every
+/// `Handler` automatically satisfies `NodeHandler`.
+///
+/// ## Transition
+///
+/// New node-only agents may prefer to implement [`NodeHandler`]
+/// directly. Existing agents that implement `Handler` continue to
+/// work unchanged thanks to the blanket `impl<T: Handler> NodeHandler
+/// for T`.
 #[async_trait]
 pub trait Handler: Send {
     async fn dns_start(&mut self) -> Result<(), String> {
@@ -279,6 +439,73 @@ pub trait Handler: Send {
         _req: NodeVersionRequest,
     ) -> Result<NodeVersionResponse, String> {
         Err("not supported".to_string())
+    }
+}
+
+/// Blanket implementation: every [`Handler`] automatically satisfies
+/// [`NodeHandler`] by forwarding to the corresponding `Handler`
+/// methods. This preserves compatibility so that existing `Handler`
+/// implementations work as `NodeHandler` without changes.
+#[async_trait]
+impl<T: Handler + ?Sized> NodeHandler for T {
+    async fn node_service(
+        &mut self,
+        req: NodeServiceRequest,
+    ) -> Result<NodeServiceResponse, String> {
+        Handler::node_service(self, req).await
+    }
+
+    async fn node_network_interface(
+        &mut self,
+        req: NodeNetworkInterfaceRequest,
+    ) -> Result<NodeNetworkInterfaceResponse, String> {
+        Handler::node_network_interface(self, req).await
+    }
+
+    async fn node_hostname(
+        &mut self,
+        req: NodeHostnameRequest,
+    ) -> Result<NodeHostnameResponse, String> {
+        Handler::node_hostname(self, req).await
+    }
+
+    async fn node_time_sync(
+        &mut self,
+        req: NodeTimeSyncRequest,
+    ) -> Result<NodeTimeSyncResponse, String> {
+        Handler::node_time_sync(self, req).await
+    }
+
+    async fn node_logging(
+        &mut self,
+        req: NodeLoggingRequest,
+    ) -> Result<NodeLoggingResponse, String> {
+        Handler::node_logging(self, req).await
+    }
+
+    async fn node_remote_access(
+        &mut self,
+        req: NodeRemoteAccessRequest,
+    ) -> Result<NodeRemoteAccessResponse, String> {
+        Handler::node_remote_access(self, req).await
+    }
+
+    async fn node_power(&mut self, req: NodePowerRequest) -> Result<NodePowerResponse, String> {
+        Handler::node_power(self, req).await
+    }
+
+    async fn node_observation(
+        &mut self,
+        req: NodeObservationRequest,
+    ) -> Result<NodeObservationResponse, String> {
+        Handler::node_observation(self, req).await
+    }
+
+    async fn node_version(
+        &mut self,
+        req: NodeVersionRequest,
+    ) -> Result<NodeVersionResponse, String> {
+        Handler::node_version(self, req).await
     }
 }
 
@@ -1557,5 +1784,87 @@ mod tests {
             },
         )
         .await;
+    }
+
+    // ── NodeHandler trait tests ──────────────────────────────────
+    //
+    // Verify that the `NodeHandler` trait is independently usable
+    // and that the blanket `impl<T: Handler> NodeHandler for T`
+    // correctly forwards calls.
+
+    /// A `Handler` implementor used to verify that the blanket
+    /// `NodeHandler` impl forwards to its `Handler` node methods.
+    #[cfg(feature = "server")]
+    struct BlanketTestHandler;
+
+    #[cfg(feature = "server")]
+    #[async_trait::async_trait]
+    impl super::Handler for BlanketTestHandler {
+        async fn node_service(
+            &mut self,
+            _req: crate::types::node::NodeServiceRequest,
+        ) -> Result<crate::types::node::NodeServiceResponse, String> {
+            Ok(crate::types::node::NodeServiceResponse::Status { active: true })
+        }
+
+        async fn node_power(
+            &mut self,
+            _req: crate::types::node::NodePowerRequest,
+        ) -> Result<crate::types::node::NodePowerResponse, String> {
+            Ok(crate::types::node::NodePowerResponse::Initiated)
+        }
+    }
+
+    /// Calling a `NodeHandler` method on a `Handler` implementor
+    /// should forward through the blanket impl.
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn blanket_node_handler_forwards_to_handler() {
+        use crate::types::node::{
+            NodePowerRequest, NodePowerResponse, NodeServiceRequest, NodeServiceResponse,
+        };
+
+        let mut h = BlanketTestHandler;
+
+        // Call through `NodeHandler` trait explicitly.
+        let service_resp = super::NodeHandler::node_service(
+            &mut h,
+            NodeServiceRequest::Status {
+                service: "test".into(),
+            },
+        )
+        .await;
+        assert_eq!(
+            service_resp.unwrap(),
+            NodeServiceResponse::Status { active: true },
+        );
+
+        let power_resp = super::NodeHandler::node_power(&mut h, NodePowerRequest::Reboot).await;
+        assert_eq!(power_resp.unwrap(), NodePowerResponse::Initiated);
+    }
+
+    /// Default `NodeHandler` methods return `"not supported"` when
+    /// the underlying `Handler` does not override them.
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn blanket_node_handler_defaults_not_supported() {
+        use crate::types::node::{NodeHostnameRequest, NodeVersionRequest};
+
+        let mut h = BlanketTestHandler;
+
+        // `BlanketTestHandler` does not override `node_hostname` or
+        // `node_version`, so the defaults should return an error.
+        let hostname_resp =
+            super::NodeHandler::node_hostname(&mut h, NodeHostnameRequest::Get).await;
+        assert_eq!(hostname_resp.unwrap_err(), "not supported");
+
+        let version_resp = super::NodeHandler::node_version(
+            &mut h,
+            NodeVersionRequest::SetOsVersion {
+                version: "1.0".into(),
+            },
+        )
+        .await;
+        assert_eq!(version_resp.unwrap_err(), "not supported");
     }
 }

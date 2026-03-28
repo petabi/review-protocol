@@ -20,18 +20,30 @@ use crate::{
 ///
 /// # Node API vs legacy flat API
 ///
-/// `Connection` exposes two styles of methods for managing the
-/// connected agent (node):
+/// `Connection` exposes three styles of methods for managing the
+/// connected agent (node).  **For new code, prefer the
+/// [`node()`](Self::node) handle** (see the
+/// [`server::node`](super::node) module):
+///
+/// ```rust,no_run
+/// # use review_protocol::server::Connection;
+/// # use review_protocol::types::node::NodePowerRequest;
+/// # async fn example(conn: Connection) -> anyhow::Result<()> {
+/// let resp = conn.node().power(NodePowerRequest::Reboot).await?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// - **[`node()`](Self::node) handle** — service-family entry
+///   point that groups all node methods under a single
+///   [`Node`](super::node::Node) namespace.  **Prefer this for
+///   all new code.**
 ///
 /// - **`node_*` methods** (e.g. [`node_power`](Self::node_power),
 ///   [`node_observation`](Self::node_observation)) accept a typed
 ///   `Node*Request` enum and return the corresponding
-///   `Node*Response`.  Each request variant carries a method-level
-///   [`ServiceId`](crate::service_id::ServiceId) that can be used
-///   for fine-grained authorization via the `_authorized` variants
-///   (e.g.
-///   [`node_power_authorized`](Self::node_power_authorized)).
-///   **Prefer these for all new code.**
+///   `Node*Response`.  These remain available as compatibility
+///   wrappers.
 ///
 /// - **Legacy flat methods** (e.g.
 ///   [`send_reboot_cmd`](Self::send_reboot_cmd),

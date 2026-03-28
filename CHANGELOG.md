@@ -9,6 +9,12 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `server::node` module with a `Node` handle that groups all
+  node-family API calls under a single, discoverable namespace.
+  Obtain a handle via `Connection::node()` and call methods
+  such as `node.power(req)` or `node.power_authorized(req,
+  peer, authorizer)`. Existing `Connection::node_*` methods
+  and legacy flat wrappers remain available and unchanged.
 - `auth` module with authorization hooks for request dispatch.
   Provides `PeerContext` (certificate-backed peer identity),
   `Authorizer` trait (allow/deny hook keyed by `ServiceId`),

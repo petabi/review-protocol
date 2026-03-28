@@ -10,8 +10,10 @@
 //! - [`client`] – Client-side utilities and typed clients for calling
 //!   review services.
 //! - [`server`] – Server-side helpers, service wiring, and the
-//!   `server::Connection` API used to issue requests to agents
-//!   (including the `node_*` methods).
+//!   `server::Connection` API used to issue requests to agents.
+//!   The [`server::node`] module provides the recommended
+//!   service-family entry point for node operations via
+//!   [`Connection::node()`](server::Connection::node).
 //! - [`types`] – Shared types used across the protocol surface.
 //! - [`service_id`] – Definitions and helpers for [`ServiceId`], the
 //!   key used to scope authorization and identify services.

@@ -14,12 +14,16 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   `Forbidden`, `InvalidArgs`, `VersionMismatch`, `Other`).
   This is an internal classification type — it does not affect
   wire encodings. Includes `From<AuthorizationError>` and
-  `From<HandshakeError>` conversions, plus internal helpers
-  (`classify_handler_error`, `classify_dispatch_error`) for
-  mapping authorization, dispatch, and handler failures to their
-  semantic categories.
+  `From<HandshakeError>` conversions.
+- `ProtocolErrorKind::of_io_error` method that extracts the
+  semantic classification from an `io::Error` returned by
+  `handle_authorized`. Errors produced by the dispatch loop
+  (authorization denials, unknown request codes) carry an
+  embedded classification; other `io::Error` values are
+  classified by their `ErrorKind`.
 - `AuthorizationError::kind()` method that returns
-  `ProtocolErrorKind::Forbidden`.
+  `ProtocolErrorKind::Forbidden`. Used by the dispatch loop
+  to classify authorization denials.
 - `request::NodeHandler` preparatory trait that groups the nine
   node feature-family methods under their own handler surface. A
   blanket `impl<T: Handler> NodeHandler for T` preserves full

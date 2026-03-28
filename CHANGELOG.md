@@ -9,6 +9,11 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `protocol_error` module with `ProtocolErrorKind`, a semantic
+  taxonomy of protocol-level error categories (`NotSupported`,
+  `Forbidden`, `InvalidArgs`, `VersionMismatch`, `Other`).
+  This is an internal classification type — it does not affect
+  wire encodings. Includes `From<AuthorizationError>` conversion.
 - `request::NodeHandler` preparatory trait that groups the nine
   node feature-family methods under their own handler surface. A
   blanket `impl<T: Handler> NodeHandler for T` preserves full

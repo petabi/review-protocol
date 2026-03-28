@@ -9,10 +9,12 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- `request::NodeHandler` trait that expresses the agent-side node
-  service family through its own handler trait. A blanket
-  `impl<T: Handler> NodeHandler for T` preserves full compatibility
-  so existing `Handler` implementations continue to work unchanged.
+- `request::NodeHandler` preparatory trait that groups the nine
+  node feature-family methods under their own handler surface. A
+  blanket `impl<T: Handler> NodeHandler for T` preserves full
+  compatibility so existing `Handler` implementations continue to
+  work unchanged. The dispatch path still requires `Handler`; a
+  future release may accept `NodeHandler` directly.
 - `server::node` module with a `Node` handle that groups all
   node-family API calls under a single, discoverable namespace.
   Obtain a handle via `Connection::node()` and call methods

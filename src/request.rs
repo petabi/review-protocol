@@ -3,14 +3,17 @@
 //! This module provides two handler traits:
 //!
 //! - [`Handler`] – the full agent-side handler covering both
-//!   shared/common flat methods and grouped node methods.
-//! - [`NodeHandler`] – the narrower, service-family-specific trait
-//!   for node operations only.
+//!   shared/common flat methods and grouped node methods. This is
+//!   the trait consumed by [`handle()`](super::server::handle) and
+//!   remains the only trait required for dispatch today.
+//! - [`NodeHandler`] – a preparatory trait that groups node
+//!   service-family methods under their own surface. It is not yet
+//!   independently consumable by the dispatch path.
 //!
 //! A blanket `impl<T: Handler> NodeHandler for T` ensures that
 //! existing `Handler` implementations satisfy `NodeHandler`
-//! automatically. New node-only agents may implement `NodeHandler`
-//! directly.
+//! automatically. In a future release the dispatch path may be
+//! updated to accept `NodeHandler` directly.
 
 use std::io;
 
@@ -42,24 +45,19 @@ pub enum HandlerError {
     SendError(io::Error),
 }
 
-/// The agent-side handler trait for the **node** service family.
+/// A preparatory trait that groups the nine node feature-family
+/// methods under their own handler surface.
 ///
-/// This trait groups the nine node feature-family methods that were
-/// previously part of [`Handler`]. It represents the narrower,
-/// service-family-specific handler surface for node operations such
-/// as power control, hostname management, and service lifecycle.
-///
-/// ## Transition strategy
+/// **Note:** This trait is not yet independently consumable —
+/// [`handle()`](super::server::handle) still requires the full
+/// [`Handler`] trait. `NodeHandler` exists to define the
+/// service-family boundary so that a future release can update the
+/// dispatch path to accept it directly.
 ///
 /// A blanket implementation forwards every `NodeHandler` method to
 /// the corresponding method on [`Handler`], so existing `Handler`
-/// implementations continue to work without changes. New agent code
-/// can choose to implement `NodeHandler` directly for a cleaner,
-/// focused interface.
-///
-/// In a future breaking release, `Handler` may be composed from
-/// smaller family traits like this one rather than carrying all
-/// methods directly.
+/// implementations automatically satisfy `NodeHandler` without
+/// changes.
 #[async_trait]
 pub trait NodeHandler: Send {
     /// Handles a node service-control request.
@@ -181,16 +179,12 @@ pub trait NodeHandler: Send {
 ///
 /// This trait covers all agent-side request handling, including both
 /// the shared/common flat methods and the node service-family methods.
+/// It is the only trait required by the dispatch path today
+/// ([`handle()`](super::server::handle)).
+///
 /// The node methods are also available through the narrower
 /// [`NodeHandler`] trait; a blanket implementation ensures that every
 /// `Handler` automatically satisfies `NodeHandler`.
-///
-/// ## Transition
-///
-/// New node-only agents may prefer to implement [`NodeHandler`]
-/// directly. Existing agents that implement `Handler` continue to
-/// work unchanged thanks to the blanket `impl<T: Handler> NodeHandler
-/// for T`.
 #[async_trait]
 pub trait Handler: Send {
     async fn dns_start(&mut self) -> Result<(), String> {

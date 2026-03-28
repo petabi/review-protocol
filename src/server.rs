@@ -5,6 +5,8 @@ mod api;
 #[cfg(feature = "server")]
 mod handler;
 #[cfg(feature = "server")]
+pub mod node;
+#[cfg(feature = "server")]
 pub mod stream;
 
 #[cfg(feature = "server")]
@@ -139,13 +141,18 @@ pub(crate) enum RequestCode {
 /// there is no additional node-selection parameter — calling any
 /// method on this type sends the request to that agent.
 ///
-/// The API is organized in two layers:
+/// The API is organized in three layers:
 ///
+/// - **[`node()`](Self::node) handle** — the recommended entry
+///   point for new code.  Returns a [`node::Node`] handle that
+///   groups all node-family methods under a single namespace
+///   (e.g. `conn.node().power(req)`).
 /// - **`node_*` methods** — typed, per-feature-family methods that
 ///   accept a `Node*Request` enum and return a `Node*Response`.
 ///   Each request variant carries a
 ///   [`ServiceId`](crate::service_id::ServiceId) suitable for
-///   fine-grained authorization.  **Prefer these for new code.**
+///   fine-grained authorization.  These remain available as
+///   compatibility wrappers.
 /// - **Legacy flat methods** — simpler, backward-compatible
 ///   wrappers (e.g. [`send_reboot_cmd`](Self::send_reboot_cmd)).
 ///   They do not expose `ServiceId` and cannot participate in
@@ -153,7 +160,8 @@ pub(crate) enum RequestCode {
 ///   control.
 ///
 /// See the [`impl` block documentation](Self#node-api-vs-legacy-flat-api)
-/// for migration guidance.
+/// for migration guidance and the [`server::node`](node) module
+/// for the service-family entry point.
 #[derive(Clone, Debug)]
 pub struct Connection {
     conn: quinn::Connection,
@@ -165,6 +173,31 @@ impl Connection {
     #[must_use]
     pub fn from_quinn(conn: quinn::Connection) -> Self {
         Self { conn }
+    }
+
+    /// Returns a [`Node`](node::Node) handle for issuing
+    /// node-family requests over this connection.
+    ///
+    /// The returned handle borrows this connection and exposes
+    /// the node API family through a service-family-oriented
+    /// interface.  **Prefer this for new code** over calling
+    /// the `node_*` methods on `Connection` directly.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use review_protocol::server::Connection;
+    /// # async fn example(conn: Connection) -> anyhow::Result<()> {
+    /// use review_protocol::types::node::NodePowerRequest;
+    ///
+    /// let node = conn.node();
+    /// let resp = node.power(NodePowerRequest::Reboot).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn node(&self) -> node::Node<'_> {
+        node::Node::new(self)
     }
 
     /// Returns the QUIC connection compatible with the `quinn` crate.

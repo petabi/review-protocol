@@ -95,6 +95,77 @@ impl From<crate::auth::AuthorizationError> for ProtocolErrorKind {
     }
 }
 
+#[cfg(any(feature = "client", feature = "server"))]
+impl From<&crate::HandshakeError> for ProtocolErrorKind {
+    fn from(err: &crate::HandshakeError) -> Self {
+        match err {
+            crate::HandshakeError::IncompatibleProtocol(_, _) => Self::VersionMismatch,
+            _ => Self::Other,
+        }
+    }
+}
+
+#[cfg(any(feature = "client", feature = "server"))]
+impl From<crate::HandshakeError> for ProtocolErrorKind {
+    fn from(err: crate::HandshakeError) -> Self {
+        Self::from(&err)
+    }
+}
+
+/// Classifies a handler error message into a
+/// [`ProtocolErrorKind`].
+///
+/// Handler methods return `Result<T, String>`, where the error
+/// string is a human-readable message.  This function maps
+/// well-known message patterns to their semantic category:
+///
+/// - `"not supported"` → [`NotSupported`](ProtocolErrorKind::NotSupported)
+/// - All other messages → [`Other`](ProtocolErrorKind::Other)
+///
+/// This is a **crate-internal** helper used by dispatch code to
+/// attach a semantic category to handler errors without changing
+/// the wire message.
+#[cfg(feature = "server")]
+#[must_use]
+#[allow(dead_code)] // part of the internal mapping API; used by tests and available for callers
+pub(crate) fn classify_handler_error(msg: &str) -> ProtocolErrorKind {
+    if msg == "not supported" {
+        ProtocolErrorKind::NotSupported
+    } else {
+        ProtocolErrorKind::Other
+    }
+}
+
+/// Classifies a dispatch-level I/O error into a
+/// [`ProtocolErrorKind`].
+///
+/// The dispatch loop in
+/// [`handle_authorized`](crate::server::handle_authorized)
+/// produces `io::Error` values for authorization denials, unknown
+/// request codes, and argument parse failures.  This function
+/// maps the `io::ErrorKind` to the corresponding semantic
+/// category:
+///
+/// - [`PermissionDenied`](std::io::ErrorKind::PermissionDenied)
+///   → [`Forbidden`](ProtocolErrorKind::Forbidden)
+/// - [`InvalidData`](std::io::ErrorKind::InvalidData)
+///   → [`NotSupported`](ProtocolErrorKind::NotSupported)
+///   (unknown request codes produce this kind)
+/// - [`InvalidInput`](std::io::ErrorKind::InvalidInput)
+///   → [`InvalidArgs`](ProtocolErrorKind::InvalidArgs)
+/// - All others → [`Other`](ProtocolErrorKind::Other)
+#[cfg(feature = "server")]
+#[must_use]
+#[allow(dead_code)] // part of the internal mapping API; used by tests and available for callers
+pub(crate) fn classify_dispatch_error(err: &std::io::Error) -> ProtocolErrorKind {
+    match err.kind() {
+        std::io::ErrorKind::PermissionDenied => ProtocolErrorKind::Forbidden,
+        std::io::ErrorKind::InvalidData => ProtocolErrorKind::NotSupported,
+        std::io::ErrorKind::InvalidInput => ProtocolErrorKind::InvalidArgs,
+        _ => ProtocolErrorKind::Other,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -151,5 +222,96 @@ mod tests {
 
         let kind: ProtocolErrorKind = err.into();
         assert_eq!(kind, ProtocolErrorKind::Forbidden);
+    }
+
+    #[cfg(any(feature = "client", feature = "server"))]
+    #[test]
+    fn from_handshake_error_version_mismatch() {
+        use crate::HandshakeError;
+
+        let err = HandshakeError::IncompatibleProtocol("1.0.0".into(), "2.0.0".into());
+        assert_eq!(
+            ProtocolErrorKind::from(&err),
+            ProtocolErrorKind::VersionMismatch
+        );
+        assert_eq!(
+            ProtocolErrorKind::from(err),
+            ProtocolErrorKind::VersionMismatch
+        );
+    }
+
+    #[cfg(any(feature = "client", feature = "server"))]
+    #[test]
+    fn from_handshake_error_other_variants() {
+        use crate::HandshakeError;
+
+        let cases = [
+            HandshakeError::ConnectionClosed,
+            HandshakeError::MessageTooLarge,
+            HandshakeError::InvalidMessage,
+        ];
+        for err in &cases {
+            assert_eq!(
+                ProtocolErrorKind::from(err),
+                ProtocolErrorKind::Other,
+                "expected Other for {err}"
+            );
+        }
+    }
+
+    #[cfg(feature = "server")]
+    #[test]
+    fn classify_handler_error_not_supported() {
+        use super::classify_handler_error;
+
+        assert_eq!(
+            classify_handler_error("not supported"),
+            ProtocolErrorKind::NotSupported
+        );
+    }
+
+    #[cfg(feature = "server")]
+    #[test]
+    fn classify_handler_error_other() {
+        use super::classify_handler_error;
+
+        assert_eq!(
+            classify_handler_error("some other error"),
+            ProtocolErrorKind::Other
+        );
+        assert_eq!(classify_handler_error(""), ProtocolErrorKind::Other);
+    }
+
+    #[cfg(feature = "server")]
+    #[test]
+    fn classify_dispatch_error_mappings() {
+        use std::io;
+
+        use super::classify_dispatch_error;
+
+        // PermissionDenied -> Forbidden
+        let err = io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "authorization denied: test",
+        );
+        assert_eq!(classify_dispatch_error(&err), ProtocolErrorKind::Forbidden);
+
+        // InvalidData -> NotSupported (unknown request code)
+        let err = io::Error::new(io::ErrorKind::InvalidData, "unknown request code");
+        assert_eq!(
+            classify_dispatch_error(&err),
+            ProtocolErrorKind::NotSupported
+        );
+
+        // InvalidInput -> InvalidArgs
+        let err = io::Error::new(io::ErrorKind::InvalidInput, "bad arguments");
+        assert_eq!(
+            classify_dispatch_error(&err),
+            ProtocolErrorKind::InvalidArgs
+        );
+
+        // Other kinds -> Other
+        let err = io::Error::new(io::ErrorKind::ConnectionReset, "connection lost");
+        assert_eq!(classify_dispatch_error(&err), ProtocolErrorKind::Other);
     }
 }

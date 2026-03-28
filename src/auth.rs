@@ -177,6 +177,18 @@ impl AuthorizationError {
     pub fn reason(&self) -> &str {
         &self.reason
     }
+
+    /// Returns the [`ProtocolErrorKind`] for this error.
+    ///
+    /// Authorization errors always map to
+    /// [`ProtocolErrorKind::Forbidden`].
+    ///
+    /// [`ProtocolErrorKind`]: crate::protocol_error::ProtocolErrorKind
+    /// [`ProtocolErrorKind::Forbidden`]: crate::protocol_error::ProtocolErrorKind::Forbidden
+    #[must_use]
+    pub fn kind(&self) -> crate::protocol_error::ProtocolErrorKind {
+        crate::protocol_error::ProtocolErrorKind::from(self)
+    }
 }
 
 impl fmt::Display for AuthorizationError {
@@ -411,5 +423,13 @@ mod tests {
     fn authorization_error_display() {
         let err = AuthorizationError::new("policy violation");
         assert_eq!(err.to_string(), "authorization denied: policy violation");
+    }
+
+    #[test]
+    fn authorization_error_kind_is_forbidden() {
+        use crate::protocol_error::ProtocolErrorKind;
+
+        let err = AuthorizationError::new("denied");
+        assert_eq!(err.kind(), ProtocolErrorKind::Forbidden);
     }
 }

@@ -112,57 +112,84 @@ impl From<crate::HandshakeError> for ProtocolErrorKind {
     }
 }
 
-/// Classifies a handler error message into a
-/// [`ProtocolErrorKind`].
+/// An error from the dispatch loop that carries a
+/// [`ProtocolErrorKind`] classification.
 ///
-/// Handler methods return `Result<T, String>`, where the error
-/// string is a human-readable message.  This function maps
-/// well-known message patterns to their semantic category:
-///
-/// - `"not supported"` → [`NotSupported`](ProtocolErrorKind::NotSupported)
-/// - All other messages → [`Other`](ProtocolErrorKind::Other)
-///
-/// This is a **crate-internal** helper used by dispatch code to
-/// attach a semantic category to handler errors without changing
-/// the wire message.
+/// Used as the inner error of [`io::Error`](std::io::Error) values
+/// produced by
+/// [`handle_authorized`](crate::server::handle_authorized) for
+/// authorization denials and unknown request codes.  Callers can
+/// recover the classification via
+/// [`ProtocolErrorKind::of_io_error`].
 #[cfg(feature = "server")]
-#[must_use]
-#[allow(dead_code)] // part of the internal mapping API; used by tests and available for callers
-pub(crate) fn classify_handler_error(msg: &str) -> ProtocolErrorKind {
-    if msg == "not supported" {
-        ProtocolErrorKind::NotSupported
-    } else {
-        ProtocolErrorKind::Other
+#[derive(Debug)]
+pub(crate) struct DispatchError {
+    kind: ProtocolErrorKind,
+    message: String,
+}
+
+#[cfg(feature = "server")]
+impl DispatchError {
+    /// Creates a new dispatch error with the given classification
+    /// and human-readable message.
+    pub(crate) fn new(kind: ProtocolErrorKind, message: impl Into<String>) -> Self {
+        Self {
+            kind,
+            message: message.into(),
+        }
+    }
+
+    /// Returns the semantic classification of this error.
+    pub(crate) fn protocol_kind(&self) -> ProtocolErrorKind {
+        self.kind
     }
 }
 
-/// Classifies a dispatch-level I/O error into a
-/// [`ProtocolErrorKind`].
-///
-/// The dispatch loop in
-/// [`handle_authorized`](crate::server::handle_authorized)
-/// produces `io::Error` values for authorization denials, unknown
-/// request codes, and argument parse failures.  This function
-/// maps the `io::ErrorKind` to the corresponding semantic
-/// category:
-///
-/// - [`PermissionDenied`](std::io::ErrorKind::PermissionDenied)
-///   → [`Forbidden`](ProtocolErrorKind::Forbidden)
-/// - [`InvalidData`](std::io::ErrorKind::InvalidData)
-///   → [`NotSupported`](ProtocolErrorKind::NotSupported)
-///   (unknown request codes produce this kind)
-/// - [`InvalidInput`](std::io::ErrorKind::InvalidInput)
-///   → [`InvalidArgs`](ProtocolErrorKind::InvalidArgs)
-/// - All others → [`Other`](ProtocolErrorKind::Other)
 #[cfg(feature = "server")]
-#[must_use]
-#[allow(dead_code)] // part of the internal mapping API; used by tests and available for callers
-pub(crate) fn classify_dispatch_error(err: &std::io::Error) -> ProtocolErrorKind {
-    match err.kind() {
-        std::io::ErrorKind::PermissionDenied => ProtocolErrorKind::Forbidden,
-        std::io::ErrorKind::InvalidData => ProtocolErrorKind::NotSupported,
-        std::io::ErrorKind::InvalidInput => ProtocolErrorKind::InvalidArgs,
-        _ => ProtocolErrorKind::Other,
+impl fmt::Display for DispatchError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+#[cfg(feature = "server")]
+impl std::error::Error for DispatchError {}
+
+#[cfg(feature = "server")]
+impl ProtocolErrorKind {
+    /// Extracts the [`ProtocolErrorKind`] from an
+    /// [`io::Error`](std::io::Error).
+    ///
+    /// If the error was produced by the dispatch loop (and wraps
+    /// a classified inner error), the embedded classification is
+    /// returned directly.  Otherwise the `io::ErrorKind` is mapped:
+    ///
+    /// - [`PermissionDenied`](std::io::ErrorKind::PermissionDenied)
+    ///   → [`Forbidden`]
+    /// - [`InvalidData`](std::io::ErrorKind::InvalidData)
+    ///   → [`NotSupported`]
+    /// - [`InvalidInput`](std::io::ErrorKind::InvalidInput)
+    ///   → [`InvalidArgs`]
+    /// - All others → [`Other`]
+    ///
+    /// [`Forbidden`]: ProtocolErrorKind::Forbidden
+    /// [`NotSupported`]: ProtocolErrorKind::NotSupported
+    /// [`InvalidArgs`]: ProtocolErrorKind::InvalidArgs
+    /// [`Other`]: ProtocolErrorKind::Other
+    #[must_use]
+    pub fn of_io_error(err: &std::io::Error) -> Self {
+        if let Some(inner) = err
+            .get_ref()
+            .and_then(|e| e.downcast_ref::<DispatchError>())
+        {
+            return inner.protocol_kind();
+        }
+        match err.kind() {
+            std::io::ErrorKind::PermissionDenied => Self::Forbidden,
+            std::io::ErrorKind::InvalidData => Self::NotSupported,
+            std::io::ErrorKind::InvalidInput => Self::InvalidArgs,
+            _ => Self::Other,
+        }
     }
 }
 
@@ -261,57 +288,62 @@ mod tests {
 
     #[cfg(feature = "server")]
     #[test]
-    fn classify_handler_error_not_supported() {
-        use super::classify_handler_error;
-
-        assert_eq!(
-            classify_handler_error("not supported"),
-            ProtocolErrorKind::NotSupported
-        );
-    }
-
-    #[cfg(feature = "server")]
-    #[test]
-    fn classify_handler_error_other() {
-        use super::classify_handler_error;
-
-        assert_eq!(
-            classify_handler_error("some other error"),
-            ProtocolErrorKind::Other
-        );
-        assert_eq!(classify_handler_error(""), ProtocolErrorKind::Other);
-    }
-
-    #[cfg(feature = "server")]
-    #[test]
-    fn classify_dispatch_error_mappings() {
+    fn of_io_error_with_dispatch_error() {
         use std::io;
 
-        use super::classify_dispatch_error;
+        use super::DispatchError;
 
-        // PermissionDenied -> Forbidden
+        // Embedded DispatchError takes priority over ErrorKind
+        let err = io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            DispatchError::new(ProtocolErrorKind::Forbidden, "authorization denied: test"),
+        );
+        assert_eq!(
+            ProtocolErrorKind::of_io_error(&err),
+            ProtocolErrorKind::Forbidden,
+        );
+
+        let err = io::Error::new(
+            io::ErrorKind::InvalidData,
+            DispatchError::new(ProtocolErrorKind::NotSupported, "unknown request code"),
+        );
+        assert_eq!(
+            ProtocolErrorKind::of_io_error(&err),
+            ProtocolErrorKind::NotSupported,
+        );
+    }
+
+    #[cfg(feature = "server")]
+    #[test]
+    fn of_io_error_fallback_mappings() {
+        use std::io;
+
+        // Without embedded DispatchError, falls back to ErrorKind
         let err = io::Error::new(
             io::ErrorKind::PermissionDenied,
             "authorization denied: test",
         );
-        assert_eq!(classify_dispatch_error(&err), ProtocolErrorKind::Forbidden);
+        assert_eq!(
+            ProtocolErrorKind::of_io_error(&err),
+            ProtocolErrorKind::Forbidden,
+        );
 
-        // InvalidData -> NotSupported (unknown request code)
         let err = io::Error::new(io::ErrorKind::InvalidData, "unknown request code");
         assert_eq!(
-            classify_dispatch_error(&err),
-            ProtocolErrorKind::NotSupported
+            ProtocolErrorKind::of_io_error(&err),
+            ProtocolErrorKind::NotSupported,
         );
 
-        // InvalidInput -> InvalidArgs
         let err = io::Error::new(io::ErrorKind::InvalidInput, "bad arguments");
         assert_eq!(
-            classify_dispatch_error(&err),
-            ProtocolErrorKind::InvalidArgs
+            ProtocolErrorKind::of_io_error(&err),
+            ProtocolErrorKind::InvalidArgs,
         );
 
-        // Other kinds -> Other
         let err = io::Error::new(io::ErrorKind::ConnectionReset, "connection lost");
-        assert_eq!(classify_dispatch_error(&err), ProtocolErrorKind::Other);
+        assert_eq!(
+            ProtocolErrorKind::of_io_error(&err),
+            ProtocolErrorKind::Other,
+        );
     }
 }

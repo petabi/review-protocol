@@ -10,6 +10,7 @@ use num_enum::FromPrimitive;
 use oinq::request::parse_args;
 
 use super::RequestCode;
+use crate::protocol_error::DispatchError;
 use crate::types::{
     ColumnStatisticsUpdate, DataSource, DataSourceKey, EventMessage, HostNetworkGroup, LabelDb,
     OutlierInfo, SamplingPolicy, TimeSeriesUpdate, UpdateClusterRequest, UserAgent,
@@ -250,7 +251,7 @@ where
             .await?;
             return Err(io::Error::new(
                 io::ErrorKind::PermissionDenied,
-                e.to_string(),
+                DispatchError::new(e.kind(), e.to_string()),
             ));
         }
 
@@ -410,7 +411,10 @@ where
                 .await?;
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
-                    "unknown request code",
+                    DispatchError::new(
+                        crate::protocol_error::ProtocolErrorKind::NotSupported,
+                        "unknown request code",
+                    ),
                 ));
             }
             _ => {
@@ -708,7 +712,7 @@ mod tests {
     #[cfg(feature = "server")]
     async fn authorization_denied_maps_to_forbidden() {
         use crate::auth::{AuthorizationError, Authorizer, PeerContext};
-        use crate::protocol_error::{ProtocolErrorKind, classify_dispatch_error};
+        use crate::protocol_error::ProtocolErrorKind;
 
         struct DenyAll;
         impl Authorizer for DenyAll {
@@ -758,7 +762,7 @@ mod tests {
         let server_err = server_task.await.unwrap().unwrap_err();
         assert_eq!(server_err.kind(), io::ErrorKind::PermissionDenied);
         assert_eq!(
-            classify_dispatch_error(&server_err),
+            ProtocolErrorKind::of_io_error(&server_err),
             ProtocolErrorKind::Forbidden,
         );
     }
@@ -766,7 +770,7 @@ mod tests {
     #[tokio::test]
     #[cfg(feature = "server")]
     async fn unknown_request_code_maps_to_not_supported() {
-        use crate::protocol_error::{ProtocolErrorKind, classify_dispatch_error};
+        use crate::protocol_error::ProtocolErrorKind;
 
         let _lock = TOKEN.lock().await;
         let channel = channel().await;
@@ -802,7 +806,7 @@ mod tests {
         let server_err = server_task.await.unwrap().unwrap_err();
         assert_eq!(server_err.kind(), io::ErrorKind::InvalidData);
         assert_eq!(
-            classify_dispatch_error(&server_err),
+            ProtocolErrorKind::of_io_error(&server_err),
             ProtocolErrorKind::NotSupported,
         );
     }

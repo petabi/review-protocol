@@ -1,4 +1,26 @@
 //! Request handler for the server.
+//!
+//! # `ProtocolErrorKind` integration
+//!
+//! Selected request paths in [`handle_authorized`] classify internal
+//! errors with [`ProtocolErrorKind`](crate::ProtocolErrorKind) via
+//! [`DispatchError`].  This is an **internal-only** taxonomy — it
+//! does not change the on-wire error format.  Callers can recover
+//! the classification from the returned `io::Error` with
+//! [`ProtocolErrorKind::of_io_error`](crate::ProtocolErrorKind::of_io_error).
+//!
+//! Currently classified paths:
+//!
+//! - Authorization denials → [`Forbidden`](crate::ProtocolErrorKind::Forbidden)
+//! - Unknown request codes → [`NotSupported`](crate::ProtocolErrorKind::NotSupported)
+//! - Argument parse failures (representative handlers) →
+//!   [`InvalidArgs`](crate::ProtocolErrorKind::InvalidArgs)
+//!
+//! Future handlers should follow the same pattern when adding
+//! classification. When the project moves to surface
+//! `ProtocolErrorKind` on the wire, prefer additive changes (new
+//! optional fields or a parallel error envelope) to avoid breaking
+//! existing clients.
 
 use std::{
     collections::{HashMap, HashSet},
@@ -10,7 +32,7 @@ use num_enum::FromPrimitive;
 use oinq::request::parse_args;
 
 use super::RequestCode;
-use crate::protocol_error::DispatchError;
+use crate::protocol_error::{DispatchError, ProtocolErrorKind};
 use crate::types::{
     ColumnStatisticsUpdate, DataSource, DataSourceKey, EventMessage, HostNetworkGroup, LabelDb,
     OutlierInfo, SamplingPolicy, TimeSeriesUpdate, UpdateClusterRequest, UserAgent,
@@ -277,7 +299,10 @@ where
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::GetModel => {
-                let name = parse_args::<String>(body)?;
+                // Classify parse failures as InvalidArgs so callers
+                // can distinguish bad input from other I/O errors.
+                let name = parse_args::<String>(body)
+                    .map_err(|e| DispatchError::from_io(ProtocolErrorKind::InvalidArgs, &e))?;
                 let result = handler.get_model(&name).await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
@@ -317,7 +342,10 @@ where
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
             RequestCode::GetOutliers => {
-                let (model_id, timestamp) = parse_args::<(u32, i64)>(body)?;
+                // Classify parse failures as InvalidArgs so callers
+                // can distinguish bad input from other I/O errors.
+                let (model_id, timestamp) = parse_args::<(u32, i64)>(body)
+                    .map_err(|e| DispatchError::from_io(ProtocolErrorKind::InvalidArgs, &e))?;
                 let result = handler.get_outliers(model_id, timestamp).await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
@@ -808,6 +836,55 @@ mod tests {
         assert_eq!(
             ProtocolErrorKind::of_io_error(&server_err),
             ProtocolErrorKind::NotSupported,
+        );
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn malformed_args_maps_to_invalid_args() {
+        use crate::protocol_error::ProtocolErrorKind;
+
+        let _lock = TOKEN.lock().await;
+        let channel = channel().await;
+
+        let mut handler = ModelHandler {
+            insert_model_payload: Arc::new(Mutex::new(None)),
+            update_model_payload: Arc::new(Mutex::new(None)),
+        };
+
+        let (mut server_send, mut server_recv) = (channel.server.send, channel.server.recv);
+        let (mut client_send, client_recv) = (channel.client.send, channel.client.recv);
+
+        let server_task = tokio::spawn(async move {
+            super::handle(
+                &mut handler,
+                &mut server_send,
+                &mut server_recv,
+                "test-peer",
+            )
+            .await
+        });
+
+        // Send a GetModel request with a wrong payload type (unit
+        // instead of String). The server's parse_args will fail.
+        let mut buf = Vec::new();
+        oinq::message::send_request(
+            &mut client_send,
+            &mut buf,
+            u32::from(RequestCode::GetModel),
+            (),
+        )
+        .await
+        .unwrap();
+
+        drop(client_send);
+        drop(client_recv);
+
+        let server_err = server_task.await.unwrap().unwrap_err();
+        assert_eq!(
+            ProtocolErrorKind::of_io_error(&server_err),
+            ProtocolErrorKind::InvalidArgs,
+            "parse failure should classify as InvalidArgs"
         );
     }
 }

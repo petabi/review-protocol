@@ -24,6 +24,14 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - `AuthorizationError::kind()` method that returns
   `ProtocolErrorKind::Forbidden`. Used by the dispatch loop
   to classify authorization denials.
+- `ProtocolErrorKind` adopted in representative request
+  handlers in both `server::handler` and `request` modules.
+  Argument parse failures in selected paths are now
+  classified as `InvalidArgs` internally. Wire behavior is
+  unchanged.
+- `HandlerError::kind()` method on the agent-side handler
+  error type, returning the `ProtocolErrorKind` classification
+  extracted from the underlying `io::Error`.
 - `request::NodeHandler` preparatory trait that groups the nine
   node feature-family methods under their own handler surface. A
   blanket `impl<T: Handler> NodeHandler for T` preserves full

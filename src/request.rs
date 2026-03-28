@@ -1,5 +1,26 @@
 //! Request handling for the agent.
 //!
+//! # `ProtocolErrorKind` integration
+//!
+//! Selected request paths in [`handle()`] classify internal errors
+//! with [`ProtocolErrorKind`](crate::ProtocolErrorKind) via
+//! [`DispatchError`](crate::protocol_error::DispatchError).  This
+//! is an **internal-only** taxonomy — it does not change the
+//! on-wire error format.  Callers can inspect the classification
+//! through [`HandlerError::kind()`].
+//!
+//! Currently classified paths:
+//!
+//! - Argument parse failures (representative handlers) →
+//!   [`InvalidArgs`](crate::ProtocolErrorKind::InvalidArgs)
+//!
+//! Handler-level `Err("not supported")` responses are sent on the
+//! wire as-is (preserving backward compatibility) and do **not**
+//! appear as `HandlerError`.  When the project surfaces
+//! `ProtocolErrorKind` on the wire, prefer additive changes (new
+//! optional fields or a parallel error envelope) to avoid breaking
+//! existing callers.
+//!
 //! This module provides two handler traits:
 //!
 //! - [`Handler`] – the full agent-side handler covering both
@@ -37,12 +58,38 @@ use crate::{
 };
 
 /// The error type for handling a request.
+///
+/// Each variant wraps an [`io::Error`] from the transport layer.
+/// Use [`kind()`](Self::kind) to obtain the semantic
+/// [`ProtocolErrorKind`](crate::ProtocolErrorKind) classification
+/// of the error — for example, distinguishing a malformed-argument
+/// parse failure ([`InvalidArgs`](crate::ProtocolErrorKind::InvalidArgs))
+/// from a generic I/O error.
 #[derive(Debug, Error)]
 pub enum HandlerError {
     #[error("failed to receive request")]
     RecvError(io::Error),
     #[error("failed to send response")]
     SendError(io::Error),
+}
+
+impl HandlerError {
+    /// Returns the semantic [`ProtocolErrorKind`] for this error.
+    ///
+    /// For `RecvError`, the classification is extracted from the
+    /// inner `io::Error` (which may embed a
+    /// [`DispatchError`](crate::protocol_error::DispatchError)
+    /// carrying an explicit classification).  `SendError` always
+    /// maps to [`Other`](crate::ProtocolErrorKind::Other) because
+    /// send failures are transport-level issues, not semantic
+    /// protocol errors.
+    #[must_use]
+    pub fn kind(&self) -> crate::ProtocolErrorKind {
+        match self {
+            Self::RecvError(e) => crate::ProtocolErrorKind::of_io_error(e),
+            Self::SendError(_) => crate::ProtocolErrorKind::Other,
+        }
+    }
 }
 
 /// A preparatory trait that groups the nine node feature-family
@@ -575,7 +622,14 @@ pub async fn handle<H: Handler>(
                     .map_err(HandlerError::SendError)?;
             }
             RequestCode::ReloadTi => {
-                let version = parse_args::<&str>(body).map_err(HandlerError::RecvError)?;
+                // Classify parse failures as InvalidArgs so that
+                // HandlerError::kind() returns the correct category.
+                let version = parse_args::<&str>(body).map_err(|e| {
+                    HandlerError::RecvError(crate::protocol_error::DispatchError::from_io(
+                        crate::ProtocolErrorKind::InvalidArgs,
+                        &e,
+                    ))
+                })?;
                 let result = handler.reload_ti(version).await;
                 send_response(send, &mut buf, result)
                     .await
@@ -764,7 +818,14 @@ pub async fn handle<H: Handler>(
                     .map_err(HandlerError::SendError)?;
             }
             RequestCode::NodePower => {
-                let req = parse_args::<NodePowerRequest>(body).map_err(HandlerError::RecvError)?;
+                // Classify parse failures as InvalidArgs so that
+                // HandlerError::kind() returns the correct category.
+                let req = parse_args::<NodePowerRequest>(body).map_err(|e| {
+                    HandlerError::RecvError(crate::protocol_error::DispatchError::from_io(
+                        crate::ProtocolErrorKind::InvalidArgs,
+                        &e,
+                    ))
+                })?;
                 let result = handler.node_power(req).await;
                 send_response(send, &mut buf, result)
                     .await
@@ -1860,5 +1921,134 @@ mod tests {
         )
         .await;
         assert_eq!(version_resp.unwrap_err(), "not supported");
+    }
+
+    // ── ProtocolErrorKind classification tests ───────────────────
+    //
+    // These tests verify that HandlerError::kind() returns the
+    // correct ProtocolErrorKind for representative error paths.
+
+    /// Malformed payload for `ReloadTi` classifies as `InvalidArgs`.
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn reload_ti_parse_failure_is_invalid_args() {
+        use crate::ProtocolErrorKind;
+        use crate::test::{TOKEN, channel};
+
+        let _lock = TOKEN.lock().await;
+        let channel = channel().await;
+
+        let (mut server_send, mut server_recv) = (channel.server.send, channel.server.recv);
+        let (mut client_send, client_recv) = (channel.client.send, channel.client.recv);
+
+        let server_task = tokio::spawn(async move {
+            let mut handler = NoopHandler;
+            super::handle(&mut handler, &mut server_send, &mut server_recv).await
+        });
+
+        // Send ReloadTi with wrong payload type (u32 instead of &str).
+        let mut buf = Vec::new();
+        oinq::message::send_request(
+            &mut client_send,
+            &mut buf,
+            u32::from(RequestCode::ReloadTi),
+            42u32,
+        )
+        .await
+        .unwrap();
+
+        drop(client_send);
+        drop(client_recv);
+
+        let server_err = server_task.await.unwrap().unwrap_err();
+        assert_eq!(
+            server_err.kind(),
+            ProtocolErrorKind::InvalidArgs,
+            "parse failure should classify as InvalidArgs"
+        );
+    }
+
+    /// Malformed payload for `NodePower` classifies as `InvalidArgs`.
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn node_power_parse_failure_is_invalid_args() {
+        use crate::ProtocolErrorKind;
+        use crate::test::{TOKEN, channel};
+
+        let _lock = TOKEN.lock().await;
+        let channel = channel().await;
+
+        let (mut server_send, mut server_recv) = (channel.server.send, channel.server.recv);
+        let (mut client_send, client_recv) = (channel.client.send, channel.client.recv);
+
+        let server_task = tokio::spawn(async move {
+            let mut handler = NoopHandler;
+            super::handle(&mut handler, &mut server_send, &mut server_recv).await
+        });
+
+        // Send NodePower with wrong payload type (String instead of
+        // NodePowerRequest enum).
+        let mut buf = Vec::new();
+        oinq::message::send_request(
+            &mut client_send,
+            &mut buf,
+            u32::from(RequestCode::NodePower),
+            "not-a-power-request".to_string(),
+        )
+        .await
+        .unwrap();
+
+        drop(client_send);
+        drop(client_recv);
+
+        let server_err = server_task.await.unwrap().unwrap_err();
+        assert_eq!(
+            server_err.kind(),
+            ProtocolErrorKind::InvalidArgs,
+            "parse failure should classify as InvalidArgs"
+        );
+    }
+
+    /// Default "not supported" handler responses still produce the
+    /// expected wire error string — wire behavior is unchanged.
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn unsupported_handler_preserves_wire_error() {
+        use crate::test::{TOKEN, channel};
+        use crate::types::node::{NodePowerRequest, NodePowerResponse};
+
+        let _lock = TOKEN.lock().await;
+        let channel = channel().await;
+
+        let (mut server_send, mut server_recv) = (channel.server.send, channel.server.recv);
+        let (mut client_send, mut client_recv) = (channel.client.send, channel.client.recv);
+
+        let server_task = tokio::spawn(async move {
+            let mut handler = NoopHandler;
+            super::handle(&mut handler, &mut server_send, &mut server_recv).await
+        });
+
+        // NoopHandler does not implement node_power, so the default
+        // returns Err("not supported").
+        let res: Result<NodePowerResponse, String> = crate::unary_request(
+            &mut client_send,
+            &mut client_recv,
+            u32::from(RequestCode::NodePower),
+            NodePowerRequest::GracefulReboot,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            res.unwrap_err(),
+            "not supported",
+            "wire error message must be preserved"
+        );
+
+        drop(client_send);
+        drop(client_recv);
+
+        let server_res = server_task.await.unwrap();
+        assert!(server_res.is_ok());
     }
 }

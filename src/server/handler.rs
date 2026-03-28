@@ -703,4 +703,107 @@ mod tests {
         // Verify the allowed request was actually processed
         assert!(insert_model_payload.lock().unwrap().is_some());
     }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn authorization_denied_maps_to_forbidden() {
+        use crate::auth::{AuthorizationError, Authorizer, PeerContext};
+        use crate::protocol_error::{ProtocolErrorKind, classify_dispatch_error};
+
+        struct DenyAll;
+        impl Authorizer for DenyAll {
+            fn authorize(
+                &self,
+                _peer: &PeerContext,
+                _service: &crate::service_id::ServiceId,
+            ) -> Result<(), AuthorizationError> {
+                Err(AuthorizationError::new("test denial"))
+            }
+        }
+
+        let _lock = TOKEN.lock().await;
+        let channel = channel().await;
+
+        let mut handler = ModelHandler {
+            insert_model_payload: Arc::new(Mutex::new(None)),
+            update_model_payload: Arc::new(Mutex::new(None)),
+        };
+
+        let (mut server_send, mut server_recv) = (channel.server.send, channel.server.recv);
+        let (mut client_send, mut client_recv) = (channel.client.send, channel.client.recv);
+
+        let peer = PeerContext::new("test-peer");
+        let authorizer = DenyAll;
+
+        let server_task = tokio::spawn(async move {
+            super::handle_authorized(
+                &mut handler,
+                &mut server_send,
+                &mut server_recv,
+                &peer,
+                &authorizer,
+            )
+            .await
+        });
+
+        let _res: Result<u32, String> = crate::unary_request(
+            &mut client_send,
+            &mut client_recv,
+            u32::from(RequestCode::InsertModel),
+            vec![0x10, 0x20],
+        )
+        .await
+        .unwrap();
+
+        let server_err = server_task.await.unwrap().unwrap_err();
+        assert_eq!(server_err.kind(), io::ErrorKind::PermissionDenied);
+        assert_eq!(
+            classify_dispatch_error(&server_err),
+            ProtocolErrorKind::Forbidden,
+        );
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn unknown_request_code_maps_to_not_supported() {
+        use crate::protocol_error::{ProtocolErrorKind, classify_dispatch_error};
+
+        let _lock = TOKEN.lock().await;
+        let channel = channel().await;
+
+        let mut handler = ModelHandler {
+            insert_model_payload: Arc::new(Mutex::new(None)),
+            update_model_payload: Arc::new(Mutex::new(None)),
+        };
+
+        let (mut server_send, mut server_recv) = (channel.server.send, channel.server.recv);
+        let (mut client_send, mut client_recv) = (channel.client.send, channel.client.recv);
+
+        let server_task = tokio::spawn(async move {
+            super::handle(
+                &mut handler,
+                &mut server_send,
+                &mut server_recv,
+                "test-peer",
+            )
+            .await
+        });
+
+        // Send a request with the Unknown request code
+        let _res: Result<(), String> = crate::unary_request(
+            &mut client_send,
+            &mut client_recv,
+            u32::from(RequestCode::Unknown),
+            (),
+        )
+        .await
+        .unwrap();
+
+        let server_err = server_task.await.unwrap().unwrap_err();
+        assert_eq!(server_err.kind(), io::ErrorKind::InvalidData);
+        assert_eq!(
+            classify_dispatch_error(&server_err),
+            ProtocolErrorKind::NotSupported,
+        );
+    }
 }

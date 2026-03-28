@@ -13,7 +13,13 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   taxonomy of protocol-level error categories (`NotSupported`,
   `Forbidden`, `InvalidArgs`, `VersionMismatch`, `Other`).
   This is an internal classification type — it does not affect
-  wire encodings. Includes `From<AuthorizationError>` conversion.
+  wire encodings. Includes `From<AuthorizationError>` and
+  `From<HandshakeError>` conversions, plus internal helpers
+  (`classify_handler_error`, `classify_dispatch_error`) for
+  mapping authorization, dispatch, and handler failures to their
+  semantic categories.
+- `AuthorizationError::kind()` method that returns
+  `ProtocolErrorKind::Forbidden`.
 - `request::NodeHandler` preparatory trait that groups the nine
   node feature-family methods under their own handler surface. A
   blanket `impl<T: Handler> NodeHandler for T` preserves full

@@ -18,6 +18,8 @@
 //! - [`service_id`] – Definitions and helpers for [`ServiceId`], the
 //!   key used to scope authorization and identify services.
 //! - [`auth`] – Authorization-related types and helpers.
+//! - [`protocol_error`] – Semantic error categories
+//!   ([`ProtocolErrorKind`]) for internal classification.
 //!
 //! ## Node API family
 //!
@@ -68,6 +70,7 @@ pub mod auth;
 pub mod client;
 #[cfg(feature = "client")]
 pub mod frame;
+pub mod protocol_error;
 #[cfg(feature = "client")]
 pub mod request;
 pub mod server;
@@ -85,6 +88,7 @@ pub use server::EventStreamHandler;
 #[cfg(any(feature = "client", feature = "server"))]
 use thiserror::Error;
 
+pub use self::protocol_error::ProtocolErrorKind;
 use crate::types::Status;
 
 /// The error type for a handshake failure.

@@ -378,7 +378,7 @@ pub struct Connection {
     connection: quinn::Connection,
 }
 
-#[cfg(any(feature = "client", test))]
+#[cfg(feature = "client")]
 impl Connection {
     /// Gets the local address of the connection.
     ///
@@ -438,7 +438,7 @@ impl Connection {
 /// # Errors
 ///
 /// Returns `HandshakeError` if the handshake failed.
-#[cfg(test)]
+#[cfg(all(test, feature = "client", feature = "server"))]
 pub(crate) async fn handshake(
     conn: &quinn::Connection,
     app_name: &str,

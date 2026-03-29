@@ -3,15 +3,18 @@
 #![allow(clippy::unwrap_used)]
 
 use std::{
-    collections::HashSet,
     net::{IpAddr, Ipv6Addr, SocketAddr},
     sync::LazyLock,
 };
+
+#[cfg(all(feature = "client", feature = "server"))]
+use std::collections::HashSet;
 
 use quinn::{Connection, RecvStream, SendStream};
 use rustls::pki_types::{CertificateDer, PrivatePkcs8KeyDer};
 use tokio::sync::Mutex;
 
+#[cfg(all(feature = "client", feature = "server"))]
 use crate::types::{
     DataSource, DataSourceKey, DataType, EventCategory, HostNetworkGroup, LabelDb, LabelDbKind,
     LabelDbRule, SamplingKind, SamplingPolicy,
@@ -22,6 +25,7 @@ pub(crate) struct Channel {
     pub(crate) client: Endpoint,
 }
 
+#[allow(dead_code)]
 pub(crate) struct Endpoint {
     pub(crate) conn: Connection,
     pub(crate) send: SendStream,
@@ -105,13 +109,13 @@ pub(crate) async fn channel() -> Channel {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(feature = "client", feature = "server"))]
 pub(crate) struct TestEnvironment {
     server_cert_pem: String,
     server_config: quinn::ServerConfig,
 }
 
-#[cfg(test)]
+#[cfg(all(feature = "client", feature = "server"))]
 impl TestEnvironment {
     // server configuration
     const SERVER_NAME: &str = "test-server";
@@ -216,14 +220,14 @@ impl TestEnvironment {
     }
 }
 
-#[cfg(any(feature = "client", feature = "server"))]
+#[cfg(all(feature = "client", feature = "server"))]
 pub(crate) static TEST_ENV: LazyLock<Mutex<TestEnvironment>> =
     LazyLock::new(|| Mutex::new(TestEnvironment::new()));
 
-#[cfg(feature = "client")]
+#[cfg(all(feature = "client", feature = "server"))]
 pub(crate) struct TestServerHandler;
 
-#[cfg(feature = "client")]
+#[cfg(all(feature = "client", feature = "server"))]
 #[async_trait::async_trait]
 impl crate::server::Handler for TestServerHandler {
     // Returns `Some` for `id` 5 and `name` "name5" only.

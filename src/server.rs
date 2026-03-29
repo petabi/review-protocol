@@ -40,7 +40,7 @@ use crate::{
 ///
 /// This trait provides a standardized interface for processing event messages
 /// received from unidirectional streams, abstracting away protocol-level details.
-#[cfg(any(feature = "server", test))]
+#[cfg(feature = "server")]
 #[async_trait::async_trait]
 pub trait EventStreamHandler {
     /// Handles a single event message
@@ -132,7 +132,7 @@ pub(crate) enum RequestCode {
     Unknown = u32::MAX,
 }
 
-#[cfg(any(feature = "server", test))]
+#[cfg(feature = "server")]
 /// A connection to a single agent (node).
 ///
 /// Each `Connection` wraps an underlying QUIC connection and
@@ -167,7 +167,7 @@ pub struct Connection {
     conn: quinn::Connection,
 }
 
-#[cfg(any(feature = "server", test))]
+#[cfg(feature = "server")]
 impl Connection {
     /// Creates a new connection from a QUIC connection from the `quinn` crate.
     #[must_use]
@@ -204,7 +204,7 @@ impl Connection {
     ///
     /// This is for backward compatibility only and will be removed in a future
     /// release.
-    #[cfg(test)]
+    #[cfg(all(test, feature = "client"))]
     #[must_use]
     pub(crate) fn as_quinn(&self) -> &quinn::Connection {
         &self.conn
@@ -230,7 +230,7 @@ impl Connection {
         self.conn.open_bi()
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, feature = "client"))]
     pub(crate) fn close(&self) {
         self.conn.close(0u32.into(), b"");
     }
@@ -420,7 +420,7 @@ impl Connection {
     }
 }
 
-#[cfg(any(feature = "server", test))]
+#[cfg(feature = "server")]
 /// Processes a handshake message and sends a response.
 ///
 /// # Errors
@@ -747,7 +747,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "server")]
+    #[cfg(all(feature = "client", feature = "server"))]
     async fn test_accept_event_stream() {
         use std::sync::{Arc, Mutex};
 
@@ -825,7 +825,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "server")]
+    #[cfg(all(feature = "client", feature = "server"))]
     async fn test_handle_event_stream() {
         use std::sync::{Arc, Mutex};
 
@@ -899,7 +899,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "server")]
+    #[cfg(all(feature = "client", feature = "server"))]
     async fn test_accept_multiple_streams() {
         use std::sync::{Arc, Mutex};
 
@@ -984,7 +984,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "server")]
+    #[cfg(all(feature = "client", feature = "server"))]
     async fn test_concurrency_limiting() {
         use std::sync::{
             Arc,

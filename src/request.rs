@@ -4,7 +4,7 @@
 //!
 //! Selected request paths in [`handle()`] classify internal errors
 //! with [`ProtocolErrorKind`](crate::ProtocolErrorKind) via
-//! [`DispatchError`](crate::protocol_error::DispatchError).  This
+//! `DispatchError` (a crate-internal error type).  This
 //! is an **internal-only** taxonomy — it does not change the
 //! on-wire error format.  Callers can inspect the classification
 //! through [`HandlerError::kind()`].
@@ -74,11 +74,11 @@ pub enum HandlerError {
 }
 
 impl HandlerError {
-    /// Returns the semantic [`ProtocolErrorKind`] for this error.
+    /// Returns the semantic [`ProtocolErrorKind`](crate::ProtocolErrorKind) for this error.
     ///
     /// For `RecvError`, the classification is extracted from the
     /// inner `io::Error` (which may embed a
-    /// [`DispatchError`](crate::protocol_error::DispatchError)
+    /// `DispatchError` (a crate-internal error type)
     /// carrying an explicit classification).  `SendError` always
     /// maps to [`Other`](crate::ProtocolErrorKind::Other) because
     /// send failures are transport-level issues, not semantic

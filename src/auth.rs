@@ -11,7 +11,7 @@
 //!
 //! # Design
 //!
-//! - [`ServiceId`](crate::service_id::ServiceId), not wire
+//! - [`ServiceId`], not wire
 //!   `RequestCode`, is the semantic key for authorization.
 //!   Every authorization decision receives the logical
 //!   `ServiceId` that identifies the requested operation
@@ -27,7 +27,7 @@
 //! 1. When a connection is established, the server constructs a
 //!    [`PeerContext`] from the peer's TLS/QUIC certificate.
 //! 2. For each request, the server resolves the wire request code
-//!    to a [`ServiceId`](crate::service_id::ServiceId) and calls
+//!    to a [`ServiceId`] and calls
 //!    [`Authorizer::authorize`] with the peer's identity and the
 //!    target service.
 //! 3. If `authorize` returns `Ok(())`, the request is dispatched
@@ -241,7 +241,7 @@ pub struct ProtocolMetadata {
 /// metadata (agent kind, roles, protocol information, and an
 /// arbitrary attribute map).  It is designed as an **additive,
 /// non-breaking** extension alongside the existing [`PeerContext`]
-/// and [`ServiceId`](crate::service_id::ServiceId) types.
+/// and [`ServiceId`] types.
 ///
 /// # Relationship to `PeerContext` and `ServiceId`
 ///
@@ -250,7 +250,7 @@ pub struct ProtocolMetadata {
 ///   `AuthorizationContext` **derives** its [`peer_identity`]
 ///   from a `PeerContext` via [`From<&PeerContext>`] or the
 ///   explicit constructors.
-/// - [`ServiceId`](crate::service_id::ServiceId) identifies the
+/// - [`ServiceId`] identifies the
 ///   operation being requested and is **not** included in
 ///   `AuthorizationContext`.  Authorization decisions should
 ///   receive `AuthorizationContext` and `ServiceId` as separate
@@ -264,7 +264,7 @@ pub struct ProtocolMetadata {
 /// **Every field in `AuthorizationContext` must be populated from
 /// authenticated sources only** — the peer's TLS/QUIC certificate
 /// or the embedding application's own trusted inputs.  The
-/// constructors deliberately accept only [`&PeerContext`] (which
+/// constructors deliberately accept only [`PeerContext`] (which
 /// is itself certificate-backed) and explicit parameters that the
 /// embedding application provides from its trusted context.
 ///

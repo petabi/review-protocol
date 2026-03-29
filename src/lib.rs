@@ -57,6 +57,34 @@
 //! 3. Authorization is keyed by [`ServiceId`] so policies can be
 //!    targeted to individual services.
 //!
+//! ### Richer context with `AuthorizationContext`
+//!
+//! [`AuthorizationContext`] extends the authorization model with
+//! optional authenticated metadata (agent kind, roles, protocol
+//! version, and application-supplied attributes) without changing
+//! the wire format or breaking existing code.
+//! [`ServiceId`] remains **separate** from `AuthorizationContext`
+//! so the operation being authorized is always explicit.
+//!
+//! Existing [`Authorizer`] implementations continue to work
+//! unchanged.  To use them where an [`AuthorizerV2`] is required,
+//! wrap with [`AuthorizerV2Adapter`].  New code that needs the
+//! richer metadata can implement [`AuthorizerV2`] directly.
+//! See [`auth::AuthorizationContext`] for construction examples
+//! and migration guidance.
+//!
+//! **Compatibility:** policy engines remain outside
+//! `review-protocol`.  This crate provides identity plumbing and
+//! dispatch hooks; the actual allow/deny logic belongs to the
+//! embedding application.  Existing `PeerContext` flows continue
+//! to work unchanged — no migration is required until the
+//! application opts in to the richer context.
+//!
+//! [`AuthorizationContext`]: auth::AuthorizationContext
+//! [`Authorizer`]: auth::Authorizer
+//! [`AuthorizerV2`]: auth::AuthorizerV2
+//! [`AuthorizerV2Adapter`]: auth::AuthorizerV2Adapter
+//!
 //! ## Further reading
 //!
 //! Release-specific rollout choreography and sequencing are documented

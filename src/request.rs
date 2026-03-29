@@ -21,20 +21,23 @@
 //! optional fields or a parallel error envelope) to avoid breaking
 //! existing callers.
 //!
-//! This module provides two handler traits:
+//! This module provides two handler traits and two dispatch entry
+//! points:
 //!
 //! - [`Handler`] – the full agent-side handler covering both
 //!   shared/common flat methods and grouped node methods. This is
-//!   the trait consumed by [`handle()`](super::server::handle) and
-//!   remains the only trait required for dispatch today.
-//! - [`NodeHandler`] – a preparatory trait that groups node
-//!   service-family methods under their own surface. It is not yet
-//!   independently consumable by the dispatch path.
+//!   the trait consumed by [`handle()`].
+//! - [`NodeHandler`] – a trait that groups node service-family
+//!   methods under their own surface. It can be used independently
+//!   with [`handle_node()`] for node-focused agents.
 //!
 //! A blanket `impl<T: Handler> NodeHandler for T` ensures that
 //! existing `Handler` implementations satisfy `NodeHandler`
-//! automatically. In a future release the dispatch path may be
-//! updated to accept `NodeHandler` directly.
+//! automatically.
+//!
+//! [`handle_node()`] is an **additive** dispatch entry point — it
+//! does not replace [`handle()`]. Existing agents using `Handler`
+//! + `handle()` continue to work unchanged.
 
 use std::io;
 
@@ -92,19 +95,38 @@ impl HandlerError {
     }
 }
 
-/// A preparatory trait that groups the nine node feature-family
-/// methods under their own handler surface.
+/// A trait that groups the nine node feature-family methods under
+/// their own handler surface.
 ///
-/// **Note:** This trait is not yet independently consumable —
-/// [`handle()`](super::server::handle) still requires the full
-/// [`Handler`] trait. `NodeHandler` exists to define the
-/// service-family boundary so that a future release can update the
-/// dispatch path to accept it directly.
+/// This trait can be used independently with [`handle_node()`] to
+/// build a node-focused agent that handles only node-family
+/// requests without implementing the full [`Handler`] trait.
 ///
 /// A blanket implementation forwards every `NodeHandler` method to
 /// the corresponding method on [`Handler`], so existing `Handler`
 /// implementations automatically satisfy `NodeHandler` without
 /// changes.
+///
+/// # Example
+///
+/// ```ignore
+/// struct MyNodeAgent;
+///
+/// #[async_trait::async_trait]
+/// impl review_protocol::request::NodeHandler for MyNodeAgent {
+///     async fn node_hostname(
+///         &mut self,
+///         req: NodeHostnameRequest,
+///     ) -> Result<NodeHostnameResponse, String> {
+///         Ok(NodeHostnameResponse::Get {
+///             hostname: "my-node".into(),
+///         })
+///     }
+/// }
+///
+/// // Use handle_node() to dispatch only node-family requests:
+/// // request::handle_node(&mut agent, &mut send, &mut recv).await
+/// ```
 #[async_trait]
 pub trait NodeHandler: Send {
     /// Handles a node service-control request.
@@ -548,6 +570,136 @@ impl<T: Handler + ?Sized> NodeHandler for T {
     ) -> Result<NodeVersionResponse, String> {
         Handler::node_version(self, req).await
     }
+}
+
+/// Handles only node-family requests to an agent.
+///
+/// This is a node-only dispatch entry point that accepts
+/// [`NodeHandler`] directly, allowing a node-focused agent to serve
+/// node-family requests without implementing the full [`Handler`]
+/// trait.
+///
+/// Only `Node*` request codes (100–108) are dispatched. Any
+/// non-node request code receives an error response on the wire
+/// (same format as unknown codes in [`handle()`]).
+///
+/// This function is **additive** — it does not replace [`handle()`].
+/// Existing agents using `Handler` + `handle()` continue to work
+/// unchanged. Use `handle_node` when an agent only needs to serve
+/// the node service family.
+///
+/// # Errors
+///
+/// * `HandlerError::RecvError` if the request could not be received
+/// * `HandlerError::SendError` if the response could not be sent
+#[allow(clippy::too_many_lines)]
+pub async fn handle_node<H: NodeHandler>(
+    handler: &mut H,
+    send: &mut quinn::SendStream,
+    recv: &mut quinn::RecvStream,
+) -> Result<(), HandlerError> {
+    let mut buf = Vec::new();
+    loop {
+        let (code, body) = match oinq::message::recv_request_raw(recv, &mut buf).await {
+            Ok(res) => res,
+            Err(e) => {
+                if e.kind() == io::ErrorKind::UnexpectedEof {
+                    break;
+                }
+                return Err(HandlerError::RecvError(e));
+            }
+        };
+
+        let req = RequestCode::from_primitive(code);
+        match req {
+            RequestCode::NodeService => {
+                let req =
+                    parse_args::<NodeServiceRequest>(body).map_err(HandlerError::RecvError)?;
+                let result = handler.node_service(req).await;
+                send_response(send, &mut buf, result)
+                    .await
+                    .map_err(HandlerError::SendError)?;
+            }
+            RequestCode::NodeNetworkInterface => {
+                let req = parse_args::<NodeNetworkInterfaceRequest>(body)
+                    .map_err(HandlerError::RecvError)?;
+                let result = handler.node_network_interface(req).await;
+                send_response(send, &mut buf, result)
+                    .await
+                    .map_err(HandlerError::SendError)?;
+            }
+            RequestCode::NodeHostname => {
+                let req =
+                    parse_args::<NodeHostnameRequest>(body).map_err(HandlerError::RecvError)?;
+                let result = handler.node_hostname(req).await;
+                send_response(send, &mut buf, result)
+                    .await
+                    .map_err(HandlerError::SendError)?;
+            }
+            RequestCode::NodeTimeSync => {
+                let req =
+                    parse_args::<NodeTimeSyncRequest>(body).map_err(HandlerError::RecvError)?;
+                let result = handler.node_time_sync(req).await;
+                send_response(send, &mut buf, result)
+                    .await
+                    .map_err(HandlerError::SendError)?;
+            }
+            RequestCode::NodeLogging => {
+                let req =
+                    parse_args::<NodeLoggingRequest>(body).map_err(HandlerError::RecvError)?;
+                let result = handler.node_logging(req).await;
+                send_response(send, &mut buf, result)
+                    .await
+                    .map_err(HandlerError::SendError)?;
+            }
+            RequestCode::NodeRemoteAccess => {
+                let req =
+                    parse_args::<NodeRemoteAccessRequest>(body).map_err(HandlerError::RecvError)?;
+                let result = handler.node_remote_access(req).await;
+                send_response(send, &mut buf, result)
+                    .await
+                    .map_err(HandlerError::SendError)?;
+            }
+            RequestCode::NodePower => {
+                // Classify parse failures as InvalidArgs so that
+                // HandlerError::kind() returns the correct
+                // category.
+                let req = parse_args::<NodePowerRequest>(body).map_err(|e| {
+                    HandlerError::RecvError(crate::protocol_error::DispatchError::from_io(
+                        crate::ProtocolErrorKind::InvalidArgs,
+                        &e,
+                    ))
+                })?;
+                let result = handler.node_power(req).await;
+                send_response(send, &mut buf, result)
+                    .await
+                    .map_err(HandlerError::SendError)?;
+            }
+            RequestCode::NodeObservation => {
+                let req =
+                    parse_args::<NodeObservationRequest>(body).map_err(HandlerError::RecvError)?;
+                let result = handler.node_observation(req).await;
+                send_response(send, &mut buf, result)
+                    .await
+                    .map_err(HandlerError::SendError)?;
+            }
+            RequestCode::NodeVersion => {
+                let req =
+                    parse_args::<NodeVersionRequest>(body).map_err(HandlerError::RecvError)?;
+                let result = handler.node_version(req).await;
+                send_response(send, &mut buf, result)
+                    .await
+                    .map_err(HandlerError::SendError)?;
+            }
+            _ => {
+                let err_msg = format!("unknown request code: {code}");
+                oinq::message::send_err(send, &mut buf, err_msg)
+                    .await
+                    .map_err(HandlerError::SendError)?;
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Handles requests to an agent.
@@ -2043,6 +2195,192 @@ mod tests {
             res.unwrap_err(),
             "not supported",
             "wire error message must be preserved"
+        );
+
+        drop(client_send);
+        drop(client_recv);
+
+        let server_res = server_task.await.unwrap();
+        assert!(server_res.is_ok());
+    }
+
+    // ── handle_node dispatch tests ──────────────────────────────
+    //
+    // These tests verify that `handle_node` dispatches node-family
+    // requests to a `NodeHandler`-only type (not implementing
+    // `Handler`) and that non-node codes receive an error response.
+
+    /// A type implementing only `NodeHandler`, not `Handler`.
+    #[cfg(feature = "server")]
+    struct StandaloneNodeHandler;
+
+    #[cfg(feature = "server")]
+    #[async_trait::async_trait]
+    impl super::NodeHandler for StandaloneNodeHandler {
+        async fn node_hostname(
+            &mut self,
+            req: crate::types::node::NodeHostnameRequest,
+        ) -> Result<crate::types::node::NodeHostnameResponse, String> {
+            match req {
+                crate::types::node::NodeHostnameRequest::Get => {
+                    Ok(crate::types::node::NodeHostnameResponse::Get {
+                        hostname: "standalone-node".into(),
+                    })
+                }
+                crate::types::node::NodeHostnameRequest::Set { hostname } => {
+                    let _ = hostname;
+                    Ok(crate::types::node::NodeHostnameResponse::Done)
+                }
+            }
+        }
+
+        async fn node_power(
+            &mut self,
+            _req: crate::types::node::NodePowerRequest,
+        ) -> Result<crate::types::node::NodePowerResponse, String> {
+            Ok(crate::types::node::NodePowerResponse::Initiated)
+        }
+    }
+
+    /// Helper for `handle_node` dispatch tests.
+    #[cfg(feature = "server")]
+    async fn handle_node_roundtrip<Req, Resp>(code: RequestCode, req: Req, expected: Resp)
+    where
+        Req: serde::Serialize + std::fmt::Debug,
+        Resp: serde::de::DeserializeOwned + std::fmt::Debug + PartialEq,
+    {
+        use crate::test::{TOKEN, channel};
+
+        let _lock = TOKEN.lock().await;
+        let channel = channel().await;
+
+        let (mut server_send, mut server_recv) = (channel.server.send, channel.server.recv);
+        let (mut client_send, mut client_recv) = (channel.client.send, channel.client.recv);
+
+        let server_task = tokio::spawn(async move {
+            let mut handler = StandaloneNodeHandler;
+            super::handle_node(&mut handler, &mut server_send, &mut server_recv).await
+        });
+
+        let res: Result<Resp, String> =
+            crate::unary_request(&mut client_send, &mut client_recv, u32::from(code), req)
+                .await
+                .expect("wire transport should succeed");
+
+        assert_eq!(
+            res.expect("response should be Ok"),
+            expected,
+            "handle_node should dispatch node request correctly"
+        );
+
+        drop(client_send);
+        drop(client_recv);
+
+        let server_res = server_task.await.unwrap();
+        assert!(server_res.is_ok());
+    }
+
+    /// `handle_node` dispatches `NodeHostname` to a
+    /// `NodeHandler`-only type.
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn handle_node_hostname_dispatch() {
+        use crate::types::node::{NodeHostnameRequest, NodeHostnameResponse};
+        handle_node_roundtrip(
+            RequestCode::NodeHostname,
+            NodeHostnameRequest::Get,
+            NodeHostnameResponse::Get {
+                hostname: "standalone-node".into(),
+            },
+        )
+        .await;
+    }
+
+    /// `handle_node` dispatches `NodePower` to a
+    /// `NodeHandler`-only type.
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn handle_node_power_dispatch() {
+        use crate::types::node::{NodePowerRequest, NodePowerResponse};
+        handle_node_roundtrip(
+            RequestCode::NodePower,
+            NodePowerRequest::GracefulReboot,
+            NodePowerResponse::Initiated,
+        )
+        .await;
+    }
+
+    /// Unimplemented node methods return `"not supported"` through
+    /// `handle_node`.
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn handle_node_default_not_supported() {
+        use crate::test::{TOKEN, channel};
+        use crate::types::node::{NodeServiceRequest, NodeServiceResponse};
+
+        let _lock = TOKEN.lock().await;
+        let channel = channel().await;
+
+        let (mut server_send, mut server_recv) = (channel.server.send, channel.server.recv);
+        let (mut client_send, mut client_recv) = (channel.client.send, channel.client.recv);
+
+        let server_task = tokio::spawn(async move {
+            let mut handler = StandaloneNodeHandler;
+            super::handle_node(&mut handler, &mut server_send, &mut server_recv).await
+        });
+
+        // StandaloneNodeHandler does not implement node_service.
+        let res: Result<NodeServiceResponse, String> = crate::unary_request(
+            &mut client_send,
+            &mut client_recv,
+            u32::from(RequestCode::NodeService),
+            NodeServiceRequest::Status {
+                service: "test".into(),
+            },
+        )
+        .await
+        .expect("wire transport should succeed");
+
+        assert_eq!(res.unwrap_err(), "not supported");
+
+        drop(client_send);
+        drop(client_recv);
+
+        let server_res = server_task.await.unwrap();
+        assert!(server_res.is_ok());
+    }
+
+    /// Non-node request codes receive an error through
+    /// `handle_node`.
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn handle_node_rejects_non_node_codes() {
+        use crate::test::{TOKEN, channel};
+
+        let _lock = TOKEN.lock().await;
+        let channel = channel().await;
+
+        let (mut server_send, mut server_recv) = (channel.server.send, channel.server.recv);
+        let (mut client_send, mut client_recv) = (channel.client.send, channel.client.recv);
+
+        let server_task = tokio::spawn(async move {
+            let mut handler = StandaloneNodeHandler;
+            super::handle_node(&mut handler, &mut server_send, &mut server_recv).await
+        });
+
+        // Send a flat DnsStart code — not a node family code.
+        let res: Result<(), String> = crate::unary_request(
+            &mut client_send,
+            &mut client_recv,
+            u32::from(RequestCode::DnsStart),
+            (),
+        )
+        .await
+        .expect("wire transport should succeed");
+
+        assert!(
+            res.unwrap_err().contains("unknown request code"),
+            "non-node code should be rejected"
         );
 
         drop(client_send);

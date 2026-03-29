@@ -9,6 +9,10 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `request::handle_node()` dispatch entry point that accepts
+  `NodeHandler` directly, allowing a node-focused agent to serve
+  node-family requests without implementing the full `Handler`
+  trait. This is additive and does not replace `request::handle()`.
 - `protocol_error` module with `ProtocolErrorKind`, a semantic
   taxonomy of protocol-level error categories (`NotSupported`,
   `Forbidden`, `InvalidArgs`, `VersionMismatch`, `Other`).

@@ -2,13 +2,12 @@
 
 #![allow(clippy::unwrap_used)]
 
+#[cfg(all(feature = "client", feature = "server"))]
+use std::collections::HashSet;
 use std::{
     net::{IpAddr, Ipv6Addr, SocketAddr},
     sync::LazyLock,
 };
-
-#[cfg(all(feature = "client", feature = "server"))]
-use std::collections::HashSet;
 
 use quinn::{Connection, RecvStream, SendStream};
 use rustls::pki_types::{CertificateDer, PrivatePkcs8KeyDer};

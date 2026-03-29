@@ -36,6 +36,7 @@
 //!    response and returns
 //!    [`io::ErrorKind::PermissionDenied`](std::io::ErrorKind::PermissionDenied).
 
+use std::collections::HashMap;
 use std::fmt;
 
 use crate::service_id::ServiceId;
@@ -136,6 +137,272 @@ impl PeerContext {
     #[must_use]
     pub fn fingerprint(&self) -> Option<&str> {
         self.fingerprint.as_deref()
+    }
+}
+
+/// Certificate-backed identity extracted from a [`PeerContext`].
+///
+/// `PeerIdentity` captures the subset of [`PeerContext`] fields
+/// that represent the authenticated identity of a peer: the peer
+/// name (typically the certificate CN), the optional certificate
+/// subject DN, and the optional certificate fingerprint.
+///
+/// This type is used as the `peer_identity` field of
+/// [`AuthorizationContext`] so that authorization decisions can
+/// reference the identity without carrying the full
+/// [`PeerContext`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PeerIdentity {
+    /// Peer identifier string, typically derived from the
+    /// certificate common name or connection address.
+    name: String,
+    /// Full certificate subject DN (e.g. `"CN=agent-1,O=Acme"`),
+    /// if available from the peer certificate.
+    subject: Option<String>,
+    /// Hex-encoded certificate fingerprint, if available.
+    fingerprint: Option<String>,
+}
+
+impl PeerIdentity {
+    /// Returns the peer name.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Returns the certificate subject, if available.
+    #[must_use]
+    pub fn subject(&self) -> Option<&str> {
+        self.subject.as_deref()
+    }
+
+    /// Returns the certificate fingerprint, if available.
+    #[must_use]
+    pub fn fingerprint(&self) -> Option<&str> {
+        self.fingerprint.as_deref()
+    }
+}
+
+impl From<&PeerContext> for PeerIdentity {
+    fn from(peer: &PeerContext) -> Self {
+        Self {
+            name: peer.name().to_owned(),
+            subject: peer.subject().map(str::to_owned),
+            fingerprint: peer.fingerprint().map(str::to_owned),
+        }
+    }
+}
+
+/// The kind of agent or component that authenticated.
+///
+/// `AgentKind` is an optional classifier attached to an
+/// [`AuthorizationContext`].  It lets authorization policies
+/// distinguish between different roles in the system without
+/// inspecting certificate fields directly.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum AgentKind {
+    /// An agent managed by the review system.
+    Agent,
+    /// A proxy or relay acting on behalf of another peer.
+    Proxy,
+    /// An application-defined kind not covered by the standard
+    /// variants.
+    Other(String),
+}
+
+impl fmt::Display for AgentKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Agent => f.write_str("agent"),
+            Self::Proxy => f.write_str("proxy"),
+            Self::Other(s) => f.write_str(s),
+        }
+    }
+}
+
+/// Protocol and capability metadata for an authenticated peer.
+///
+/// `ProtocolMetadata` is an optional extension attached to an
+/// [`AuthorizationContext`].  It carries version and capability
+/// information that the embedding application may use to make
+/// policy decisions (e.g. denying requests from outdated agents).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ProtocolMetadata {
+    /// Protocol version string (e.g. `"0.17.0"`), if known.
+    pub version: Option<String>,
+    /// Capability tokens advertised by the peer.
+    pub capabilities: Vec<String>,
+}
+
+/// Authenticated peer metadata for richer authorization decisions.
+///
+/// `AuthorizationContext` bundles certificate-backed
+/// [`PeerIdentity`] with optional embedding-application-supplied
+/// metadata (agent kind, roles, protocol information, and an
+/// arbitrary attribute map).  It is designed as an **additive,
+/// non-breaking** extension alongside the existing [`PeerContext`]
+/// and [`ServiceId`](crate::service_id::ServiceId) types.
+///
+/// # Relationship to `PeerContext` and `ServiceId`
+///
+/// - [`PeerContext`] remains the primary type for establishing
+///   certificate-backed identity at connection time.
+///   `AuthorizationContext` **derives** its [`peer_identity`]
+///   from a `PeerContext` via [`From<&PeerContext>`] or the
+///   explicit constructors.
+/// - [`ServiceId`](crate::service_id::ServiceId) identifies the
+///   operation being requested and is **not** included in
+///   `AuthorizationContext`.  Authorization decisions should
+///   receive `AuthorizationContext` and `ServiceId` as separate
+///   inputs so that the operation being authorized is always
+///   explicit.
+///
+/// [`peer_identity`]: Self::peer_identity
+///
+/// # Security: authenticated-only fields
+///
+/// **Every field in `AuthorizationContext` must be populated from
+/// authenticated sources only** — the peer's TLS/QUIC certificate
+/// or the embedding application's own trusted inputs.  The
+/// constructors deliberately accept only [`&PeerContext`] (which
+/// is itself certificate-backed) and explicit parameters that the
+/// embedding application provides from its trusted context.
+///
+/// The [`attributes`](Self::attributes) map is an explicit
+/// extension point for embedding-application-supplied metadata.
+/// **Do not populate it from request bodies, query parameters, or
+/// any other untrusted payload.**  If an embedding application
+/// needs to carry user-supplied attributes, it must authenticate
+/// and validate them before placing them in this map.
+///
+/// # Construction
+///
+/// Use [`from_peer_context`](Self::from_peer_context) for a
+/// minimal context derived from a certificate, or
+/// [`from_authenticated_inputs`](Self::from_authenticated_inputs)
+/// when the embedding application can supply additional
+/// authenticated metadata:
+///
+/// ```
+/// use review_protocol::auth::{
+///     AuthorizationContext, PeerContext,
+/// };
+///
+/// let peer = PeerContext::new("agent-1")
+///     .with_subject("CN=agent-1,O=Acme")
+///     .with_fingerprint("aa:bb:cc");
+///
+/// // Minimal context — only certificate identity.
+/// let ctx = AuthorizationContext::from_peer_context(&peer);
+/// assert_eq!(ctx.peer_identity().name(), "agent-1");
+/// assert!(ctx.agent_kind().is_none());
+/// ```
+///
+/// # Migration guidance
+///
+/// `AuthorizationContext` is additive.  Existing code that passes
+/// `&PeerContext` to [`Authorizer::authorize`] continues to work
+/// unchanged.  When an embedding application is ready to supply
+/// richer metadata, it can construct an `AuthorizationContext` and
+/// pass it alongside the `ServiceId` to its own policy layer.
+#[derive(Clone, Debug)]
+pub struct AuthorizationContext {
+    /// Certificate-backed identity of the peer.
+    peer_identity: PeerIdentity,
+    /// Optional classifier for the kind of agent or component.
+    agent_kind: Option<AgentKind>,
+    /// Optional role strings for policy evaluation.
+    roles: Option<Vec<String>>,
+    /// Optional protocol version and capability metadata.
+    protocol_metadata: Option<ProtocolMetadata>,
+    /// Embedding-application-supplied authenticated metadata.
+    ///
+    /// **Populate only from authenticated channels.**  Do not
+    /// populate from request bodies, headers, or any untrusted
+    /// source unless those inputs have been authenticated at
+    /// connection setup.
+    attributes: Option<HashMap<String, String>>,
+}
+
+impl AuthorizationContext {
+    /// Creates an `AuthorizationContext` from a [`PeerContext`],
+    /// populating only the certificate-backed identity.  All
+    /// optional fields are set to `None`.
+    ///
+    /// This is the recommended constructor when the embedding
+    /// application has no additional authenticated metadata to
+    /// supply.
+    #[must_use]
+    pub fn from_peer_context(peer: &PeerContext) -> Self {
+        Self {
+            peer_identity: PeerIdentity::from(peer),
+            agent_kind: None,
+            roles: None,
+            protocol_metadata: None,
+            attributes: None,
+        }
+    }
+
+    /// Creates an `AuthorizationContext` from a [`PeerContext`]
+    /// and additional authenticated inputs supplied by the
+    /// embedding application.
+    ///
+    /// All parameters beyond `peer` are optional and should come
+    /// from **authenticated sources only** (e.g. server-side
+    /// configuration, connection-setup metadata, or verified
+    /// claims).  Never populate these from untrusted request
+    /// payloads.
+    #[must_use]
+    pub fn from_authenticated_inputs(
+        peer: &PeerContext,
+        agent_kind: Option<AgentKind>,
+        roles: Option<Vec<String>>,
+        protocol_metadata: Option<ProtocolMetadata>,
+        attributes: Option<HashMap<String, String>>,
+    ) -> Self {
+        Self {
+            peer_identity: PeerIdentity::from(peer),
+            agent_kind,
+            roles,
+            protocol_metadata,
+            attributes,
+        }
+    }
+
+    /// Returns the certificate-backed identity of the peer.
+    #[must_use]
+    pub fn peer_identity(&self) -> &PeerIdentity {
+        &self.peer_identity
+    }
+
+    /// Returns the agent kind, if set.
+    #[must_use]
+    pub fn agent_kind(&self) -> Option<&AgentKind> {
+        self.agent_kind.as_ref()
+    }
+
+    /// Returns the roles, if set.
+    #[must_use]
+    pub fn roles(&self) -> Option<&[String]> {
+        self.roles.as_deref()
+    }
+
+    /// Returns the protocol metadata, if set.
+    #[must_use]
+    pub fn protocol_metadata(&self) -> Option<&ProtocolMetadata> {
+        self.protocol_metadata.as_ref()
+    }
+
+    /// Returns the authenticated attributes map, if set.
+    #[must_use]
+    pub fn attributes(&self) -> Option<&HashMap<String, String>> {
+        self.attributes.as_ref()
+    }
+}
+
+impl From<&PeerContext> for AuthorizationContext {
+    fn from(peer: &PeerContext) -> Self {
+        Self::from_peer_context(peer)
     }
 }
 
@@ -416,6 +683,121 @@ mod tests {
         assert!(
             auth.authorize(&peer, &service_id::SERVER_CONFIG_GET)
                 .is_err()
+        );
+    }
+
+    #[test]
+    fn authorization_context_from_peer_context() {
+        let peer = PeerContext::new("agent-1")
+            .with_subject("CN=agent-1,O=Acme")
+            .with_fingerprint("aa:bb:cc");
+        let ctx = AuthorizationContext::from_peer_context(&peer);
+
+        assert_eq!(ctx.peer_identity().name(), "agent-1");
+        assert_eq!(ctx.peer_identity().subject(), Some("CN=agent-1,O=Acme"));
+        assert_eq!(ctx.peer_identity().fingerprint(), Some("aa:bb:cc"));
+        assert!(ctx.agent_kind().is_none());
+        assert!(ctx.roles().is_none());
+        assert!(ctx.protocol_metadata().is_none());
+        assert!(ctx.attributes().is_none());
+    }
+
+    #[test]
+    fn authorization_context_from_trait() {
+        let peer = PeerContext::new("agent-2");
+        let ctx = AuthorizationContext::from(&peer);
+        assert_eq!(ctx.peer_identity().name(), "agent-2");
+        assert!(ctx.agent_kind().is_none());
+    }
+
+    #[test]
+    fn authorization_context_with_authenticated_inputs() {
+        let peer = PeerContext::new("proxy-1").with_subject("CN=proxy-1,O=Acme");
+
+        let mut attrs = HashMap::new();
+        attrs.insert("tenant".to_owned(), "acme-corp".to_owned());
+
+        let meta = ProtocolMetadata {
+            version: Some("0.17.0".to_owned()),
+            capabilities: vec!["streaming".to_owned()],
+        };
+
+        let ctx = AuthorizationContext::from_authenticated_inputs(
+            &peer,
+            Some(AgentKind::Proxy),
+            Some(vec!["admin".to_owned(), "reader".to_owned()]),
+            Some(meta),
+            Some(attrs),
+        );
+
+        assert_eq!(ctx.peer_identity().name(), "proxy-1");
+        assert_eq!(ctx.agent_kind(), Some(&AgentKind::Proxy));
+        assert_eq!(ctx.roles().map(<[String]>::len), Some(2));
+        let meta = ctx.protocol_metadata().expect("metadata set");
+        assert_eq!(meta.version.as_deref(), Some("0.17.0"));
+        assert_eq!(meta.capabilities, vec!["streaming"]);
+        assert_eq!(
+            ctx.attributes()
+                .and_then(|a| a.get("tenant"))
+                .map(String::as_str),
+            Some("acme-corp"),
+        );
+    }
+
+    /// Demonstrates that `AuthorizationContext` constructors only
+    /// accept `PeerContext` (certificate-backed) and explicit
+    /// authenticated inputs — there is no API that populates
+    /// fields from an untrusted request payload.
+    #[test]
+    fn authenticated_only_constraints() {
+        // Simulate untrusted payload data.
+        let untrusted_name = "evil-peer";
+        let untrusted_role = "superadmin";
+
+        // The only way to build an AuthorizationContext is via
+        // PeerContext (certificate-backed) and explicit params.
+        let peer = PeerContext::new("real-agent");
+        let ctx = AuthorizationContext::from_peer_context(&peer);
+
+        // The untrusted payload cannot influence the identity.
+        assert_ne!(ctx.peer_identity().name(), untrusted_name);
+        assert_eq!(ctx.peer_identity().name(), "real-agent");
+
+        // Roles are None unless explicitly provided by the
+        // embedding application via from_authenticated_inputs.
+        assert!(ctx.roles().is_none());
+
+        // Even with from_authenticated_inputs, the identity
+        // comes from PeerContext, not from untrusted data.
+        let ctx2 = AuthorizationContext::from_authenticated_inputs(
+            &peer,
+            None,
+            Some(vec![untrusted_role.to_owned()]),
+            None,
+            None,
+        );
+        // Identity is still from the certificate.
+        assert_eq!(ctx2.peer_identity().name(), "real-agent");
+    }
+
+    #[test]
+    fn peer_identity_from_peer_context() {
+        let peer = PeerContext::new("node-3")
+            .with_subject("CN=node-3")
+            .with_fingerprint("dd:ee:ff");
+        let id = PeerIdentity::from(&peer);
+        assert_eq!(id.name(), "node-3");
+        assert_eq!(id.subject(), Some("CN=node-3"));
+        assert_eq!(id.fingerprint(), Some("dd:ee:ff"));
+    }
+
+    #[test]
+    fn agent_kind_display() {
+        assert_eq!(AgentKind::Agent.to_string(), "agent");
+        assert_eq!(AgentKind::Proxy.to_string(), "proxy");
+        assert_eq!(
+            AgentKind::Other("scanner".to_owned()).to_string(),
+            "scanner"
         );
     }
 

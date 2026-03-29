@@ -9,6 +9,31 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `AuthorizerV2` trait in `auth` module that receives an
+  `AuthorizationContext` (instead of a bare `PeerContext`)
+  at authorization decision points. Existing `Authorizer`
+  implementations are unchanged and can be wrapped with
+  the new `AuthorizerV2Adapter` to satisfy `AuthorizerV2`.
+- `AuthorizerV2Adapter<T>` adapter that wraps any existing
+  `Authorizer` as an `AuthorizerV2` by deriving a
+  `PeerContext` from the `AuthorizationContext`.
+- `AuthorizationContext::to_peer_context()` method for
+  round-tripping back to `PeerContext`.
+- `server::handle_authorized_with_context` function that
+  accepts `AuthorizationContext` and `AuthorizerV2` for
+  richer server-side authorization.
+- Nine `_with_context` methods on `server::Connection`
+  (`node_service_with_context`,
+  `node_network_interface_with_context`,
+  `node_hostname_with_context`,
+  `node_time_sync_with_context`,
+  `node_logging_with_context`,
+  `node_remote_access_with_context`,
+  `node_power_with_context`,
+  `node_observation_with_context`,
+  `node_version_with_context`) and corresponding methods
+  on `server::node::Node`, accepting `AuthorizationContext`
+  and `AuthorizerV2`.
 - `AuthorizationContext` type in `auth` module that carries
   richer authenticated peer metadata (`PeerIdentity`,
   optional `AgentKind`, roles, `ProtocolMetadata`, and an

@@ -808,6 +808,238 @@ impl Connection {
         .await
     }
 
+    // -- _with_context variants (AuthorizerV2) -----------------
+
+    /// Sends a node service-control request with
+    /// [`AuthorizerV2`](crate::auth::AuthorizerV2) authorization.
+    ///
+    /// Like [`node_service_authorized`](Self::node_service_authorized)
+    /// but accepts an
+    /// [`AuthorizationContext`](crate::auth::AuthorizationContext)
+    /// and an [`AuthorizerV2`](crate::auth::AuthorizerV2).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authorization was denied,
+    /// serialization/deserialization failed, or communication with
+    /// the client failed.
+    pub async fn node_service_with_context(
+        &self,
+        req: NodeServiceRequest,
+        auth_ctx: &crate::auth::AuthorizationContext,
+        authorizer: &dyn crate::auth::AuthorizerV2,
+    ) -> anyhow::Result<NodeServiceResponse> {
+        let sid = req.service_id();
+        self.send_request_authorized_with_context(
+            client::RequestCode::NodeService,
+            &req,
+            &sid,
+            auth_ctx,
+            authorizer,
+        )
+        .await
+    }
+
+    /// Sends a node network-interface request with
+    /// [`AuthorizerV2`](crate::auth::AuthorizerV2) authorization.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authorization was denied,
+    /// serialization/deserialization failed, or communication with
+    /// the client failed.
+    pub async fn node_network_interface_with_context(
+        &self,
+        req: NodeNetworkInterfaceRequest,
+        auth_ctx: &crate::auth::AuthorizationContext,
+        authorizer: &dyn crate::auth::AuthorizerV2,
+    ) -> anyhow::Result<NodeNetworkInterfaceResponse> {
+        let sid = req.service_id();
+        self.send_request_authorized_with_context(
+            client::RequestCode::NodeNetworkInterface,
+            &req,
+            &sid,
+            auth_ctx,
+            authorizer,
+        )
+        .await
+    }
+
+    /// Sends a node hostname request with
+    /// [`AuthorizerV2`](crate::auth::AuthorizerV2) authorization.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authorization was denied,
+    /// serialization/deserialization failed, or communication with
+    /// the client failed.
+    pub async fn node_hostname_with_context(
+        &self,
+        req: NodeHostnameRequest,
+        auth_ctx: &crate::auth::AuthorizationContext,
+        authorizer: &dyn crate::auth::AuthorizerV2,
+    ) -> anyhow::Result<NodeHostnameResponse> {
+        let sid = req.service_id();
+        self.send_request_authorized_with_context(
+            client::RequestCode::NodeHostname,
+            &req,
+            &sid,
+            auth_ctx,
+            authorizer,
+        )
+        .await
+    }
+
+    /// Sends a node time-synchronization request with
+    /// [`AuthorizerV2`](crate::auth::AuthorizerV2) authorization.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authorization was denied,
+    /// serialization/deserialization failed, or communication with
+    /// the client failed.
+    pub async fn node_time_sync_with_context(
+        &self,
+        req: NodeTimeSyncRequest,
+        auth_ctx: &crate::auth::AuthorizationContext,
+        authorizer: &dyn crate::auth::AuthorizerV2,
+    ) -> anyhow::Result<NodeTimeSyncResponse> {
+        let sid = req.service_id();
+        self.send_request_authorized_with_context(
+            client::RequestCode::NodeTimeSync,
+            &req,
+            &sid,
+            auth_ctx,
+            authorizer,
+        )
+        .await
+    }
+
+    /// Sends a node logging-configuration request with
+    /// [`AuthorizerV2`](crate::auth::AuthorizerV2) authorization.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authorization was denied,
+    /// serialization/deserialization failed, or communication with
+    /// the client failed.
+    pub async fn node_logging_with_context(
+        &self,
+        req: NodeLoggingRequest,
+        auth_ctx: &crate::auth::AuthorizationContext,
+        authorizer: &dyn crate::auth::AuthorizerV2,
+    ) -> anyhow::Result<NodeLoggingResponse> {
+        let sid = req.service_id();
+        self.send_request_authorized_with_context(
+            client::RequestCode::NodeLogging,
+            &req,
+            &sid,
+            auth_ctx,
+            authorizer,
+        )
+        .await
+    }
+
+    /// Sends a node remote-access request with
+    /// [`AuthorizerV2`](crate::auth::AuthorizerV2) authorization.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authorization was denied,
+    /// serialization/deserialization failed, or communication with
+    /// the client failed.
+    pub async fn node_remote_access_with_context(
+        &self,
+        req: NodeRemoteAccessRequest,
+        auth_ctx: &crate::auth::AuthorizationContext,
+        authorizer: &dyn crate::auth::AuthorizerV2,
+    ) -> anyhow::Result<NodeRemoteAccessResponse> {
+        let sid = req.service_id();
+        self.send_request_authorized_with_context(
+            client::RequestCode::NodeRemoteAccess,
+            &req,
+            &sid,
+            auth_ctx,
+            authorizer,
+        )
+        .await
+    }
+
+    /// Sends a node power-control request with
+    /// [`AuthorizerV2`](crate::auth::AuthorizerV2) authorization.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authorization was denied,
+    /// serialization/deserialization failed, or communication with
+    /// the client failed.
+    pub async fn node_power_with_context(
+        &self,
+        req: NodePowerRequest,
+        auth_ctx: &crate::auth::AuthorizationContext,
+        authorizer: &dyn crate::auth::AuthorizerV2,
+    ) -> anyhow::Result<NodePowerResponse> {
+        let sid = req.service_id();
+        self.send_request_authorized_with_context(
+            client::RequestCode::NodePower,
+            &req,
+            &sid,
+            auth_ctx,
+            authorizer,
+        )
+        .await
+    }
+
+    /// Sends a node host-observation request with
+    /// [`AuthorizerV2`](crate::auth::AuthorizerV2) authorization.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authorization was denied,
+    /// serialization/deserialization failed, or communication with
+    /// the client failed.
+    pub async fn node_observation_with_context(
+        &self,
+        req: NodeObservationRequest,
+        auth_ctx: &crate::auth::AuthorizationContext,
+        authorizer: &dyn crate::auth::AuthorizerV2,
+    ) -> anyhow::Result<NodeObservationResponse> {
+        let sid = req.service_id();
+        self.send_request_authorized_with_context(
+            client::RequestCode::NodeObservation,
+            &req,
+            &sid,
+            auth_ctx,
+            authorizer,
+        )
+        .await
+    }
+
+    /// Sends a node version-management request with
+    /// [`AuthorizerV2`](crate::auth::AuthorizerV2) authorization.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authorization was denied,
+    /// serialization/deserialization failed, or communication with
+    /// the client failed.
+    pub async fn node_version_with_context(
+        &self,
+        req: NodeVersionRequest,
+        auth_ctx: &crate::auth::AuthorizationContext,
+        authorizer: &dyn crate::auth::AuthorizerV2,
+    ) -> anyhow::Result<NodeVersionResponse> {
+        let sid = req.service_id();
+        self.send_request_authorized_with_context(
+            client::RequestCode::NodeVersion,
+            &req,
+            &sid,
+            auth_ctx,
+            authorizer,
+        )
+        .await
+    }
+
     /// Sends the given payload to the client.
     async fn send_request<T: serde::Serialize + ?Sized, S: serde::de::DeserializeOwned>(
         &self,
@@ -846,6 +1078,27 @@ impl Connection {
     ) -> anyhow::Result<S> {
         authorizer
             .authorize(peer, service_id)
+            .map_err(|e| anyhow!(e))?;
+        self.send_request(request_code, payload).await
+    }
+
+    /// Checks authorization via [`AuthorizerV2`] then sends the
+    /// given payload to the client.
+    ///
+    /// [`AuthorizerV2`]: crate::auth::AuthorizerV2
+    async fn send_request_authorized_with_context<
+        T: serde::Serialize + ?Sized,
+        S: serde::de::DeserializeOwned,
+    >(
+        &self,
+        request_code: client::RequestCode,
+        payload: &T,
+        service_id: &crate::service_id::ServiceId,
+        auth_ctx: &crate::auth::AuthorizationContext,
+        authorizer: &dyn crate::auth::AuthorizerV2,
+    ) -> anyhow::Result<S> {
+        authorizer
+            .authorize_with_context(auth_ctx, service_id)
             .map_err(|e| anyhow!(e))?;
         self.send_request(request_code, payload).await
     }

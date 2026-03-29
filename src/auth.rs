@@ -243,6 +243,40 @@ pub struct ProtocolMetadata {
 /// non-breaking** extension alongside the existing [`PeerContext`]
 /// and [`ServiceId`] types.
 ///
+/// # What belongs in `AuthorizationContext`
+///
+/// Only **authenticated peer metadata** set by the server or the
+/// authentication layer should appear here:
+///
+/// - **Certificate identity** — name, subject DN, fingerprint
+///   (carried as [`PeerIdentity`]).
+/// - **Agent kind** — [`AgentKind`] classifier assigned by the
+///   server during connection setup.
+/// - **Roles** — role strings assigned by the server or extracted
+///   from verified claims (e.g. an auth token validated at
+///   connection time).
+/// - **Protocol metadata** — [`ProtocolMetadata`] such as the
+///   protocol version advertised during the handshake.
+/// - **Authenticated attributes** — arbitrary key-value pairs
+///   that the embedding application populates from its own
+///   trusted context (e.g. tenant ID, deployment zone).
+///
+/// # What does *not* belong
+///
+/// - **[`ServiceId`]** — the operation being requested is
+///   **not** part of `AuthorizationContext`.  Authorization
+///   decisions receive `AuthorizationContext` and `ServiceId`
+///   as separate inputs so that the operation being authorized
+///   is always explicit.  See the [`AuthorizerV2`] trait and
+///   the [`AuthorizerV2Adapter`] examples for the recommended
+///   calling convention.
+/// - **Untrusted request data** — request bodies, query
+///   parameters, HTTP headers, or any other payload-provided
+///   value must never be placed in this type.
+/// - **Ephemeral connection metadata** — IP addresses, port
+///   numbers, or other transport-layer details that may change
+///   between requests.
+///
 /// # Relationship to `PeerContext` and `ServiceId`
 ///
 /// - [`PeerContext`] remains the primary type for establishing
@@ -259,7 +293,7 @@ pub struct ProtocolMetadata {
 ///
 /// [`peer_identity`]: Self::peer_identity
 ///
-/// # Security: authenticated-only fields
+/// # Security guidance
 ///
 /// **Every field in `AuthorizationContext` must be populated from
 /// authenticated sources only** — the peer's TLS/QUIC certificate
@@ -274,6 +308,18 @@ pub struct ProtocolMetadata {
 /// any other untrusted payload.**  If an embedding application
 /// needs to carry user-supplied attributes, it must authenticate
 /// and validate them before placing them in this map.
+///
+/// In particular:
+///
+/// - **Never populate from untrusted payloads.**  Request bodies,
+///   headers, and query strings are not authenticated sources.
+/// - **Validate before inserting.**  If the embedding application
+///   must carry user-supplied attributes, authenticate and
+///   validate them at connection setup — not at request time.
+/// - **Treat all fields as authoritative.**  Downstream policy
+///   code assumes these values were set by the authentication
+///   layer.  Corrupting them undermines every authorization
+///   decision.
 ///
 /// # Construction
 ///
@@ -298,6 +344,50 @@ pub struct ProtocolMetadata {
 /// assert!(ctx.agent_kind().is_none());
 /// ```
 ///
+/// A helper adapter can convert from an authenticated connection
+/// into an `AuthorizationContext` with richer metadata:
+///
+/// ```
+/// use std::collections::HashMap;
+/// use review_protocol::auth::{
+///     AgentKind, AuthorizationContext, PeerContext,
+///     ProtocolMetadata,
+/// };
+///
+/// /// Builds an `AuthorizationContext` from an authenticated
+/// /// connection's certificate and server-side metadata.
+/// fn context_from_authenticated_connection(
+///     peer: &PeerContext,
+///     agent_kind: AgentKind,
+///     roles: Vec<String>,
+/// ) -> AuthorizationContext {
+///     let meta = ProtocolMetadata {
+///         version: Some("0.17.0".into()),
+///         capabilities: vec!["streaming".into()],
+///     };
+///     let mut attrs = HashMap::new();
+///     attrs.insert("tenant".into(), "acme-corp".into());
+///
+///     AuthorizationContext::from_authenticated_inputs(
+///         peer,
+///         Some(agent_kind),
+///         Some(roles),
+///         Some(meta),
+///         Some(attrs),
+///     )
+/// }
+///
+/// let peer = PeerContext::new("agent-1")
+///     .with_subject("CN=agent-1,O=Acme");
+/// let ctx = context_from_authenticated_connection(
+///     &peer,
+///     AgentKind::Agent,
+///     vec!["reader".into()],
+/// );
+/// assert_eq!(ctx.peer_identity().name(), "agent-1");
+/// assert_eq!(ctx.agent_kind().unwrap().to_string(), "agent");
+/// ```
+///
 /// # Migration guidance
 ///
 /// `AuthorizationContext` is additive.  Existing code that passes
@@ -305,6 +395,78 @@ pub struct ProtocolMetadata {
 /// unchanged.  When an embedding application is ready to supply
 /// richer metadata, it can construct an `AuthorizationContext` and
 /// pass it alongside the `ServiceId` to its own policy layer.
+///
+/// The recommended migration path is:
+///
+/// 1. **Keep existing `Authorizer` implementations.**  They
+///    continue to work at every call site that accepts
+///    `&dyn Authorizer`.
+/// 2. **Wrap with [`AuthorizerV2Adapter`]** wherever a new
+///    `_with_context` call site requires `&dyn AuthorizerV2`:
+///
+///    ```
+///    use review_protocol::auth::{
+///        AuthorizationContext, AuthorizerV2,
+///        AuthorizerV2Adapter, NoopAuthorizer, PeerContext,
+///    };
+///    use review_protocol::service_id;
+///
+///    let legacy = NoopAuthorizer;
+///    let adapter = AuthorizerV2Adapter::new(legacy);
+///
+///    let peer = PeerContext::new("agent-1");
+///    let ctx = AuthorizationContext::from_peer_context(&peer);
+///    // The adapter delegates to the legacy authorizer.
+///    assert!(adapter
+///        .authorize_with_context(
+///            &ctx,
+///            &service_id::NODE_POWER_REBOOT,
+///        )
+///        .is_ok());
+///    ```
+///
+/// 3. **Implement [`AuthorizerV2`] directly** when the policy
+///    needs richer metadata (roles, agent kind, attributes):
+///
+///    ```
+///    use review_protocol::auth::{
+///        AuthorizationContext, AuthorizationError,
+///        AuthorizerV2, PeerContext,
+///    };
+///    use review_protocol::service_id::ServiceId;
+///
+///    struct RoleGate;
+///
+///    impl AuthorizerV2 for RoleGate {
+///        fn authorize_with_context(
+///            &self,
+///            ctx: &AuthorizationContext,
+///            _service: &ServiceId,
+///        ) -> Result<(), AuthorizationError> {
+///            let dominated =
+///                ctx.roles().is_some_and(|roles| {
+///                    roles.iter().any(|r| r == "admin")
+///                });
+///            if dominated {
+///                Ok(())
+///            } else {
+///                Err(AuthorizationError::new(
+///                    "admin role required",
+///                ))
+///            }
+///        }
+///    }
+///    ```
+///
+/// # Compatibility note
+///
+/// Policy engines remain **outside** `review-protocol`.  This
+/// crate provides the identity plumbing and the
+/// [`Authorizer`]/[`AuthorizerV2`] dispatch hooks; the actual
+/// allow/deny logic is implemented by the embedding application.
+/// Existing [`PeerContext`] flows continue to work unchanged —
+/// no migration is required until the application opts in to the
+/// richer context.
 #[derive(Clone, Debug)]
 pub struct AuthorizationContext {
     /// Certificate-backed identity of the peer.
@@ -1057,6 +1219,133 @@ mod tests {
             adapter
                 .authorize_with_context(&ctx, &service_id::SERVER_CONFIG_GET,)
                 .is_err()
+        );
+    }
+
+    /// Demonstrates the full migration path: a legacy `Authorizer`
+    /// used via `AuthorizerV2Adapter` alongside a direct
+    /// `AuthorizerV2` implementation that leverages richer context.
+    #[test]
+    fn migration_legacy_and_richer_context_side_by_side() {
+        // --- Legacy authorizer (family-based) ---
+        struct FamilyGate;
+        impl Authorizer for FamilyGate {
+            fn authorize(
+                &self,
+                _peer: &PeerContext,
+                service: &ServiceId,
+            ) -> Result<(), AuthorizationError> {
+                if service.family.starts_with("node.") {
+                    Ok(())
+                } else {
+                    Err(AuthorizationError::new("only node services"))
+                }
+            }
+        }
+
+        // --- Richer authorizer (role-based) ---
+        struct RoleGate;
+        impl AuthorizerV2 for RoleGate {
+            fn authorize_with_context(
+                &self,
+                ctx: &AuthorizationContext,
+                _service: &ServiceId,
+            ) -> Result<(), AuthorizationError> {
+                if ctx.roles().is_some_and(|r| r.iter().any(|s| s == "admin")) {
+                    Ok(())
+                } else {
+                    Err(AuthorizationError::new("admin role required"))
+                }
+            }
+        }
+
+        let peer = PeerContext::new("agent-1").with_subject("CN=agent-1,O=Acme");
+
+        // Legacy flow: PeerContext + Authorizer — unchanged.
+        let legacy = FamilyGate;
+        assert!(
+            legacy
+                .authorize(&peer, &service_id::NODE_POWER_REBOOT,)
+                .is_ok()
+        );
+        assert!(
+            legacy
+                .authorize(&peer, &service_id::SERVER_CONFIG_GET,)
+                .is_err()
+        );
+
+        // Wrap the legacy authorizer for _with_context sites.
+        let adapted = AuthorizerV2Adapter::new(FamilyGate);
+        let ctx = AuthorizationContext::from_peer_context(&peer);
+        assert!(
+            adapted
+                .authorize_with_context(&ctx, &service_id::NODE_POWER_REBOOT,)
+                .is_ok()
+        );
+
+        // Richer flow: AuthorizationContext + AuthorizerV2.
+        let rich_ctx = AuthorizationContext::from_authenticated_inputs(
+            &peer,
+            Some(AgentKind::Agent),
+            Some(vec!["admin".to_owned()]),
+            None,
+            None,
+        );
+        let role_gate = RoleGate;
+        assert!(
+            role_gate
+                .authorize_with_context(&rich_ctx, &service_id::NODE_POWER_REBOOT,)
+                .is_ok()
+        );
+
+        // Without the admin role, the richer authorizer denies.
+        let no_role_ctx = AuthorizationContext::from_peer_context(&peer);
+        assert!(
+            role_gate
+                .authorize_with_context(&no_role_ctx, &service_id::NODE_POWER_REBOOT,)
+                .is_err()
+        );
+    }
+
+    /// Verifies that `AuthorizationContext` constructed via the
+    /// helper-adapter pattern round-trips correctly to
+    /// `PeerContext` and carries the expected metadata.
+    #[test]
+    fn context_from_authenticated_connection_helper() {
+        let peer = PeerContext::new("proxy-1")
+            .with_subject("CN=proxy-1,O=Corp")
+            .with_fingerprint("11:22:33");
+
+        let meta = ProtocolMetadata {
+            version: Some("0.17.0".to_owned()),
+            capabilities: vec!["streaming".to_owned()],
+        };
+
+        let mut attrs = HashMap::new();
+        attrs.insert("tenant".to_owned(), "acme".to_owned());
+
+        let ctx = AuthorizationContext::from_authenticated_inputs(
+            &peer,
+            Some(AgentKind::Proxy),
+            Some(vec!["reader".to_owned()]),
+            Some(meta),
+            Some(attrs),
+        );
+
+        // Identity round-trips through to_peer_context.
+        let derived = ctx.to_peer_context();
+        assert_eq!(derived.name(), "proxy-1");
+        assert_eq!(derived.subject(), Some("CN=proxy-1,O=Corp"),);
+        assert_eq!(derived.fingerprint(), Some("11:22:33"));
+
+        // Richer metadata is accessible.
+        assert_eq!(ctx.agent_kind(), Some(&AgentKind::Proxy),);
+        assert_eq!(ctx.roles().map(<[String]>::len), Some(1),);
+        assert_eq!(
+            ctx.attributes()
+                .and_then(|a| a.get("tenant"))
+                .map(String::as_str),
+            Some("acme"),
         );
     }
 

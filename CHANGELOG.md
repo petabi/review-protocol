@@ -9,6 +9,15 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Documentation, examples, and tests for
+  `AuthorizationContext` and the migration path from
+  `Authorizer` to `AuthorizerV2`. Includes expanded rustdoc
+  covering what belongs (and does not belong) in the context,
+  security guidance, copy-pastable doctests for constructing
+  contexts, implementing `AuthorizerV2`, and wrapping legacy
+  authorizers with `AuthorizerV2Adapter`. Crate-level docs
+  now describe the richer-context authorization model and
+  confirm that existing `PeerContext` flows are unchanged.
 - `AuthorizerV2` trait in `auth` module that receives an
   `AuthorizationContext` (instead of a bare `PeerContext`)
   at authorization decision points. Existing `Authorizer`

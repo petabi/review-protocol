@@ -220,6 +220,241 @@ where
     handle_authorized(handler, send, recv, &peer_ctx, &crate::auth::NoopAuthorizer).await
 }
 
+/// Handles requests to the server with authorization using an
+/// [`AuthorizerV2`](crate::auth::AuthorizerV2).
+///
+/// Like [`handle_authorized`], but receives an
+/// [`AuthorizationContext`](crate::auth::AuthorizationContext)
+/// and an [`AuthorizerV2`](crate::auth::AuthorizerV2) instead
+/// of a bare [`PeerContext`](crate::auth::PeerContext) and
+/// [`Authorizer`](crate::auth::Authorizer).  This allows
+/// authorization policies to use the richer metadata carried by
+/// `AuthorizationContext` (agent kind, roles, protocol metadata,
+/// and application-supplied attributes).
+///
+/// Existing callers should continue to use [`handle_authorized`]
+/// with the legacy [`Authorizer`] trait.  When migrating to the
+/// richer context, wrap legacy authorizers with
+/// [`AuthorizerV2Adapter`](crate::auth::AuthorizerV2Adapter) or
+/// implement [`AuthorizerV2`](crate::auth::AuthorizerV2)
+/// directly.
+///
+/// # Errors
+///
+/// - There was an error reading from the stream.
+/// - There was an error writing to the stream.
+/// - An unknown request code was received.
+/// - The arguments to the request were invalid.
+/// - Authorization was denied for a request.
+#[allow(clippy::too_many_lines)]
+pub async fn handle_authorized_with_context<H>(
+    handler: &mut H,
+    send: &mut quinn::SendStream,
+    recv: &mut quinn::RecvStream,
+    auth_ctx: &crate::auth::AuthorizationContext,
+    authorizer: &dyn crate::auth::AuthorizerV2,
+) -> io::Result<Option<(u32, Vec<u8>)>>
+where
+    H: Handler + Sync,
+{
+    let peer_name = auth_ctx.peer_identity().name();
+    let mut buf = Vec::new();
+    loop {
+        let (code, body) = match oinq::message::recv_request_raw(recv, &mut buf).await {
+            Ok(res) => res,
+            Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => break,
+            Err(e) => return Err(e),
+        };
+
+        let req_code = RequestCode::from_primitive(code);
+
+        if let Some(service_id) = crate::service_id::from_server_request_code(req_code)
+            && let Err(e) = authorizer.authorize_with_context(auth_ctx, &service_id)
+        {
+            oinq::request::send_response(
+                send,
+                &mut buf,
+                Err::<(), String>("authorization denied".to_string()),
+            )
+            .await?;
+            return Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                DispatchError::new(e.kind(), e.to_string()),
+            ));
+        }
+
+        match req_code {
+            RequestCode::GetAllowlist => {
+                parse_args::<()>(body)?;
+                let result = handler.get_allowlist(peer_name).await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::GetBlocklist => {
+                parse_args::<()>(body)?;
+                let result = handler.get_blocklist(peer_name).await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::GetDataSource => {
+                let data_source_key = parse_args::<DataSourceKey>(body)?;
+                let result = handler.get_data_source(&data_source_key).await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::GetIndicator => {
+                let name = parse_args::<String>(body)?;
+                let result = handler.get_indicator(&name).await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::GetModel => {
+                let name = parse_args::<String>(body)
+                    .map_err(|e| DispatchError::from_io(ProtocolErrorKind::InvalidArgs, &e))?;
+                let result = handler.get_model(&name).await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::GetModelNames => {
+                parse_args::<()>(body)?;
+                let result = handler.get_model_names().await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::GetLabelDbPatterns => {
+                let db_names = parse_args::<Vec<(&str, &str)>>(body)?;
+                let result = handler.get_labeldb_patterns(&db_names).await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::GetTorExitNodeList => {
+                parse_args::<()>(body)?;
+                let result = handler.get_tor_exit_node_list().await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::GetTrustedDomainList => {
+                parse_args::<()>(body)?;
+                let result = handler.get_trusted_domain_list().await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::GetTrustedUserAgentList => {
+                parse_args::<()>(body)?;
+                let result = handler.get_trusted_user_agent_list().await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::GetConfig => {
+                parse_args::<()>(body)?;
+                let result = handler.get_config(peer_name).await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::GetInternalNetworkList => {
+                parse_args::<()>(body)?;
+                let result = handler.get_internal_network_list(peer_name).await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::GetOutliers => {
+                let (model_id, timestamp) = parse_args::<(u32, i64)>(body)
+                    .map_err(|e| DispatchError::from_io(ProtocolErrorKind::InvalidArgs, &e))?;
+                let result = handler.get_outliers(model_id, timestamp).await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::GetPretrainedModel => {
+                let name = parse_args::<String>(body)?;
+                let result = handler.get_pretrained_model(&name).await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::GetSamplingPolicyList => {
+                parse_args::<()>(body)?;
+                let result = handler.get_sampling_policy_list(peer_name).await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::InsertColumnStatistics => {
+                let (statistics, model_id, batch_ts) =
+                    parse_args::<(Vec<ColumnStatisticsUpdate>, u32, i64)>(body)?;
+                let result = handler
+                    .insert_column_statistics(&statistics, model_id, batch_ts)
+                    .await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::InsertDataSource => {
+                let data_source = parse_args::<DataSource>(body)?;
+                let result = handler.insert_data_source(&data_source).await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::InsertEventLabels => {
+                let (model_id, round, event_labels) =
+                    parse_args::<(u32, u32, Vec<EventMessage>)>(body)?;
+                let result = handler
+                    .insert_event_labels(model_id, round, &event_labels)
+                    .await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::InsertModel => {
+                let body = parse_args::<Vec<u8>>(body)?;
+                let result = handler.insert_model(&body).await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::InsertTimeSeries => {
+                let (time_series, model_id, batch_ts) =
+                    parse_args::<(Vec<TimeSeriesUpdate>, u32, i64)>(body)?;
+                let result = handler
+                    .insert_time_series(&time_series, model_id, batch_ts)
+                    .await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::RemoveModel => {
+                let name = parse_args::<String>(body)?;
+                let result = handler.remove_model(&name).await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::RenewCertificate => {
+                let result = handler.renew_certificate(peer_name).await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::UpdateClusters => {
+                let (input, model_id) = parse_args::<(Vec<UpdateClusterRequest>, u32)>(body)?;
+                let result = handler.update_clusters(&input, model_id).await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::UpdateModel => {
+                let body = parse_args::<Vec<u8>>(body)?;
+                let result = handler.update_model(&body).await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::UpdateOutliers => {
+                let (outliers, model_id, timestamp) =
+                    parse_args::<(Vec<OutlierInfo>, u32, i64)>(body)?;
+                let result = handler
+                    .update_outliers(&outliers, model_id, timestamp)
+                    .await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::UpdateHostOpenedPorts => {
+                let hosts = parse_args::<HashMap<IpAddr, HashMap<(u16, u8), u32>>>(body)?;
+                let result = handler.update_host_ports(peer_name, &hosts).await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::UpdateHostOsAgents => {
+                let hosts = parse_args::<Vec<(IpAddr, Vec<UserAgent>, Vec<String>)>>(body)?;
+                let result = handler.update_host_user_agents(peer_name, &hosts).await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
+            RequestCode::Unknown => {
+                oinq::frame::send(
+                    send,
+                    &mut buf,
+                    Err("unknown request code") as Result<(), &str>,
+                )
+                .await?;
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    DispatchError::new(
+                        crate::protocol_error::ProtocolErrorKind::NotSupported,
+                        "unknown request code",
+                    ),
+                ));
+            }
+            _ => {
+                return Ok(Some((code, body.into())));
+            }
+        }
+    }
+    Ok(None)
+}
+
 /// Handles requests to the server with authorization.
 ///
 /// Like [`handle`], but checks each request against the provided
@@ -886,5 +1121,204 @@ mod tests {
             ProtocolErrorKind::InvalidArgs,
             "parse failure should classify as InvalidArgs"
         );
+    }
+
+    // -- handle_authorized_with_context tests -----------------
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn with_context_allowed_via_adapter() {
+        use crate::auth::{AuthorizerV2Adapter, NoopAuthorizer, PeerContext};
+
+        let _lock = TOKEN.lock().await;
+        let channel = channel().await;
+
+        let insert_model_payload = Arc::new(Mutex::new(None));
+
+        let mut handler = ModelHandler {
+            insert_model_payload: Arc::clone(&insert_model_payload),
+            update_model_payload: Arc::new(Mutex::new(None)),
+        };
+
+        let (mut server_send, mut server_recv) = (channel.server.send, channel.server.recv);
+        let (mut client_send, mut client_recv) = (channel.client.send, channel.client.recv);
+
+        let peer = PeerContext::new("test-peer");
+        let auth_ctx = crate::auth::AuthorizationContext::from_peer_context(&peer);
+        let authorizer = AuthorizerV2Adapter::new(NoopAuthorizer);
+
+        let server_task = tokio::spawn(async move {
+            super::handle_authorized_with_context(
+                &mut handler,
+                &mut server_send,
+                &mut server_recv,
+                &auth_ctx,
+                &authorizer,
+            )
+            .await
+        });
+
+        let payload = vec![0x10, 0x20];
+        let res: Result<u32, String> = crate::unary_request(
+            &mut client_send,
+            &mut client_recv,
+            u32::from(RequestCode::InsertModel),
+            payload,
+        )
+        .await
+        .unwrap();
+        assert_eq!(res.unwrap(), 42);
+
+        drop(client_send);
+        drop(client_recv);
+
+        let server_res = server_task.await.unwrap();
+        match server_res {
+            Ok(_) => {}
+            Err(e) if e.kind() == io::ErrorKind::NotConnected => {}
+            Err(e) => panic!("unexpected server error: {e:?}"),
+        }
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn with_context_denied_by_v2_authorizer() {
+        use crate::auth::{AuthorizationContext, AuthorizationError, AuthorizerV2, PeerContext};
+
+        struct DenyNonAdmin;
+        impl AuthorizerV2 for DenyNonAdmin {
+            fn authorize_with_context(
+                &self,
+                ctx: &AuthorizationContext,
+                _service: &crate::service_id::ServiceId,
+            ) -> Result<(), AuthorizationError> {
+                if ctx.roles().is_some_and(|r| r.iter().any(|s| s == "admin")) {
+                    Ok(())
+                } else {
+                    Err(AuthorizationError::new("admin required"))
+                }
+            }
+        }
+
+        let _lock = TOKEN.lock().await;
+        let channel = channel().await;
+
+        let mut handler = ModelHandler {
+            insert_model_payload: Arc::new(Mutex::new(None)),
+            update_model_payload: Arc::new(Mutex::new(None)),
+        };
+
+        let (mut server_send, mut server_recv) = (channel.server.send, channel.server.recv);
+        let (mut client_send, mut client_recv) = (channel.client.send, channel.client.recv);
+
+        // No admin role → denied.
+        let peer = PeerContext::new("test-peer");
+        let auth_ctx = AuthorizationContext::from_peer_context(&peer);
+        let authorizer = DenyNonAdmin;
+
+        let server_task = tokio::spawn(async move {
+            super::handle_authorized_with_context(
+                &mut handler,
+                &mut server_send,
+                &mut server_recv,
+                &auth_ctx,
+                &authorizer,
+            )
+            .await
+        });
+
+        let res: Result<u32, String> = crate::unary_request(
+            &mut client_send,
+            &mut client_recv,
+            u32::from(RequestCode::InsertModel),
+            vec![0x10, 0x20],
+        )
+        .await
+        .unwrap();
+        assert_eq!(res, Err("authorization denied".to_string()));
+
+        let server_res = server_task.await.unwrap();
+        assert!(server_res.is_err());
+        assert_eq!(
+            server_res.unwrap_err().kind(),
+            io::ErrorKind::PermissionDenied,
+        );
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn with_context_allowed_by_role() {
+        use crate::auth::{AuthorizationContext, AuthorizationError, AuthorizerV2, PeerContext};
+
+        struct RequireAdmin;
+        impl AuthorizerV2 for RequireAdmin {
+            fn authorize_with_context(
+                &self,
+                ctx: &AuthorizationContext,
+                _service: &crate::service_id::ServiceId,
+            ) -> Result<(), AuthorizationError> {
+                if ctx.roles().is_some_and(|r| r.iter().any(|s| s == "admin")) {
+                    Ok(())
+                } else {
+                    Err(AuthorizationError::new("admin required"))
+                }
+            }
+        }
+
+        let _lock = TOKEN.lock().await;
+        let channel = channel().await;
+
+        let insert_model_payload = Arc::new(Mutex::new(None));
+
+        let mut handler = ModelHandler {
+            insert_model_payload: Arc::clone(&insert_model_payload),
+            update_model_payload: Arc::new(Mutex::new(None)),
+        };
+
+        let (mut server_send, mut server_recv) = (channel.server.send, channel.server.recv);
+        let (mut client_send, mut client_recv) = (channel.client.send, channel.client.recv);
+
+        // With admin role → allowed.
+        let peer = PeerContext::new("test-peer");
+        let auth_ctx = AuthorizationContext::from_authenticated_inputs(
+            &peer,
+            None,
+            Some(vec!["admin".to_owned()]),
+            None,
+            None,
+        );
+        let authorizer = RequireAdmin;
+
+        let server_task = tokio::spawn(async move {
+            super::handle_authorized_with_context(
+                &mut handler,
+                &mut server_send,
+                &mut server_recv,
+                &auth_ctx,
+                &authorizer,
+            )
+            .await
+        });
+
+        let payload = vec![0x10, 0x20];
+        let res: Result<u32, String> = crate::unary_request(
+            &mut client_send,
+            &mut client_recv,
+            u32::from(RequestCode::InsertModel),
+            payload,
+        )
+        .await
+        .unwrap();
+        assert_eq!(res.unwrap(), 42);
+
+        drop(client_send);
+        drop(client_recv);
+
+        let server_res = server_task.await.unwrap();
+        match server_res {
+            Ok(_) => {}
+            Err(e) if e.kind() == io::ErrorKind::NotConnected => {}
+            Err(e) => panic!("unexpected server error: {e:?}"),
+        }
     }
 }

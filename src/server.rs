@@ -25,7 +25,7 @@ use oinq::{
 use semver::{Version, VersionReq};
 
 #[cfg(feature = "server")]
-pub use self::handler::{Handler, handle, handle_authorized};
+pub use self::handler::{Handler, handle, handle_authorized, handle_authorized_with_context};
 #[cfg(feature = "server")]
 pub use self::stream::process_event_stream;
 #[cfg(feature = "server")]

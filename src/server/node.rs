@@ -358,6 +358,179 @@ impl<'a> Node<'a> {
             .node_version_authorized(req, peer, authorizer)
             .await
     }
+
+    // -- _with_context variants (AuthorizerV2) -----------------
+
+    /// Sends a node service-control request with
+    /// [`AuthorizerV2`](crate::auth::AuthorizerV2) authorization.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authorization was denied,
+    /// serialization/deserialization failed, or communication
+    /// with the client failed.
+    pub async fn service_with_context(
+        &self,
+        req: NodeServiceRequest,
+        auth_ctx: &crate::auth::AuthorizationContext,
+        authorizer: &dyn crate::auth::AuthorizerV2,
+    ) -> anyhow::Result<NodeServiceResponse> {
+        self.conn
+            .node_service_with_context(req, auth_ctx, authorizer)
+            .await
+    }
+
+    /// Sends a node network-interface request with
+    /// [`AuthorizerV2`](crate::auth::AuthorizerV2) authorization.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authorization was denied,
+    /// serialization/deserialization failed, or communication
+    /// with the client failed.
+    pub async fn network_interface_with_context(
+        &self,
+        req: NodeNetworkInterfaceRequest,
+        auth_ctx: &crate::auth::AuthorizationContext,
+        authorizer: &dyn crate::auth::AuthorizerV2,
+    ) -> anyhow::Result<NodeNetworkInterfaceResponse> {
+        self.conn
+            .node_network_interface_with_context(req, auth_ctx, authorizer)
+            .await
+    }
+
+    /// Sends a node hostname request with
+    /// [`AuthorizerV2`](crate::auth::AuthorizerV2) authorization.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authorization was denied,
+    /// serialization/deserialization failed, or communication
+    /// with the client failed.
+    pub async fn hostname_with_context(
+        &self,
+        req: NodeHostnameRequest,
+        auth_ctx: &crate::auth::AuthorizationContext,
+        authorizer: &dyn crate::auth::AuthorizerV2,
+    ) -> anyhow::Result<NodeHostnameResponse> {
+        self.conn
+            .node_hostname_with_context(req, auth_ctx, authorizer)
+            .await
+    }
+
+    /// Sends a node time-synchronization request with
+    /// [`AuthorizerV2`](crate::auth::AuthorizerV2) authorization.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authorization was denied,
+    /// serialization/deserialization failed, or communication
+    /// with the client failed.
+    pub async fn time_sync_with_context(
+        &self,
+        req: NodeTimeSyncRequest,
+        auth_ctx: &crate::auth::AuthorizationContext,
+        authorizer: &dyn crate::auth::AuthorizerV2,
+    ) -> anyhow::Result<NodeTimeSyncResponse> {
+        self.conn
+            .node_time_sync_with_context(req, auth_ctx, authorizer)
+            .await
+    }
+
+    /// Sends a node logging-configuration request with
+    /// [`AuthorizerV2`](crate::auth::AuthorizerV2) authorization.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authorization was denied,
+    /// serialization/deserialization failed, or communication
+    /// with the client failed.
+    pub async fn logging_with_context(
+        &self,
+        req: NodeLoggingRequest,
+        auth_ctx: &crate::auth::AuthorizationContext,
+        authorizer: &dyn crate::auth::AuthorizerV2,
+    ) -> anyhow::Result<NodeLoggingResponse> {
+        self.conn
+            .node_logging_with_context(req, auth_ctx, authorizer)
+            .await
+    }
+
+    /// Sends a node remote-access request with
+    /// [`AuthorizerV2`](crate::auth::AuthorizerV2) authorization.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authorization was denied,
+    /// serialization/deserialization failed, or communication
+    /// with the client failed.
+    pub async fn remote_access_with_context(
+        &self,
+        req: NodeRemoteAccessRequest,
+        auth_ctx: &crate::auth::AuthorizationContext,
+        authorizer: &dyn crate::auth::AuthorizerV2,
+    ) -> anyhow::Result<NodeRemoteAccessResponse> {
+        self.conn
+            .node_remote_access_with_context(req, auth_ctx, authorizer)
+            .await
+    }
+
+    /// Sends a node power-control request with
+    /// [`AuthorizerV2`](crate::auth::AuthorizerV2) authorization.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authorization was denied,
+    /// serialization/deserialization failed, or communication
+    /// with the client failed.
+    pub async fn power_with_context(
+        &self,
+        req: NodePowerRequest,
+        auth_ctx: &crate::auth::AuthorizationContext,
+        authorizer: &dyn crate::auth::AuthorizerV2,
+    ) -> anyhow::Result<NodePowerResponse> {
+        self.conn
+            .node_power_with_context(req, auth_ctx, authorizer)
+            .await
+    }
+
+    /// Sends a node host-observation request with
+    /// [`AuthorizerV2`](crate::auth::AuthorizerV2) authorization.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authorization was denied,
+    /// serialization/deserialization failed, or communication
+    /// with the client failed.
+    pub async fn observation_with_context(
+        &self,
+        req: NodeObservationRequest,
+        auth_ctx: &crate::auth::AuthorizationContext,
+        authorizer: &dyn crate::auth::AuthorizerV2,
+    ) -> anyhow::Result<NodeObservationResponse> {
+        self.conn
+            .node_observation_with_context(req, auth_ctx, authorizer)
+            .await
+    }
+
+    /// Sends a node version-management request with
+    /// [`AuthorizerV2`](crate::auth::AuthorizerV2) authorization.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authorization was denied,
+    /// serialization/deserialization failed, or communication
+    /// with the client failed.
+    pub async fn version_with_context(
+        &self,
+        req: NodeVersionRequest,
+        auth_ctx: &crate::auth::AuthorizationContext,
+        authorizer: &dyn crate::auth::AuthorizerV2,
+    ) -> anyhow::Result<NodeVersionResponse> {
+        self.conn
+            .node_version_with_context(req, auth_ctx, authorizer)
+            .await
+    }
 }
 
 #[cfg(test)]
@@ -555,6 +728,84 @@ mod tests {
         let client_res = client_handle.await.unwrap();
         assert!(client_res.is_ok());
 
+        test_env.teardown(&server_conn);
+    }
+
+    /// Verifies that `Node::power_with_context` allows a request
+    /// when the `AuthorizerV2` permits it.
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn power_with_context_via_node_handle() {
+        use crate::auth::{AuthorizationContext, AuthorizerV2Adapter, NoopAuthorizer, PeerContext};
+
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let mut handler = TestHandler;
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+            crate::request::handle(&mut handler, &mut send, &mut recv).await
+        });
+
+        let peer = PeerContext::new("test-agent");
+        let auth_ctx = AuthorizationContext::from_peer_context(&peer);
+        let authorizer = AuthorizerV2Adapter::new(NoopAuthorizer);
+        let node = server_conn.node();
+        let resp = node
+            .power_with_context(NodePowerRequest::Reboot, &auth_ctx, &authorizer)
+            .await
+            .unwrap();
+        assert_eq!(resp, NodePowerResponse::Initiated);
+
+        let client_res = client_handle.await.unwrap();
+        assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    /// Verifies that `Node::power_with_context` denies a request
+    /// when an `AuthorizerV2` checks roles.
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn power_with_context_denied_by_role() {
+        use crate::auth::{AuthorizationContext, AuthorizationError, AuthorizerV2, PeerContext};
+        use crate::service_id::ServiceId;
+
+        struct RequireAdmin;
+        impl AuthorizerV2 for RequireAdmin {
+            fn authorize_with_context(
+                &self,
+                ctx: &AuthorizationContext,
+                _service: &ServiceId,
+            ) -> Result<(), AuthorizationError> {
+                if ctx.roles().is_some_and(|r| r.iter().any(|s| s == "admin")) {
+                    Ok(())
+                } else {
+                    Err(AuthorizationError::new("admin required"))
+                }
+            }
+        }
+
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let peer = PeerContext::new("test-agent");
+        let auth_ctx = AuthorizationContext::from_peer_context(&peer);
+        let authorizer = RequireAdmin;
+        let node = server_conn.node();
+        let result = node
+            .power_with_context(NodePowerRequest::Reboot, &auth_ctx, &authorizer)
+            .await;
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("authorization denied")
+        );
+
+        drop(client_conn);
         test_env.teardown(&server_conn);
     }
 

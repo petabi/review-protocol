@@ -398,6 +398,27 @@ impl AuthorizationContext {
     pub fn attributes(&self) -> Option<&HashMap<String, String>> {
         self.attributes.as_ref()
     }
+
+    /// Derives a [`PeerContext`] from this authorization context.
+    ///
+    /// The returned `PeerContext` carries the same
+    /// certificate-backed identity fields (`name`, `subject`,
+    /// `fingerprint`) that were originally extracted from the
+    /// `PeerContext` used to construct this
+    /// `AuthorizationContext`.  This is used internally by the
+    /// [`AuthorizerV2Adapter`] to delegate to legacy
+    /// [`Authorizer`] implementations.
+    #[must_use]
+    pub fn to_peer_context(&self) -> PeerContext {
+        let mut ctx = PeerContext::new(self.peer_identity.name());
+        if let Some(subject) = self.peer_identity.subject() {
+            ctx = ctx.with_subject(subject);
+        }
+        if let Some(fp) = self.peer_identity.fingerprint() {
+            ctx = ctx.with_fingerprint(fp);
+        }
+        ctx
+    }
 }
 
 impl From<&PeerContext> for AuthorizationContext {
@@ -594,6 +615,134 @@ impl Authorizer for NoopAuthorizer {
         _service: &ServiceId,
     ) -> Result<(), AuthorizationError> {
         Ok(())
+    }
+}
+
+/// Extended authorization policy that receives an
+/// [`AuthorizationContext`] instead of a bare [`PeerContext`].
+///
+/// `AuthorizerV2` is the evolution of the [`Authorizer`] trait.
+/// Where [`Authorizer::authorize`] receives only a [`PeerContext`]
+/// and a [`ServiceId`], `AuthorizerV2::authorize_with_context`
+/// receives the richer [`AuthorizationContext`] (which bundles
+/// certificate-backed identity with optional agent kind, roles,
+/// protocol metadata, and application-supplied attributes).
+///
+/// # Migration path
+///
+/// Existing [`Authorizer`] implementations **do not need to
+/// change**.  To use an old `Authorizer` where an `AuthorizerV2`
+/// is expected, wrap it with [`AuthorizerV2Adapter`]:
+///
+/// ```
+/// use review_protocol::auth::{
+///     AuthorizerV2Adapter, NoopAuthorizer,
+/// };
+///
+/// let legacy = NoopAuthorizer;
+/// let v2 = AuthorizerV2Adapter::new(legacy);
+/// // `v2` implements `AuthorizerV2` and delegates to `legacy`.
+/// ```
+///
+/// New code that wants richer context should implement
+/// `AuthorizerV2` directly.
+///
+/// # Examples
+///
+/// ```
+/// use review_protocol::auth::{
+///     AuthorizationContext, AuthorizationError,
+///     AuthorizerV2, PeerContext,
+/// };
+/// use review_protocol::service_id::ServiceId;
+///
+/// struct RoleBasedAuthorizer;
+///
+/// impl AuthorizerV2 for RoleBasedAuthorizer {
+///     fn authorize_with_context(
+///         &self,
+///         ctx: &AuthorizationContext,
+///         service: &ServiceId,
+///     ) -> Result<(), AuthorizationError> {
+///         if let Some(roles) = ctx.roles() {
+///             if roles.iter().any(|r| r == "admin") {
+///                 return Ok(());
+///             }
+///         }
+///         Err(AuthorizationError::new(
+///             "admin role required",
+///         ))
+///     }
+/// }
+/// ```
+pub trait AuthorizerV2: Send + Sync {
+    /// Checks whether the peer described by `ctx` is authorized
+    /// to invoke `service`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AuthorizationError`] if the peer is not
+    /// authorized to invoke the requested service.
+    fn authorize_with_context(
+        &self,
+        ctx: &AuthorizationContext,
+        service: &ServiceId,
+    ) -> Result<(), AuthorizationError>;
+}
+
+/// Adapter that presents an [`Authorizer`] as an
+/// [`AuthorizerV2`].
+///
+/// `AuthorizerV2Adapter` wraps an existing [`Authorizer`]
+/// implementation and satisfies the [`AuthorizerV2`] trait by
+/// deriving a [`PeerContext`] from the incoming
+/// [`AuthorizationContext`] and delegating to the inner
+/// authorizer.
+///
+/// This ensures that all existing [`Authorizer`] implementations
+/// can be used wherever an `AuthorizerV2` is required, without
+/// any code changes.
+///
+/// # Examples
+///
+/// ```
+/// use review_protocol::auth::{
+///     AuthorizationContext, AuthorizerV2,
+///     AuthorizerV2Adapter, NoopAuthorizer, PeerContext,
+/// };
+/// use review_protocol::service_id;
+///
+/// let adapter = AuthorizerV2Adapter::new(NoopAuthorizer);
+/// let peer = PeerContext::new("agent-1");
+/// let ctx = AuthorizationContext::from_peer_context(&peer);
+/// assert!(
+///     adapter
+///         .authorize_with_context(
+///             &ctx,
+///             &service_id::NODE_POWER_REBOOT,
+///         )
+///         .is_ok()
+/// );
+/// ```
+pub struct AuthorizerV2Adapter<T> {
+    inner: T,
+}
+
+impl<T: Authorizer> AuthorizerV2Adapter<T> {
+    /// Creates a new adapter wrapping the given [`Authorizer`].
+    pub fn new(inner: T) -> Self {
+        Self { inner }
+    }
+}
+
+impl<T: Authorizer> AuthorizerV2 for AuthorizerV2Adapter<T> {
+    fn authorize_with_context(
+        &self,
+        ctx: &AuthorizationContext,
+        service: &ServiceId,
+    ) -> Result<(), AuthorizationError> {
+        let peer = ctx.to_peer_context();
+        self.inner.authorize(&peer, service)
     }
 }
 
@@ -813,5 +962,141 @@ mod tests {
 
         let err = AuthorizationError::new("denied");
         assert_eq!(err.kind(), ProtocolErrorKind::Forbidden);
+    }
+
+    #[test]
+    fn authorization_context_to_peer_context_round_trip() {
+        let peer = PeerContext::new("agent-1")
+            .with_subject("CN=agent-1,O=Acme")
+            .with_fingerprint("aa:bb:cc");
+        let ctx = AuthorizationContext::from_peer_context(&peer);
+        let derived = ctx.to_peer_context();
+        assert_eq!(derived.name(), "agent-1");
+        assert_eq!(derived.subject(), Some("CN=agent-1,O=Acme"));
+        assert_eq!(derived.fingerprint(), Some("aa:bb:cc"));
+    }
+
+    #[test]
+    fn authorization_context_to_peer_context_minimal() {
+        let peer = PeerContext::new("agent-2");
+        let ctx = AuthorizationContext::from_peer_context(&peer);
+        let derived = ctx.to_peer_context();
+        assert_eq!(derived.name(), "agent-2");
+        assert_eq!(derived.subject(), None);
+        assert_eq!(derived.fingerprint(), None);
+    }
+
+    #[test]
+    fn authorizer_v2_direct_implementation() {
+        struct RoleAdmin;
+        impl AuthorizerV2 for RoleAdmin {
+            fn authorize_with_context(
+                &self,
+                ctx: &AuthorizationContext,
+                _service: &ServiceId,
+            ) -> Result<(), AuthorizationError> {
+                if ctx.roles().is_some_and(|r| r.iter().any(|s| s == "admin")) {
+                    Ok(())
+                } else {
+                    Err(AuthorizationError::new("admin role required"))
+                }
+            }
+        }
+
+        let auth = RoleAdmin;
+        let peer = PeerContext::new("agent-1");
+
+        // No roles → denied.
+        let ctx = AuthorizationContext::from_peer_context(&peer);
+        assert!(
+            auth.authorize_with_context(&ctx, &service_id::NODE_POWER_REBOOT,)
+                .is_err()
+        );
+
+        // With admin role → allowed.
+        let ctx = AuthorizationContext::from_authenticated_inputs(
+            &peer,
+            None,
+            Some(vec!["admin".to_owned()]),
+            None,
+            None,
+        );
+        assert!(
+            auth.authorize_with_context(&ctx, &service_id::NODE_POWER_REBOOT,)
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn authorizer_v2_adapter_delegates_to_legacy() {
+        struct NodeOnly;
+        impl Authorizer for NodeOnly {
+            fn authorize(
+                &self,
+                _peer: &PeerContext,
+                service: &ServiceId,
+            ) -> Result<(), AuthorizationError> {
+                if service.family.starts_with("node.") {
+                    Ok(())
+                } else {
+                    Err(AuthorizationError::new("only node APIs"))
+                }
+            }
+        }
+
+        let adapter = AuthorizerV2Adapter::new(NodeOnly);
+        let peer = PeerContext::new("agent-1").with_subject("CN=agent-1");
+        let ctx = AuthorizationContext::from_peer_context(&peer);
+
+        assert!(
+            adapter
+                .authorize_with_context(&ctx, &service_id::NODE_POWER_REBOOT,)
+                .is_ok()
+        );
+        assert!(
+            adapter
+                .authorize_with_context(&ctx, &service_id::SERVER_CONFIG_GET,)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn authorizer_v2_adapter_preserves_identity() {
+        use std::sync::{Arc, Mutex};
+
+        struct Capture {
+            name: Arc<Mutex<String>>,
+            subject: Arc<Mutex<Option<String>>>,
+        }
+        impl Authorizer for Capture {
+            fn authorize(
+                &self,
+                peer: &PeerContext,
+                _service: &ServiceId,
+            ) -> Result<(), AuthorizationError> {
+                *self.name.lock().unwrap() = peer.name().to_owned();
+                *self.subject.lock().unwrap() = peer.subject().map(str::to_owned);
+                Ok(())
+            }
+        }
+
+        let captured_name = Arc::new(Mutex::new(String::new()));
+        let captured_subject = Arc::new(Mutex::new(None));
+
+        let adapter = AuthorizerV2Adapter::new(Capture {
+            name: Arc::clone(&captured_name),
+            subject: Arc::clone(&captured_subject),
+        });
+        let peer = PeerContext::new("proxy-1").with_subject("CN=proxy-1,O=Corp");
+        let ctx = AuthorizationContext::from_peer_context(&peer);
+        adapter
+            .authorize_with_context(&ctx, &service_id::NODE_POWER_REBOOT)
+            .unwrap();
+
+        assert_eq!(*captured_name.lock().unwrap(), "proxy-1");
+        assert_eq!(
+            *captured_subject.lock().unwrap(),
+            Some("CN=proxy-1,O=Corp".to_owned()),
+        );
     }
 }

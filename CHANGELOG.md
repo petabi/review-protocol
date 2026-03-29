@@ -9,6 +9,20 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `AuthorizationContext` type in `auth` module that carries
+  richer authenticated peer metadata (`PeerIdentity`,
+  optional `AgentKind`, roles, `ProtocolMetadata`, and an
+  authenticated attributes map) without changing the wire
+  format. Includes `From<&PeerContext>` conversion,
+  `from_peer_context` and `from_authenticated_inputs`
+  constructors. `ServiceId` remains separate.
+- `PeerIdentity` type that extracts certificate-backed
+  identity fields from `PeerContext` for use in
+  `AuthorizationContext`.
+- `AgentKind` enum (`Agent`, `Proxy`, `Other(String)`) for
+  classifying authenticated peers.
+- `ProtocolMetadata` struct with optional `version` and
+  `capabilities` fields for protocol-level policy decisions.
 - `request::handle_node()` dispatch entry point that accepts
   `NodeHandler` directly, allowing a node-focused agent to serve
   node-family requests without implementing the full `Handler`

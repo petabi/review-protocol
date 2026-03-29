@@ -233,7 +233,7 @@ where
 /// and application-supplied attributes).
 ///
 /// Existing callers should continue to use [`handle_authorized`]
-/// with the legacy [`Authorizer`] trait.  When migrating to the
+/// with the legacy [`Authorizer`](crate::auth::Authorizer) trait.  When migrating to the
 /// richer context, wrap legacy authorizers with
 /// [`AuthorizerV2Adapter`](crate::auth::AuthorizerV2Adapter) or
 /// implement [`AuthorizerV2`](crate::auth::AuthorizerV2)

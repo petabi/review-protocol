@@ -385,7 +385,7 @@ impl Connection {
     /// # Errors
     ///
     /// Returns an error if the call to the underlying
-    /// [`local_addr`](quinn::Connection::local_addr) fails.
+    /// [`local_addr`](quinn::Endpoint::local_addr) fails.
     pub fn local_addr(&self) -> std::io::Result<SocketAddr> {
         self.endpoint.local_addr()
     }

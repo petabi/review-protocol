@@ -82,7 +82,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- - Changed `TimeSeriesUpdate::cluster_id` field type from
+- Changed `TimeSeriesUpdate::cluster_id` field type from
   `String` to `u32`.
 - Changed `UpdateClusterRequest::cluster_id` field type from
   `i32` to `u32`.

@@ -181,7 +181,7 @@ pub enum Status {
 }
 
 /// Threat level of a detection event.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum ThreatLevel {
     VeryLow,
     Low,
@@ -1142,5 +1142,27 @@ mod tests {
                 "ThreatLevel {level:?} failed round-trip"
             );
         }
+    }
+
+    #[test]
+    fn threat_level_as_hash_key() {
+        use std::collections::HashMap;
+
+        let mut counts: HashMap<ThreatLevel, usize> = HashMap::new();
+        let events = [
+            ThreatLevel::Low,
+            ThreatLevel::High,
+            ThreatLevel::Low,
+            ThreatLevel::Medium,
+            ThreatLevel::High,
+            ThreatLevel::High,
+        ];
+        for level in &events {
+            *counts.entry(*level).or_insert(0) += 1;
+        }
+        assert_eq!(counts[&ThreatLevel::Low], 2);
+        assert_eq!(counts[&ThreatLevel::High], 3);
+        assert_eq!(counts[&ThreatLevel::Medium], 1);
+        assert_eq!(counts.get(&ThreatLevel::VeryLow), None);
     }
 }

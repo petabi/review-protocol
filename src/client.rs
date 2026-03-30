@@ -495,7 +495,7 @@ pub(crate) async fn handshake(
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "client"))]
 mod tests {
     #![allow(clippy::unwrap_used)]
 

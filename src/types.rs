@@ -1148,6 +1148,8 @@ mod tests {
     fn threat_level_as_hash_key() {
         use std::collections::HashMap;
 
+        use super::ThreatLevel;
+
         let mut counts: HashMap<ThreatLevel, usize> = HashMap::new();
         let events = [
             ThreatLevel::Low,

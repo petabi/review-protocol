@@ -5,7 +5,7 @@ file is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and
 this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.18.1] - 2026-03-30
 
 ### Changed
 
@@ -697,7 +697,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - `client::handshake` implements the application-level handshake process for the
   client after a QUIC connection is established.
 
-[Unreleased]: https://github.com/petabi/review-protocol/compare/0.18.0...main
+[0.18.1]: https://github.com/petabi/review-protocol/compare/0.18.0...0.18.1
 [0.18.0]: https://github.com/petabi/review-protocol/compare/0.17.0...0.18.0
 [0.17.0]: https://github.com/petabi/review-protocol/compare/0.16.0...0.17.0
 [0.16.0]: https://github.com/petabi/review-protocol/compare/0.15.0...0.16.0

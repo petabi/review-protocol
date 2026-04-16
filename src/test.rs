@@ -55,7 +55,7 @@ pub(crate) async fn channel() -> Channel {
                 Ok(e) => e,
                 Err(e) => {
                     if e.kind() == tokio::io::ErrorKind::AddrInUse {
-                        tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+                        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                         continue;
                     }
                     panic!("{}", e);
@@ -341,8 +341,8 @@ impl crate::server::Handler for TestServerHandler {
         Ok(vec![SamplingPolicy {
             id: 1,
             kind: SamplingKind::Conn,
-            interval: std::time::Duration::from_secs(60),
-            period: std::time::Duration::from_secs(3600),
+            interval: std::time::Duration::from_mins(1),
+            period: std::time::Duration::from_hours(1),
             offset: 0,
             src_ip: None,
             dst_ip: None,

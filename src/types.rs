@@ -977,7 +977,7 @@ pub mod node {
             assert_eq!(resp, roundtrip(&resp));
 
             let resp = NodeObservationResponse::Uptime {
-                uptime: Duration::from_secs(86400),
+                uptime: Duration::from_hours(24),
             };
             assert_eq!(resp, roundtrip(&resp));
         }

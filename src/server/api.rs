@@ -1510,8 +1510,8 @@ mod tests {
         let sampling_policies_to_send = vec![SamplingPolicy {
             id: 42,
             kind: SamplingKind::Conn,
-            interval: Duration::from_secs(60),
-            period: Duration::from_secs(3600),
+            interval: Duration::from_mins(1),
+            period: Duration::from_hours(1),
             offset: 0,
             src_ip: None,
             dst_ip: None,

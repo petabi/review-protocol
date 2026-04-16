@@ -362,7 +362,7 @@ impl ConnectionBuilder {
         use std::sync::Arc;
         use std::time::Duration;
 
-        const KEEP_ALIVE_INTERVAL: Duration = Duration::from_millis(5_000);
+        const KEEP_ALIVE_INTERVAL: Duration = Duration::from_secs(5);
 
         let tls_cfg = rustls::ClientConfig::builder()
             .with_root_certificates(self.roots.clone())

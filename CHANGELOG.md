@@ -38,11 +38,6 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   bound concurrency with a `tokio::sync::Semaphore` if needed. The
   caller now owns the spawn lifetime, concurrency policy, and error
   handling. See the updated `README.md` and `examples/event_handler.rs`.
-- `benches/unidirectional_streams.rs` and the `criterion`
-  dev-dependency. The benchmarks measured connection setup, codec
-  round-trip cost, and in-iteration `sleep` rather than the operations
-  their names implied; rather than ship misleading numbers we removed
-  them pending a redesign.
 
 ## [0.18.1] - 2026-03-30
 

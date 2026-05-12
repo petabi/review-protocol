@@ -509,7 +509,7 @@ pub(crate) async fn handshake(
 mod tests {
     #![allow(clippy::unwrap_used)]
 
-    use rcgen::{BasicConstraints, CertificateParams, IsCa, Issuer, KeyPair};
+    use rcgen::{BasicConstraints, CertificateParams, IsCa, KeyPair};
 
     use super::*;
 
@@ -523,7 +523,6 @@ mod tests {
         root_params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
         let root_key = KeyPair::generate().unwrap();
         let root_cert = root_params.self_signed(&root_key).unwrap();
-        let root_issuer = Issuer::from_params(&root_params, &root_key);
 
         // Intermediate CA signed by root
         let mut intermediate_params =
@@ -531,15 +530,14 @@ mod tests {
         intermediate_params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
         let intermediate_key = KeyPair::generate().unwrap();
         let intermediate_cert = intermediate_params
-            .signed_by(&intermediate_key, &root_issuer)
+            .signed_by(&intermediate_key, &root_cert, &root_key)
             .unwrap();
-        let intermediate_issuer = Issuer::from_params(&intermediate_params, &intermediate_key);
 
         // Leaf certificate signed by intermediate
         let leaf_params = CertificateParams::new(vec!["test-client".to_string()]).unwrap();
         let leaf_key = KeyPair::generate().unwrap();
         let leaf_cert = leaf_params
-            .signed_by(&leaf_key, &intermediate_issuer)
+            .signed_by(&leaf_key, &intermediate_cert, &intermediate_key)
             .unwrap();
 
         // Build the full chain PEM: leaf + intermediate
@@ -587,7 +585,7 @@ mod tests {
             "1.0",
             crate::Status::Ready,
             single.cert.pem().as_bytes(),
-            single.signing_key.serialize_pem().as_bytes(),
+            single.key_pair.serialize_pem().as_bytes(),
         )
         .unwrap();
         assert_eq!(builder.certs.len(), 1);
@@ -625,7 +623,7 @@ mod tests {
             "1.0",
             crate::Status::Ready,
             single.cert.pem().as_bytes(),
-            single.signing_key.serialize_pem().as_bytes(),
+            single.key_pair.serialize_pem().as_bytes(),
         )
         .unwrap();
 

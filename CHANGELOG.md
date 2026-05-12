@@ -7,6 +7,23 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `Connection::accept_uni` on the server-side `Connection` wrapper,
+  mirroring `open_bi`, so callers no longer need `as_quinn` to reach
+  the underlying `quinn::Connection::accept_uni`.
+
+### Changed
+
+- `EventStreamHandler` trait methods (`handle_event`, `on_error`,
+  `on_stream_end`) now return `std::io::Result<()>` instead of
+  `Result<(), String>`. Implementors must update their return types
+  and convert errors via `std::io::Error::other`.
+- Bumped `rcgen` (optional and dev-dependency) from 0.13 to 0.14.
+  Users of the `rcgen` / `test-support` feature must update calls to
+  the rcgen 0.14 API (e.g. `signing_key` instead of `key_pair`,
+  `Issuer::from_params` for chained signing).
+
 ### Removed
 
 - `Connection::accept_event_streams`. The bundled spawn loop hard-coded
@@ -17,12 +34,6 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   bound concurrency with a `tokio::sync::Semaphore` if needed. The
   caller now owns the spawn lifetime, concurrency policy, and error
   handling. See the updated `README.md` and `examples/event_handler.rs`.
-
-### Added
-
-- `Connection::accept_uni` on the server-side `Connection` wrapper,
-  mirroring `open_bi`, so callers no longer need `as_quinn` to reach
-  the underlying `quinn::Connection::accept_uni`.
 
 ## [0.18.1] - 2026-03-30
 

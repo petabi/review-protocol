@@ -97,14 +97,6 @@ Run tests with:
 cargo test --features client,server
 ```
 
-### Performance Benchmarks
-
-Performance benchmarks are available in `benches/unidirectional_streams.rs`:
-
-```bash
-cargo bench --features client,server
-```
-
 ## License
 
 Copyright 2024-2025 Petabi, Inc.

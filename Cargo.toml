@@ -49,7 +49,6 @@ thiserror = { version = "2", optional = true }
 tokio = { version = "1", features = ["sync"], optional = true }
 
 [dev-dependencies]
-criterion = "0.7.0"
 quinn = { version = "0.11", features = ["ring"] }
 rcgen = "0.14"
 rustls = { version = "0.23", default-features = false, features = [
@@ -59,11 +58,6 @@ rustls = { version = "0.23", default-features = false, features = [
 rustls-pemfile = "2"
 tokio = { version = "1", features = ["macros", "rt"] }
 tokio-test = "0.4.4"
-
-[[bench]]
-name = "unidirectional_streams"
-harness = false
-required-features = ["test-support"]
 
 [[example]]
 name = "event_handler"

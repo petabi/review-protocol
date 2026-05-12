@@ -113,11 +113,13 @@ pub(crate) async fn channel() -> Channel {
     }
 }
 
+#[cfg(all(feature = "client", feature = "server"))]
 pub struct TestEnvironment {
     server_cert_pem: String,
     server_config: quinn::ServerConfig,
 }
 
+#[cfg(all(feature = "client", feature = "server"))]
 impl TestEnvironment {
     // server configuration
     const SERVER_NAME: &str = "test-server";
@@ -222,12 +224,15 @@ impl TestEnvironment {
     }
 }
 
+#[cfg(all(feature = "client", feature = "server"))]
 pub static TEST_ENV: LazyLock<Mutex<TestEnvironment>> =
     LazyLock::new(|| Mutex::new(TestEnvironment::new()));
 
+#[cfg(all(feature = "client", feature = "server"))]
 #[allow(dead_code)]
 pub(crate) struct TestServerHandler;
 
+#[cfg(all(feature = "client", feature = "server"))]
 #[async_trait::async_trait]
 impl crate::server::Handler for TestServerHandler {
     // Returns `Some` for `id` 5 and `name` "name5" only.

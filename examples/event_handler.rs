@@ -243,19 +243,29 @@ async fn example_multiple_streams() {
     let (server_conn, client_conn) = test_env.setup().await;
 
     let metrics = Arc::new(Mutex::new(EventMetrics::default()));
-    let metrics_for_factory = metrics.clone();
+    let metrics_for_loop = metrics.clone();
 
-    // Server accepts multiple streams with concurrency limit
+    // Server accepts streams via accept_uni + handle_event_stream, with a
+    // caller-owned Semaphore bounding concurrency at 5.
     let server_conn_for_teardown = server_conn.clone();
     let server_conn_clone = server_conn.clone();
+    let semaphore = Arc::new(tokio::sync::Semaphore::new(5));
     let server_handle = tokio::spawn(async move {
-        tokio::time::timeout(
-            std::time::Duration::from_secs(10),
-            server_conn_clone.accept_event_streams(
-                move || MetricsEventHandler::new(metrics_for_factory.clone(), 10),
-                Some(5), // Max 5 concurrent streams
-            ),
-        )
+        tokio::time::timeout(std::time::Duration::from_secs(10), async move {
+            while let Ok(recv) = server_conn_clone.accept_uni().await {
+                let permit = semaphore.clone().acquire_owned().await.unwrap();
+                let handler = MetricsEventHandler::new(metrics_for_loop.clone(), 10);
+                tokio::spawn(async move {
+                    let _permit = permit;
+                    if let Err(e) =
+                        review_protocol::server::Connection::handle_event_stream(recv, handler)
+                            .await
+                    {
+                        eprintln!("[Server] stream ended with error: {e}");
+                    }
+                });
+            }
+        })
         .await
     });
 
@@ -285,8 +295,8 @@ async fn example_multiple_streams() {
     // Wait for completion
     let (server_result, client_result) = tokio::join!(server_handle, client_handle);
 
-    // Server should timeout (expected)
-    assert!(matches!(server_result.unwrap(), Err(_)));
+    // Server's accept loop exits cleanly when the connection closes.
+    assert!(server_result.unwrap().is_ok());
     assert!(client_result.is_ok());
 
     // Print metrics

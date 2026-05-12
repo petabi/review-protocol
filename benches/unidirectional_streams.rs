@@ -9,14 +9,16 @@
 #![allow(clippy::cast_sign_loss)]
 
 use std::hint::black_box;
+use std::sync::Arc;
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use review_protocol::{
-    server::EventStreamHandler,
+    server::{Connection, EventStreamHandler},
     test::TEST_ENV,
     types::{EventKind, EventMessage},
 };
 use tokio::runtime::Runtime;
+use tokio::sync::Semaphore;
 
 /// No-op handler for measuring pure processing overhead
 struct NoopHandler;
@@ -176,13 +178,29 @@ fn benchmark_concurrent_streams(c: &mut Criterion) {
                         let (server_conn, client_conn) = test_env.setup().await;
 
                         let server_conn_clone = server_conn.clone();
+                        let semaphore = Arc::new(Semaphore::new(stream_count));
                         let server_handle = tokio::spawn(async move {
                             tokio::time::timeout(
                                 std::time::Duration::from_secs(10),
-                                server_conn_clone.accept_event_streams(
-                                    || MinimalHandler { count: 0 },
-                                    Some(stream_count),
-                                ),
+                                async move {
+                                    while let Ok(recv) =
+                                        server_conn_clone.accept_uni().await
+                                    {
+                                        let permit = semaphore
+                                            .clone()
+                                            .acquire_owned()
+                                            .await
+                                            .unwrap();
+                                        tokio::spawn(async move {
+                                            let _permit = permit;
+                                            let _ = Connection::handle_event_stream(
+                                                recv,
+                                                MinimalHandler { count: 0 },
+                                            )
+                                            .await;
+                                        });
+                                    }
+                                },
                             )
                             .await
                         });

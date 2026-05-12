@@ -46,23 +46,31 @@
 //!
 //! ## Multiple Concurrent Streams
 //!
-//! To handle multiple streams concurrently with optional concurrency limiting:
+//! Drive `accept_uni` directly and dispatch each stream to
+//! [`Connection::handle_event_stream`]. The caller owns the spawn
+//! lifetime, concurrency policy, and error handling:
 //!
 //! ```rust,ignore
+//! # use std::sync::Arc;
 //! # use review_protocol::{server::{Connection, EventStreamHandler}, types::EventMessage};
-//! # struct MyEventHandler { event_count: usize }
+//! # struct MyEventHandler;
 //! # #[async_trait::async_trait]
 //! # impl EventStreamHandler for MyEventHandler {
 //! #     async fn handle_event(&mut self, event: EventMessage) -> std::io::Result<()> { Ok(()) }
 //! # }
-//! # impl MyEventHandler {
-//! #     fn new() -> Self { MyEventHandler { event_count: 0 } }
-//! # }
+//! # impl MyEventHandler { fn new() -> Self { MyEventHandler } }
 //! # async fn example(connection: Connection) -> anyhow::Result<()> {
-//! connection.accept_event_streams(
-//!     || MyEventHandler::new(),
-//!     Some(5) // Limit to 5 concurrent streams
-//! ).await?;
+//! let semaphore = Arc::new(tokio::sync::Semaphore::new(5));
+//! while let Ok(recv) = connection.accept_uni().await {
+//!     let permit = semaphore.clone().acquire_owned().await?;
+//!     let handler = MyEventHandler::new();
+//!     tokio::spawn(async move {
+//!         let _permit = permit;
+//!         if let Err(e) = Connection::handle_event_stream(recv, handler).await {
+//!             tracing::warn!(error = %e, "event stream ended with error");
+//!         }
+//!     });
+//! }
 //! # Ok(())
 //! # }
 //! ```
@@ -369,6 +377,17 @@ impl Connection {
         self.conn.open_bi()
     }
 
+    /// Accepts the next incoming unidirectional stream.
+    ///
+    /// This directly corresponds to the `accept_uni` method of the underlying
+    /// `quinn::Connection`. Pair it with [`Connection::handle_event_stream`]
+    /// to dispatch each stream with caller-controlled concurrency and error
+    /// handling.
+    #[must_use]
+    pub fn accept_uni(&self) -> quinn::AcceptUni<'_> {
+        self.conn.accept_uni()
+    }
+
     #[cfg(any(test, feature = "test-support"))]
     #[doc(hidden)]
     pub fn close(&self) {
@@ -465,99 +484,6 @@ impl Connection {
         self::stream::process_event_stream(recv_stream, handler).await
     }
 
-    /// Accepts multiple unidirectional streams concurrently
-    ///
-    /// This method continuously accepts unidirectional streams and spawns
-    /// tasks to handle them. It's useful for server applications that need
-    /// to handle multiple concurrent event streams.
-    ///
-    /// # Arguments
-    /// * `handler_factory` - Function that creates a new handler for each
-    ///   stream
-    /// * `max_concurrent` - Maximum number of concurrent streams (None =
-    ///   unlimited)
-    ///
-    /// # Returns
-    /// * `Ok(())` - All streams handled (connection closed)
-    /// * `Err(e)` - Connection error or too many concurrent streams
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if:
-    /// * Failed to accept unidirectional stream (connection error)
-    /// * Semaphore acquisition failed (concurrency limiting error)
-    ///
-    /// # Example
-    /// ```rust,ignore
-    /// # use review_protocol::server::{Connection, EventStreamHandler};
-    /// # use review_protocol::types::EventMessage;
-    /// # struct MyEventHandler;
-    /// # #[async_trait::async_trait]
-    /// # impl EventStreamHandler for MyEventHandler {
-    /// #     async fn handle_event(&mut self, event: EventMessage) -> std::io::Result<()> {
-    /// #         Ok(())
-    /// #     }
-    /// # }
-    /// # impl MyEventHandler {
-    /// #     fn new() -> Self { MyEventHandler }
-    /// # }
-    /// # async fn example(connection: Connection) -> std::io::Result<()> {
-    /// connection.accept_event_streams(
-    ///     || MyEventHandler::new(),
-    ///     Some(10) // Max 10 concurrent streams
-    /// ).await?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub async fn accept_event_streams<H, F>(
-        &self,
-        handler_factory: F,
-        max_concurrent: Option<usize>,
-    ) -> io::Result<()>
-    where
-        H: EventStreamHandler + Send + 'static,
-        F: Fn() -> H + Send + Sync + 'static,
-    {
-        use std::sync::Arc;
-
-        let semaphore = max_concurrent.map(|n| Arc::new(tokio::sync::Semaphore::new(n)));
-
-        loop {
-            let recv_stream = match self.conn.accept_uni().await {
-                Ok(stream) => stream,
-                Err(quinn::ConnectionError::ApplicationClosed(_)) => {
-                    // Connection closed normally
-                    break;
-                }
-                Err(e) => {
-                    return Err(io::Error::other(format!("failed to accept stream: {e}")));
-                }
-            };
-
-            // Acquire semaphore permit if limited concurrency
-            let permit = if let Some(ref sem) = semaphore {
-                Some(
-                    sem.clone()
-                        .acquire_owned()
-                        .await
-                        .map_err(io::Error::other)?,
-                )
-            } else {
-                None
-            };
-
-            let handler = handler_factory();
-            tokio::spawn(async move {
-                // Move permit into task so it's dropped when task completes
-                let _permit = permit;
-                if let Err(e) = self::stream::process_event_stream(recv_stream, handler).await {
-                    eprintln!("Event stream processing error: {e}");
-                }
-            });
-        }
-
-        Ok(())
-    }
 }
 
 #[cfg(feature = "server")]
@@ -1059,19 +985,22 @@ mod tests {
         let (server_conn, client_conn) = test_env.setup().await;
 
         let events = Arc::new(Mutex::new(Vec::new()));
-        let events_for_factory = events.clone();
+        let events_for_loop = events.clone();
 
-        // Spawn server task to accept multiple event streams
+        // Spawn the recommended accept loop: accept_uni + handle_event_stream
+        // in a per-stream tokio::spawn, with the caller owning lifetime and
+        // error handling.
         let server_conn_clone = server_conn.clone();
         let server_handle = tokio::spawn(async move {
-            server_conn_clone
-                .accept_event_streams(
-                    move || TestHandler {
-                        events: events_for_factory.clone(),
-                    },
-                    Some(5),
-                )
-                .await
+            while let Ok(recv) = server_conn_clone.accept_uni().await {
+                let handler = TestHandler {
+                    events: events_for_loop.clone(),
+                };
+                tokio::spawn(async move {
+                    let _ =
+                        crate::server::Connection::handle_event_stream(recv, handler).await;
+                });
+            }
         });
 
         // Client opens multiple unidirectional streams
@@ -1131,7 +1060,7 @@ mod tests {
             atomic::{AtomicUsize, Ordering},
         };
 
-        use tokio::sync::Mutex;
+        use tokio::sync::{Mutex, Semaphore};
 
         struct SlowHandler {
             concurrent_count: Arc<AtomicUsize>,
@@ -1164,24 +1093,27 @@ mod tests {
         let concurrent_count = Arc::new(AtomicUsize::new(0));
         let max_concurrent = Arc::new(Mutex::new(0));
 
-        let concurrent_count_for_factory = concurrent_count.clone();
-        let max_concurrent_for_factory = max_concurrent.clone();
+        let concurrent_count_for_loop = concurrent_count.clone();
+        let max_concurrent_for_loop = max_concurrent.clone();
 
-        // Limit to 2 concurrent streams
+        // Limit to 2 concurrent streams via a caller-owned Semaphore.
         let max_limit = 2;
+        let semaphore = Arc::new(Semaphore::new(max_limit));
 
-        // Spawn server task to accept multiple event streams with concurrency limit
         let server_conn_clone = server_conn.clone();
         let server_handle = tokio::spawn(async move {
-            server_conn_clone
-                .accept_event_streams(
-                    move || SlowHandler {
-                        concurrent_count: concurrent_count_for_factory.clone(),
-                        max_concurrent: max_concurrent_for_factory.clone(),
-                    },
-                    Some(max_limit),
-                )
-                .await
+            while let Ok(recv) = server_conn_clone.accept_uni().await {
+                let permit = semaphore.clone().acquire_owned().await.unwrap();
+                let handler = SlowHandler {
+                    concurrent_count: concurrent_count_for_loop.clone(),
+                    max_concurrent: max_concurrent_for_loop.clone(),
+                };
+                tokio::spawn(async move {
+                    let _permit = permit;
+                    let _ =
+                        crate::server::Connection::handle_event_stream(recv, handler).await;
+                });
+            }
         });
 
         // Client opens multiple unidirectional streams rapidly

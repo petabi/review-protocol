@@ -5,6 +5,25 @@ file is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and
 this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Removed
+
+- `Connection::accept_event_streams`. The bundled spawn loop hard-coded
+  `eprintln!` for per-stream errors and flattened connection-close
+  variants into a single `Ok(())`, hiding diagnostics from the caller.
+  Drive `Connection::accept_uni` and dispatch each stream to
+  `Connection::handle_event_stream` inside a `tokio::spawn` instead;
+  bound concurrency with a `tokio::sync::Semaphore` if needed. The
+  caller now owns the spawn lifetime, concurrency policy, and error
+  handling. See the updated `README.md` and `examples/event_handler.rs`.
+
+### Added
+
+- `Connection::accept_uni` on the server-side `Connection` wrapper,
+  mirroring `open_bi`, so callers no longer need `as_quinn` to reach
+  the underlying `quinn::Connection::accept_uni`.
+
 ## [0.18.1] - 2026-03-30
 
 ### Changed

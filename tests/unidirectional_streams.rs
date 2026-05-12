@@ -145,26 +145,31 @@ async fn test_multiple_concurrent_streams() {
     let (server_conn, client_conn) = test_env.setup().await;
 
     let events = Arc::new(Mutex::new(Vec::new()));
-    let events_for_factory = events.clone();
+    let events_for_loop = events.clone();
 
-    // Server accepts multiple streams
+    // Server accepts multiple streams using accept_uni + handle_event_stream,
+    // with a Semaphore bounding concurrency at 3.
     let server_conn_for_teardown = server_conn.clone();
     let server_conn_clone = server_conn.clone();
+    let semaphore = Arc::new(tokio::sync::Semaphore::new(3));
     let server_handle = tokio::spawn(async move {
-        timeout(
-            Duration::from_secs(5),
-            server_conn_clone.accept_event_streams(
-                move || {
-                    let events = events_for_factory.clone();
-                    CollectingHandler {
+        timeout(Duration::from_secs(5), async move {
+            while let Ok(recv) = server_conn_clone.accept_uni().await {
+                let permit = semaphore.clone().acquire_owned().await.unwrap();
+                let events = events_for_loop.clone();
+                tokio::spawn(async move {
+                    let _permit = permit;
+                    let handler = CollectingHandler {
                         events,
                         errors: Arc::new(Mutex::new(Vec::new())),
                         max_events: None,
-                    }
-                },
-                Some(3),
-            ),
-        )
+                    };
+                    let _ =
+                        review_protocol::server::Connection::handle_event_stream(recv, handler)
+                            .await;
+                });
+            }
+        })
         .await
     });
 
@@ -216,8 +221,9 @@ async fn test_multiple_concurrent_streams() {
 
     let (server_result, client_result) = tokio::join!(server_handle, client_handle);
 
-    // Server should complete when connection closes (timeout)
-    assert!(server_result.unwrap().is_err());
+    // Server's accept loop should exit cleanly when the connection closes,
+    // well before the 5s timeout fires.
+    assert!(server_result.unwrap().is_ok());
     assert!(client_result.is_ok());
 
     // Verify all events were received
@@ -524,22 +530,28 @@ async fn test_concurrent_stream_processing() {
     let (server_conn, client_conn) = test_env.setup().await;
 
     let processed_count = Arc::new(Mutex::new(0_usize));
-    let processed_count_for_factory = processed_count.clone();
+    let processed_count_for_loop = processed_count.clone();
 
     let server_conn_for_teardown = server_conn.clone();
 
-    // Server accepts multiple streams with concurrency limit of 5
+    // Server accepts streams via accept_uni, bounding concurrency at 5 with
+    // a caller-owned Semaphore.
     let server_conn_clone = server_conn.clone();
+    let semaphore = Arc::new(tokio::sync::Semaphore::new(5));
     let server_handle = tokio::spawn(async move {
-        timeout(
-            Duration::from_secs(10),
-            server_conn_clone.accept_event_streams(
-                move || CountingHandler {
-                    processed_count: processed_count_for_factory.clone(),
-                },
-                Some(5),
-            ),
-        )
+        timeout(Duration::from_secs(10), async move {
+            while let Ok(recv) = server_conn_clone.accept_uni().await {
+                let permit = semaphore.clone().acquire_owned().await.unwrap();
+                let processed_count = processed_count_for_loop.clone();
+                tokio::spawn(async move {
+                    let _permit = permit;
+                    let handler = CountingHandler { processed_count };
+                    let _ =
+                        review_protocol::server::Connection::handle_event_stream(recv, handler)
+                            .await;
+                });
+            }
+        })
         .await
     });
 
@@ -587,8 +599,8 @@ async fn test_concurrent_stream_processing() {
 
     let (server_result, client_result) = tokio::join!(server_handle, client_handle);
 
-    // Server timeout is expected
-    assert!(server_result.unwrap().is_err());
+    // Server's accept loop exits cleanly when the connection closes.
+    assert!(server_result.unwrap().is_ok());
     assert!(client_result.is_ok());
 
     // Verify all 50 events were processed (10 streams * 5 events)

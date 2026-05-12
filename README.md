@@ -38,32 +38,44 @@ struct MyEventHandler;
 
 #[async_trait::async_trait]
 impl EventStreamHandler for MyEventHandler {
-    async fn handle_event(&mut self, event: EventMessage) -> Result<(), String> {
+    async fn handle_event(&mut self, event: EventMessage) -> std::io::Result<()> {
         println!("Received event: {:?}", event.kind);
         Ok(())
     }
 }
 ```
 
-Then handle incoming streams:
+Then handle incoming streams. For a single stream:
 
 ```rust
-// Single stream
 connection.accept_event_stream(MyEventHandler).await?;
+```
 
-// Multiple concurrent streams with limit
-connection.accept_event_streams(
-    || MyEventHandler,
-    Some(10)  // Max 10 concurrent streams
-).await?;
+For multiple concurrent streams, drive `accept_uni` and dispatch each
+stream to `Connection::handle_event_stream` inside a `tokio::spawn`. The
+caller owns the spawn lifetime, concurrency policy, and error handling:
+
+```rust
+use std::sync::Arc;
+use review_protocol::server::Connection;
+
+let semaphore = Arc::new(tokio::sync::Semaphore::new(10));
+while let Ok(recv) = connection.accept_uni().await {
+    let permit = semaphore.clone().acquire_owned().await?;
+    let handler = MyEventHandler;
+    tokio::spawn(async move {
+        let _permit = permit;
+        if let Err(e) = Connection::handle_event_stream(recv, handler).await {
+            tracing::warn!(error = %e, "event stream ended with error");
+        }
+    });
+}
 ```
 
 For more details, see:
 
 - [API Documentation](src/server.rs) - Comprehensive API documentation with
   examples
-- [Migration Guide](docs/migration-guide.md) - Guide for migrating from direct
-  stream handling
 - [Example](examples/event_handler.rs) - Complete working example with metrics
   and error handling
 

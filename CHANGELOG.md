@@ -19,6 +19,10 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   `on_stream_end`) now return `std::io::Result<()>` instead of
   `Result<(), String>`. Implementors must update their return types
   and convert errors via `std::io::Error::other`.
+- `EventStreamHandler::on_error`'s default implementation is now a
+  no-op. The previous default wrote to stderr via `eprintln!`, which
+  bypassed the application's logging setup. Override the method to
+  route stream-level errors into your own logger / metrics.
 - Bumped `rcgen` (optional and dev-dependency) from 0.13 to 0.14.
   Users of the `rcgen` / `test-support` feature must update calls to
   the rcgen 0.14 API (e.g. `signing_key` instead of `key_pair`,

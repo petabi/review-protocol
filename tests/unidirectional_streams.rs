@@ -164,9 +164,8 @@ async fn test_multiple_concurrent_streams() {
                         errors: Arc::new(Mutex::new(Vec::new())),
                         max_events: None,
                     };
-                    let _ =
-                        review_protocol::server::Connection::handle_event_stream(recv, handler)
-                            .await;
+                    let _ = review_protocol::server::Connection::handle_event_stream(recv, handler)
+                        .await;
                 });
             }
         })
@@ -546,9 +545,8 @@ async fn test_concurrent_stream_processing() {
                 tokio::spawn(async move {
                     let _permit = permit;
                     let handler = CountingHandler { processed_count };
-                    let _ =
-                        review_protocol::server::Connection::handle_event_stream(recv, handler)
-                            .await;
+                    let _ = review_protocol::server::Connection::handle_event_stream(recv, handler)
+                        .await;
                 });
             }
         })

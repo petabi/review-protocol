@@ -38,10 +38,10 @@ struct MyEventHandler;
 
 #[async_trait::async_trait]
 impl EventStreamHandler for MyEventHandler {
-    async fn handle_event(&mut self, event: EventMessage) -> std::io::Result<()> {
-        println!("Received event: {:?}", event.kind);
-        Ok(())
-    }
+  async fn handle_event(&mut self, event: EventMessage) -> io::Result<()> {
+    println!("Received event: {:?}", event.kind);
+    Ok(())
+  }
 }
 ```
 

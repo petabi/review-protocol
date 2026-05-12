@@ -100,7 +100,7 @@
 //!         // Handle unidirectional event streams
 //!         res = connection.accept_event_stream(MyEventHandler::new()) => {
 //!             if let Err(e) = res {
-//!                 eprintln!("Event stream error: {}", e);
+//!                 tracing::warn!(error = %e, "event stream ended with error");
 //!             }
 //!         }
 //!     }
@@ -130,7 +130,7 @@
 //!
 //!     async fn on_error(&mut self, error: &str) -> std::io::Result<()> {
 //!         self.error_count += 1;
-//!         eprintln!("Stream error #{}: {}", self.error_count, error);
+//!         tracing::warn!(error, count = self.error_count, "stream error");
 //!
 //!         if self.error_count >= self.max_errors {
 //!             Err(std::io::Error::other(format!("Too many errors: {}", self.error_count)))
@@ -226,13 +226,18 @@ pub trait EventStreamHandler {
     /// Called when an error occurs during stream processing
     ///
     /// This includes deserialization errors, network errors, etc.
-    /// The handler can decide whether to treat the error as fatal.
-    /// Default implementation logs the error.
+    /// The handler can decide whether to treat the error as fatal:
+    /// return `Ok(())` to continue processing subsequent messages, or
+    /// `Err(_)` to stop the stream and propagate the error to the
+    /// caller of [`Connection::handle_event_stream`].
+    ///
+    /// The default implementation is a no-op; the library does not
+    /// log on the application's behalf. Override this method to wire
+    /// stream-level errors into your own logging or metrics.
     ///
     /// # Arguments
     /// * `error` - Description of the error that occurred
-    async fn on_error(&mut self, error: &str) -> io::Result<()> {
-        eprintln!("Event stream error: {error}");
+    async fn on_error(&mut self, _error: &str) -> io::Result<()> {
         Ok(())
     }
 }
@@ -483,7 +488,6 @@ impl Connection {
     {
         self::stream::process_event_stream(recv_stream, handler).await
     }
-
 }
 
 #[cfg(feature = "server")]
@@ -997,8 +1001,7 @@ mod tests {
                     events: events_for_loop.clone(),
                 };
                 tokio::spawn(async move {
-                    let _ =
-                        crate::server::Connection::handle_event_stream(recv, handler).await;
+                    let _ = crate::server::Connection::handle_event_stream(recv, handler).await;
                 });
             }
         });
@@ -1110,8 +1113,7 @@ mod tests {
                 };
                 tokio::spawn(async move {
                     let _permit = permit;
-                    let _ =
-                        crate::server::Connection::handle_event_stream(recv, handler).await;
+                    let _ = crate::server::Connection::handle_event_stream(recv, handler).await;
                 });
             }
         });

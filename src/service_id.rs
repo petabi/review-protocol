@@ -584,6 +584,7 @@ pub(crate) fn from_client_request_code(code: ClientRequestCode) -> Option<Servic
 /// maps to a specific method-level identifier.
 #[cfg(any(feature = "client", feature = "server"))]
 #[must_use]
+#[allow(dead_code)] // used by tests and by server::handler; unused under client-only builds
 pub(crate) fn from_server_request_code(code: ServerRequestCode) -> Option<ServiceId> {
     match code {
         ServerRequestCode::GetDataSource => Some(SERVER_DATA_SOURCE_GET),

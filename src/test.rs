@@ -1,4 +1,6 @@
 //! Shared test code
+//!
+//! This module is exposed for integration tests and benchmarks.
 
 #![allow(clippy::unwrap_used)]
 
@@ -19,6 +21,7 @@ use crate::types::{
     LabelDbRule, SamplingKind, SamplingPolicy,
 };
 
+#[allow(dead_code)]
 pub(crate) struct Channel {
     pub(crate) server: Endpoint,
     pub(crate) client: Endpoint,
@@ -31,10 +34,12 @@ pub(crate) struct Endpoint {
     pub(crate) recv: RecvStream,
 }
 
+#[allow(dead_code)]
 pub(crate) static TOKEN: LazyLock<Mutex<u32>> = LazyLock::new(|| Mutex::new(0));
 
 /// Creates a bidirectional channel, returning server's send and receive and
 /// client's send and receive streams.
+#[allow(dead_code)]
 pub(crate) async fn channel() -> Channel {
     use std::sync::Arc;
 
@@ -109,7 +114,7 @@ pub(crate) async fn channel() -> Channel {
 }
 
 #[cfg(all(feature = "client", feature = "server"))]
-pub(crate) struct TestEnvironment {
+pub struct TestEnvironment {
     server_cert_pem: String,
     server_config: quinn::ServerConfig,
 }
@@ -140,7 +145,7 @@ impl TestEnvironment {
         }
     }
 
-    pub(crate) async fn setup(&self) -> (crate::server::Connection, crate::client::Connection) {
+    pub async fn setup(&self) -> (crate::server::Connection, crate::client::Connection) {
         use crate::Status;
 
         // client configuration
@@ -213,17 +218,18 @@ impl TestEnvironment {
         )
     }
 
-    pub(crate) fn teardown(&self, server_conn: &crate::server::Connection) {
+    pub fn teardown(&self, server_conn: &crate::server::Connection) {
         let _ = self; // Silence unused warning for `self`
         server_conn.close();
     }
 }
 
 #[cfg(all(feature = "client", feature = "server"))]
-pub(crate) static TEST_ENV: LazyLock<Mutex<TestEnvironment>> =
+pub static TEST_ENV: LazyLock<Mutex<TestEnvironment>> =
     LazyLock::new(|| Mutex::new(TestEnvironment::new()));
 
 #[cfg(all(feature = "client", feature = "server"))]
+#[allow(dead_code)]
 pub(crate) struct TestServerHandler;
 
 #[cfg(all(feature = "client", feature = "server"))]

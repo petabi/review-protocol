@@ -5,6 +5,41 @@ file is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and
 this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `Connection::accept_uni` on the server-side `Connection` wrapper,
+  mirroring `open_bi`, so callers no longer need `as_quinn` to reach
+  the underlying `quinn::Connection::accept_uni`.
+
+### Changed
+
+- `EventStreamHandler` trait methods (`handle_event`, `on_error`,
+  `on_stream_end`) now return `std::io::Result<()>` instead of
+  `Result<(), String>`. Implementors must update their return types
+  and convert errors via `std::io::Error::other`.
+- `EventStreamHandler::on_error`'s default implementation is now a
+  no-op. The previous default wrote to stderr via `eprintln!`, which
+  bypassed the application's logging setup. Override the method to
+  route stream-level errors into your own logger / metrics.
+- Bumped `rcgen` (optional and dev-dependency) from 0.13 to 0.14.
+  Users of the `rcgen` / `test-support` feature must update calls to
+  the rcgen 0.14 API (e.g. `signing_key` instead of `key_pair`,
+  `Issuer::from_params` for chained signing).
+
+### Removed
+
+- `Connection::accept_event_streams`. The bundled spawn loop hard-coded
+  `eprintln!` for per-stream errors and flattened connection-close
+  variants into a single `Ok(())`, hiding diagnostics from the caller.
+  Drive `Connection::accept_uni` and dispatch each stream to
+  `Connection::handle_event_stream` inside a `tokio::spawn` instead;
+  bound concurrency with a `tokio::sync::Semaphore` if needed. The
+  caller now owns the spawn lifetime, concurrency policy, and error
+  handling. See the updated `README.md` and the module-level docs in
+  `src/server.rs`.
+
 ## [0.18.1] - 2026-03-30
 
 ### Changed
@@ -287,6 +322,18 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   blocklist events.
 - `UnusualDestinationPattern` variant to `EventKind` enum to support detection
   of unusual destination patterns in network traffic.
+- Comprehensive integration tests in `tests/unidirectional_streams.rs`
+  covering protocol compatibility, error handling, concurrent streams, and
+  edge cases
+- Performance benchmarks in `benches/unidirectional_streams.rs` for measuring
+  event throughput, event sizes, concurrent streams, and deserialization
+  overhead
+- Complete working example in `examples/event_handler.rs` demonstrating event
+  handler implementation with metrics collection and error handling
+- Migration guide in `docs/migration-guide.md` to help applications migrate
+  from direct stream handling to the encapsulated API
+- Enhanced API documentation with usage examples for single streams, multiple
+  concurrent streams, and integration patterns
 
 ### Changed
 

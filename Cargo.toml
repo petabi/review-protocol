@@ -59,10 +59,6 @@ rustls-pemfile = "2"
 tokio = { version = "1", features = ["macros", "rt"] }
 tokio-test = "0.4.4"
 
-[[example]]
-name = "event_handler"
-required-features = ["test-support"]
-
 [lints.clippy]
 pedantic = "warn"
 unwrap_used = "warn"

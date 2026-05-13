@@ -37,7 +37,8 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   `Connection::handle_event_stream` inside a `tokio::spawn` instead;
   bound concurrency with a `tokio::sync::Semaphore` if needed. The
   caller now owns the spawn lifetime, concurrency policy, and error
-  handling. See the updated `README.md` and `examples/event_handler.rs`.
+  handling. See the updated `README.md` and the module-level docs in
+  `src/server.rs`.
 
 ## [0.18.1] - 2026-03-30
 

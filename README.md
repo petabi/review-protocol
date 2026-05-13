@@ -76,8 +76,6 @@ For more details, see:
 
 - [API Documentation](src/server.rs) - Comprehensive API documentation with
   examples
-- [Example](examples/event_handler.rs) - Complete working example with metrics
-  and error handling
 
 ### Integration Tests
 

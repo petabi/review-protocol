@@ -5,7 +5,7 @@ use super::Connection;
 use crate::{
     client,
     types::{
-        HostNetworkGroup, Process, ResourceUsage, SamplingPolicy, TrafficFilterRule,
+        HostNetworkGroup, SamplingPolicy, TrafficFilterRule,
         node::{
             NodeHostnameRequest, NodeHostnameResponse, NodeLoggingRequest, NodeLoggingResponse,
             NodeNetworkInterfaceRequest, NodeNetworkInterfaceResponse, NodeObservationRequest,
@@ -45,23 +45,18 @@ use crate::{
 ///   `Node*Response`.  These remain available as compatibility
 ///   wrappers.
 ///
-/// - **Legacy flat methods** (e.g.
-///   [`send_reboot_cmd`](Self::send_reboot_cmd),
-///   [`get_process_list`](Self::get_process_list)) provide a
-///   simpler, backward-compatible surface.  They do not expose
-///   `ServiceId` and cannot participate in `Authorizer`-based
-///   access control.  Where possible they delegate to a `node_*`
-///   method internally, but some (e.g.
-///   [`send_allowlist`](Self::send_allowlist)) still use their own
-///   request path.
+/// - **Legacy flat methods** provide a simpler,
+///   backward-compatible surface.  They do not expose `ServiceId`
+///   and cannot participate in `Authorizer`-based access control.
+///   Some (e.g. [`send_allowlist`](Self::send_allowlist)) still use
+///   their own request path.
 ///
 /// ## Migrating from flat to `node_*`
 ///
 /// When migrating, note the following differences:
 ///
 /// - `node_*` methods return the full `Node*Response` enum; you
-///   must match the expected variant.  Legacy methods return
-///   unwrapped convenience types (e.g. `Vec<Process>`).
+///   must match the expected variant.
 /// - `node_*_authorized` methods require a
 ///   [`PeerContext`](crate::auth::PeerContext) and an
 ///   [`Authorizer`](crate::auth::Authorizer).  Legacy methods
@@ -70,50 +65,6 @@ use crate::{
 ///   [`send_allowlist`](Self::send_allowlist),
 ///   [`send_ping`](Self::send_ping)); continue using them as-is.
 impl Connection {
-    /// Fetches the list of processes running on the agent.
-    ///
-    /// This is a legacy compatibility wrapper that delegates to
-    /// [`node_observation`](Self::node_observation) internally.
-    /// Prefer `node_observation` for new code — it exposes the
-    /// full response enum and supports authorization via
-    /// [`node_observation_authorized`](Self::node_observation_authorized).
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if serialization/deserialization failed or
-    /// communication with the client failed.
-    pub async fn get_process_list(&self) -> anyhow::Result<Vec<Process>> {
-        match self
-            .node_observation(NodeObservationRequest::ProcessList)
-            .await?
-        {
-            NodeObservationResponse::ProcessList { processes } => Ok(processes),
-            other => Err(anyhow!("unexpected node_observation response: {other:?}")),
-        }
-    }
-
-    /// Fetches the resource usage of an agent.
-    ///
-    /// This is a legacy compatibility wrapper that delegates to
-    /// [`node_observation`](Self::node_observation) internally.
-    /// Prefer `node_observation` for new code — it exposes the
-    /// full response enum and supports authorization via
-    /// [`node_observation_authorized`](Self::node_observation_authorized).
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if serialization/deserialization failed or
-    /// communication with the client failed.
-    pub async fn get_resource_usage(&self) -> anyhow::Result<ResourceUsage> {
-        match self
-            .node_observation(NodeObservationRequest::ResourceUsage)
-            .await?
-        {
-            NodeObservationResponse::ResourceUsage { resource_usage, .. } => Ok(resource_usage),
-            other => Err(anyhow!("unexpected node_observation response: {other:?}")),
-        }
-    }
-
     /// Sends the allowlist for network addresses.
     ///
     /// # Errors
@@ -174,22 +125,6 @@ impl Connection {
             .await
     }
 
-    /// Sends the reboot command.
-    ///
-    /// This is a legacy compatibility wrapper that delegates to
-    /// [`node_power`](Self::node_power) internally.  Prefer
-    /// `node_power` for new code — it exposes the full set of
-    /// power operations and supports authorization via
-    /// [`node_power_authorized`](Self::node_power_authorized).
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if serialization failed or communication
-    /// with the client failed.
-    pub async fn send_reboot_cmd(&self) -> anyhow::Result<()> {
-        self.node_power(NodePowerRequest::Reboot).await.map(|_| ())
-    }
-
     /// Sends the sampling policies.
     ///
     /// # Errors
@@ -198,24 +133,6 @@ impl Connection {
     pub async fn send_sampling_policies(&self, list: &[SamplingPolicy]) -> anyhow::Result<()> {
         self.send_request(client::RequestCode::SamplingPolicyList, list)
             .await
-    }
-
-    /// Sends the shutdown command.
-    ///
-    /// This is a legacy compatibility wrapper that delegates to
-    /// [`node_power`](Self::node_power) internally.  Prefer
-    /// `node_power` for new code — it exposes the full set of
-    /// power operations and supports authorization via
-    /// [`node_power_authorized`](Self::node_power_authorized).
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if serialization failed or communication
-    /// with the client failed.
-    pub async fn send_shutdown_cmd(&self) -> anyhow::Result<()> {
-        self.node_power(NodePowerRequest::Shutdown)
-            .await
-            .map(|_| ())
     }
 
     /// Sends a list of Tor exit nodes to the client.
@@ -276,21 +193,14 @@ impl Connection {
     //
     // ## Legacy flat API compatibility
     //
-    // Older "flat" methods on `Connection` (e.g. `send_reboot_cmd`,
-    // `get_process_list`) provide a simpler, backward-compatible
-    // interface for common operations.  Where possible they delegate
-    // to the corresponding `node_*` method internally.  The key
-    // differences:
-    //
-    //   - Flat methods do not expose `ServiceId` and cannot be
-    //     used with `Authorizer`-based access control.
-    //   - Flat methods return simplified types (e.g. `Vec<Process>`)
-    //     rather than the full `Node*Response` enum.
+    // Older "flat" methods on `Connection` provide a simpler,
+    // backward-compatible interface for common operations.
+    // They do not expose `ServiceId` and cannot be used with
+    // `Authorizer`-based access control.
     //
     // **Prefer `node_*` methods for new code** — they offer typed
     // request/response enums, explicit `ServiceId` scoping, and
-    // authorization support.  Use the flat methods only when
-    // backward compatibility with older callers is required.
+    // authorization support.
 
     /// Sends a node service-control request to the agent.
     ///
@@ -457,14 +367,6 @@ impl Connection {
     /// [`node_power_authorized`](Self::node_power_authorized)
     /// instead.
     ///
-    /// # Legacy compatibility
-    ///
-    /// The flat methods [`send_reboot_cmd`](Self::send_reboot_cmd)
-    /// and [`send_shutdown_cmd`](Self::send_shutdown_cmd) delegate
-    /// to this method internally.  Prefer `node_power` for new
-    /// code — it exposes the full set of power operations and
-    /// supports authorization via the `_authorized` variant.
-    ///
     /// # Errors
     ///
     /// Returns an error if serialization/deserialization failed or
@@ -487,15 +389,6 @@ impl Connection {
     /// authorization, use
     /// [`node_observation_authorized`](Self::node_observation_authorized)
     /// instead.
-    ///
-    /// # Legacy compatibility
-    ///
-    /// The flat methods
-    /// [`get_process_list`](Self::get_process_list) and
-    /// [`get_resource_usage`](Self::get_resource_usage) delegate to
-    /// this method internally.  Prefer `node_observation` for new
-    /// code — it exposes the full set of observation queries and
-    /// supports authorization via the `_authorized` variant.
     ///
     /// # Errors
     ///
@@ -1110,7 +1003,7 @@ mod tests {
     use {
         crate::{
             test::TEST_ENV,
-            types::{HostNetworkGroup, SamplingKind, SamplingPolicy},
+            types::{HostNetworkGroup, Process, ResourceUsage, SamplingKind, SamplingPolicy},
         },
         ipnet::IpNet,
         std::{
@@ -1190,7 +1083,7 @@ mod tests {
             match req {
                 super::NodeObservationRequest::ProcessList => {
                     Ok(super::NodeObservationResponse::ProcessList {
-                        processes: vec![super::Process {
+                        processes: vec![Process {
                             user: "test-user".to_string(),
                             cpu_usage: 10.0,
                             mem_usage: 20.0,
@@ -1202,7 +1095,7 @@ mod tests {
                 super::NodeObservationRequest::ResourceUsage => {
                     Ok(super::NodeObservationResponse::ResourceUsage {
                         hostname: "test-host".into(),
-                        resource_usage: super::ResourceUsage {
+                        resource_usage: ResourceUsage {
                             cpu_usage: 0.5,
                             total_memory: 100,
                             used_memory: 50,
@@ -1302,53 +1195,6 @@ mod tests {
 
     #[cfg(all(feature = "client", feature = "server"))]
     #[tokio::test]
-    async fn get_resource_usage() {
-        let test_env = TEST_ENV.lock().await;
-        let (server_conn, client_conn) = test_env.setup().await;
-
-        let mut handler = TestHandler;
-        let handler_conn = client_conn.clone();
-        let client_handle = tokio::spawn(async move {
-            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
-
-            crate::request::handle(&mut handler, &mut send, &mut recv).await
-        });
-        let server_res = server_conn.get_resource_usage().await;
-        assert!(server_res.is_ok());
-        let usage = server_res.unwrap();
-        assert_eq!(usage.total_memory, 100);
-        let client_res = client_handle.await.unwrap();
-        assert!(client_res.is_ok());
-
-        test_env.teardown(&server_conn);
-    }
-
-    #[cfg(all(feature = "client", feature = "server"))]
-    #[tokio::test]
-    async fn get_process_list() {
-        let test_env = TEST_ENV.lock().await;
-        let (server_conn, client_conn) = test_env.setup().await;
-
-        let mut handler = TestHandler;
-        let handler_conn = client_conn.clone();
-        let client_handle = tokio::spawn(async move {
-            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
-
-            crate::request::handle(&mut handler, &mut send, &mut recv).await
-        });
-        let server_res = server_conn.get_process_list().await;
-        assert!(server_res.is_ok());
-        let processes = server_res.unwrap();
-        assert_eq!(processes.len(), 1);
-        assert_eq!(processes[0].user, "test-user");
-        let client_res = client_handle.await.unwrap();
-        assert!(client_res.is_ok());
-
-        test_env.teardown(&server_conn);
-    }
-
-    #[cfg(all(feature = "client", feature = "server"))]
-    #[tokio::test]
     async fn send_allowlist() {
         let test_env = TEST_ENV.lock().await;
         let (server_conn, client_conn) = test_env.setup().await;
@@ -1367,27 +1213,6 @@ mod tests {
             crate::request::handle(&mut handler, &mut send, &mut recv).await
         });
         let server_res = server_conn.send_allowlist(&allowlist_to_send).await;
-        assert!(server_res.is_ok());
-        let client_res = client_handle.await.unwrap();
-        assert!(client_res.is_ok());
-
-        test_env.teardown(&server_conn);
-    }
-
-    #[cfg(all(feature = "client", feature = "server"))]
-    #[tokio::test]
-    async fn send_reboot_cmd() {
-        let test_env = TEST_ENV.lock().await;
-        let (server_conn, client_conn) = test_env.setup().await;
-
-        let mut handler = TestHandler;
-        let handler_conn = client_conn.clone();
-        let client_handle = tokio::spawn(async move {
-            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
-
-            crate::request::handle(&mut handler, &mut send, &mut recv).await
-        });
-        let server_res = server_conn.send_reboot_cmd().await;
         assert!(server_res.is_ok());
         let client_res = client_handle.await.unwrap();
         assert!(client_res.is_ok());
@@ -1633,27 +1458,6 @@ mod tests {
         test_env.teardown(&server_conn);
     }
 
-    #[cfg(all(feature = "client", feature = "server"))]
-    #[tokio::test]
-    async fn send_shutdown_cmd() {
-        let test_env = TEST_ENV.lock().await;
-        let (server_conn, client_conn) = test_env.setup().await;
-
-        let mut handler = TestHandler;
-        let handler_conn = client_conn.clone();
-        let client_handle = tokio::spawn(async move {
-            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
-
-            crate::request::handle(&mut handler, &mut send, &mut recv).await
-        });
-        let server_res = server_conn.send_shutdown_cmd().await;
-        assert!(server_res.is_ok());
-        let client_res = client_handle.await.unwrap();
-        assert!(client_res.is_ok());
-
-        test_env.teardown(&server_conn);
-    }
-
     // ── node feature-family round-trip tests ──────────────────────
 
     #[cfg(all(feature = "client", feature = "server"))]
@@ -1872,7 +1676,7 @@ mod tests {
             resp,
             NodeObservationResponse::ResourceUsage {
                 hostname: "test-host".into(),
-                resource_usage: super::ResourceUsage {
+                resource_usage: ResourceUsage {
                     cpu_usage: 0.5,
                     total_memory: 100,
                     used_memory: 50,
@@ -2006,7 +1810,7 @@ mod tests {
             resp,
             NodeObservationResponse::ResourceUsage {
                 hostname: "test-host".into(),
-                resource_usage: super::ResourceUsage {
+                resource_usage: ResourceUsage {
                     cpu_usage: 0.5,
                     total_memory: 100,
                     used_memory: 50,

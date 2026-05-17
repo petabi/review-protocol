@@ -48,15 +48,6 @@
 //! # Ok(())
 //! # }
 //! ```
-//!
-//! # Compatibility
-//!
-//! The existing flat methods on
-//! [`Connection`](super::Connection) (e.g.
-//! [`node_power`](super::Connection::node_power),
-//! [`send_reboot_cmd`](super::Connection::send_reboot_cmd))
-//! remain available and continue to work.  They now delegate
-//! to the same internal implementation used by [`Node`].
 
 use crate::types::node::{
     NodeHostnameRequest, NodeHostnameResponse, NodeLoggingRequest, NodeLoggingResponse,

@@ -30,6 +30,10 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Removed
 
+- Removed redundant legacy flat API methods from `Connection`:
+  `get_process_list`, `get_resource_usage`, `send_reboot_cmd`, and
+  `send_shutdown_cmd`. Callers should use the `Node` handle (`conn.node()`)
+  instead. See the `Node` module docs for migration examples.
 - `Connection::accept_event_streams`. The bundled spawn loop hard-coded
   `eprintln!` for per-stream errors and flattened connection-close
   variants into a single `Ok(())`, hiding diagnostics from the caller.

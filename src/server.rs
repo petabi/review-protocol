@@ -305,10 +305,9 @@ pub(crate) enum RequestCode {
 ///   fine-grained authorization.  These remain available as
 ///   compatibility wrappers.
 /// - **Legacy flat methods** — simpler, backward-compatible
-///   wrappers (e.g. [`send_reboot_cmd`](Self::send_reboot_cmd)).
-///   They do not expose `ServiceId` and cannot participate in
-///   [`Authorizer`](crate::auth::Authorizer)-based access
-///   control.
+///   wrappers.  They do not expose `ServiceId` and cannot
+///   participate in [`Authorizer`](crate::auth::Authorizer)-based
+///   access control.
 ///
 /// See the [`impl` block documentation](Self#node-api-vs-legacy-flat-api)
 /// for migration guidance and the [`server::node`](node) module

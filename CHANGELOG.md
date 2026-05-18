@@ -9,12 +9,34 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `NodePowerOutcome` enum to distinguish between no-response sends
+  (`Sent`) and request/response operations (`Response`).  Immediate
+  power operations (`Reboot`, `Shutdown`) return `Sent`; graceful
+  operations (`GracefulReboot`, `GracefulShutdown`) return
+  `Response(NodePowerResponse)`.
+- `Node::reboot()` and `Node::shutdown()` convenience methods that
+  send the request and return immediately without waiting for a
+  response.  The agent may close the connection while processing
+  the command.
+- `Node::reboot_authorized()`, `Node::shutdown_authorized()`,
+  `Node::reboot_with_context()`, and
+  `Node::shutdown_with_context()` authorization variants for the
+  new immediate power methods.
 - `Connection::accept_uni` on the server-side `Connection` wrapper,
   mirroring `open_bi`, so callers no longer need `as_quinn` to reach
   the underlying `quinn::Connection::accept_uni`.
 
 ### Changed
 
+- `Node::power()` now returns `anyhow::Result<NodePowerOutcome>`
+  instead of `anyhow::Result<NodePowerResponse>`.  Immediate
+  operations (`Reboot`, `Shutdown`) write the request frame,
+  finish the send stream, and return `Sent` without waiting for a
+  response.  Graceful operations continue to use the normal
+  request/response path.
+- `Connection::node_power()`, `Connection::node_power_authorized()`,
+  and `Connection::node_power_with_context()` now return
+  `NodePowerOutcome` with the same semantics.
 - `EventStreamHandler` trait methods (`handle_event`, `on_error`,
   `on_stream_end`) now return `std::io::Result<()>` instead of
   `Result<(), String>`. Implementors must update their return types

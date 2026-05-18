@@ -17,7 +17,22 @@
 //! use review_protocol::types::node::NodePowerRequest;
 //!
 //! let node = conn.node();
-//! let resp = node.power(NodePowerRequest::Reboot).await?;
+//! let resp = node.power(NodePowerRequest::GracefulReboot).await?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! # Immediate power operations
+//!
+//! [`Node::reboot`] and [`Node::shutdown`] send the request and
+//! return immediately without waiting for a response.  The agent
+//! may close the connection while processing the command:
+//!
+//! ```rust,no_run
+//! # use review_protocol::server::Connection;
+//! # async fn example(conn: Connection) -> anyhow::Result<()> {
+//! let node = conn.node();
+//! node.reboot().await?;
 //! # Ok(())
 //! # }
 //! ```
@@ -41,7 +56,7 @@
 //!
 //! let node = conn.node();
 //! let resp = node.power_authorized(
-//!     NodePowerRequest::Reboot,
+//!     NodePowerRequest::GracefulReboot,
 //!     &peer,
 //!     &authorizer,
 //! ).await?;
@@ -56,6 +71,26 @@ use crate::types::node::{
     NodeRemoteAccessResponse, NodeServiceRequest, NodeServiceResponse, NodeTimeSyncRequest,
     NodeTimeSyncResponse, NodeVersionRequest, NodeVersionResponse,
 };
+
+/// Result of a node power-control operation.
+///
+/// Immediate operations ([`NodePowerRequest::Reboot`],
+/// [`NodePowerRequest::Shutdown`]) return [`Sent`](Self::Sent) after
+/// the request frame has been written and the send stream finished.
+/// The agent may close the connection while processing the command,
+/// so no response is awaited.
+///
+/// Graceful operations ([`NodePowerRequest::GracefulReboot`],
+/// [`NodePowerRequest::GracefulShutdown`]) return
+/// [`Response`](Self::Response) after receiving the agent's
+/// acknowledgment.
+#[derive(Debug)]
+pub enum NodePowerOutcome {
+    /// The request was sent successfully; no response is expected.
+    Sent,
+    /// The agent responded with a [`NodePowerResponse`].
+    Response(NodePowerResponse),
+}
 
 /// A handle for issuing node-family requests over an existing
 /// [`Connection`](super::Connection).
@@ -265,15 +300,28 @@ impl<'a> Node<'a> {
 
     /// Sends a node power-control request to the agent.
     ///
+    /// Immediate operations (`Reboot`, `Shutdown`) return
+    /// [`NodePowerOutcome::Sent`] after the request frame has been
+    /// queued and the send stream finished.  The agent may close the
+    /// connection while processing the command, so no response is
+    /// awaited.
+    ///
+    /// Graceful operations (`GracefulReboot`, `GracefulShutdown`)
+    /// return [`NodePowerOutcome::Response`] after receiving the
+    /// agent's acknowledgment.
+    ///
     /// # Errors
     ///
-    /// Returns an error if serialization/deserialization failed
-    /// or communication with the client failed.
-    pub async fn power(&self, req: NodePowerRequest) -> anyhow::Result<NodePowerResponse> {
+    /// Returns an error if serialization failed or communication
+    /// with the client failed.
+    pub async fn power(&self, req: NodePowerRequest) -> anyhow::Result<NodePowerOutcome> {
         self.conn.node_power(req).await
     }
 
     /// Sends a node power-control request with authorization.
+    ///
+    /// See [`power`](Self::power) for the semantics of immediate
+    /// vs graceful operations.
     ///
     /// # Errors
     ///
@@ -285,8 +333,80 @@ impl<'a> Node<'a> {
         req: NodePowerRequest,
         peer: &crate::auth::PeerContext,
         authorizer: &dyn crate::auth::Authorizer,
-    ) -> anyhow::Result<NodePowerResponse> {
+    ) -> anyhow::Result<NodePowerOutcome> {
         self.conn.node_power_authorized(req, peer, authorizer).await
+    }
+
+    /// Reboots the node immediately.
+    ///
+    /// The request is sent and the send stream is finished without
+    /// waiting for a response.  The agent may close the connection
+    /// while processing the reboot command.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization failed or communication
+    /// with the client failed.
+    pub async fn reboot(&self) -> anyhow::Result<()> {
+        match self.power(NodePowerRequest::Reboot).await? {
+            NodePowerOutcome::Sent | NodePowerOutcome::Response(_) => Ok(()),
+        }
+    }
+
+    /// Reboots the node immediately with authorization.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authorization was denied,
+    /// serialization failed, or communication with the client
+    /// failed.
+    pub async fn reboot_authorized(
+        &self,
+        peer: &crate::auth::PeerContext,
+        authorizer: &dyn crate::auth::Authorizer,
+    ) -> anyhow::Result<()> {
+        match self
+            .power_authorized(NodePowerRequest::Reboot, peer, authorizer)
+            .await?
+        {
+            NodePowerOutcome::Sent | NodePowerOutcome::Response(_) => Ok(()),
+        }
+    }
+
+    /// Shuts down the node immediately.
+    ///
+    /// The request is sent and the send stream is finished without
+    /// waiting for a response.  The agent may close the connection
+    /// while processing the shutdown command.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization failed or communication
+    /// with the client failed.
+    pub async fn shutdown(&self) -> anyhow::Result<()> {
+        match self.power(NodePowerRequest::Shutdown).await? {
+            NodePowerOutcome::Sent | NodePowerOutcome::Response(_) => Ok(()),
+        }
+    }
+
+    /// Shuts down the node immediately with authorization.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authorization was denied,
+    /// serialization failed, or communication with the client
+    /// failed.
+    pub async fn shutdown_authorized(
+        &self,
+        peer: &crate::auth::PeerContext,
+        authorizer: &dyn crate::auth::Authorizer,
+    ) -> anyhow::Result<()> {
+        match self
+            .power_authorized(NodePowerRequest::Shutdown, peer, authorizer)
+            .await?
+        {
+            NodePowerOutcome::Sent | NodePowerOutcome::Response(_) => Ok(()),
+        }
     }
 
     /// Sends a node host-observation request to the agent.
@@ -469,6 +589,9 @@ impl<'a> Node<'a> {
     /// Sends a node power-control request with
     /// [`AuthorizerV2`](crate::auth::AuthorizerV2) authorization.
     ///
+    /// See [`power`](Self::power) for the semantics of immediate
+    /// vs graceful operations.
+    ///
     /// # Errors
     ///
     /// Returns an error if authorization was denied,
@@ -479,10 +602,52 @@ impl<'a> Node<'a> {
         req: NodePowerRequest,
         auth_ctx: &crate::auth::AuthorizationContext,
         authorizer: &dyn crate::auth::AuthorizerV2,
-    ) -> anyhow::Result<NodePowerResponse> {
+    ) -> anyhow::Result<NodePowerOutcome> {
         self.conn
             .node_power_with_context(req, auth_ctx, authorizer)
             .await
+    }
+
+    /// Reboots the node immediately with
+    /// [`AuthorizerV2`](crate::auth::AuthorizerV2) authorization.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authorization was denied,
+    /// serialization failed, or communication with the client
+    /// failed.
+    pub async fn reboot_with_context(
+        &self,
+        auth_ctx: &crate::auth::AuthorizationContext,
+        authorizer: &dyn crate::auth::AuthorizerV2,
+    ) -> anyhow::Result<()> {
+        match self
+            .power_with_context(NodePowerRequest::Reboot, auth_ctx, authorizer)
+            .await?
+        {
+            NodePowerOutcome::Sent | NodePowerOutcome::Response(_) => Ok(()),
+        }
+    }
+
+    /// Shuts down the node immediately with
+    /// [`AuthorizerV2`](crate::auth::AuthorizerV2) authorization.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if authorization was denied,
+    /// serialization failed, or communication with the client
+    /// failed.
+    pub async fn shutdown_with_context(
+        &self,
+        auth_ctx: &crate::auth::AuthorizationContext,
+        authorizer: &dyn crate::auth::AuthorizerV2,
+    ) -> anyhow::Result<()> {
+        match self
+            .power_with_context(NodePowerRequest::Shutdown, auth_ctx, authorizer)
+            .await?
+        {
+            NodePowerOutcome::Sent | NodePowerOutcome::Response(_) => Ok(()),
+        }
     }
 
     /// Sends a node host-observation request with
@@ -526,6 +691,8 @@ impl<'a> Node<'a> {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(all(feature = "client", feature = "server"))]
+    use super::NodePowerOutcome;
     #[cfg(all(feature = "client", feature = "server"))]
     use crate::test::TEST_ENV;
     #[cfg(all(feature = "client", feature = "server"))]
@@ -599,7 +766,10 @@ mod tests {
 
         let node = server_conn.node();
         let resp = node.power(NodePowerRequest::GracefulReboot).await.unwrap();
-        assert_eq!(resp, NodePowerResponse::Initiated);
+        assert!(matches!(
+            resp,
+            NodePowerOutcome::Response(NodePowerResponse::Initiated)
+        ));
 
         let client_res = client_handle.await.unwrap();
         assert!(client_res.is_ok());
@@ -629,10 +799,13 @@ mod tests {
         let authorizer = NoopAuthorizer;
         let node = server_conn.node();
         let resp = node
-            .power_authorized(NodePowerRequest::Reboot, &peer, &authorizer)
+            .power_authorized(NodePowerRequest::GracefulReboot, &peer, &authorizer)
             .await
             .unwrap();
-        assert_eq!(resp, NodePowerResponse::Initiated);
+        assert!(matches!(
+            resp,
+            NodePowerOutcome::Response(NodePowerResponse::Initiated)
+        ));
 
         let client_res = client_handle.await.unwrap();
         assert!(client_res.is_ok());
@@ -744,10 +917,13 @@ mod tests {
         let authorizer = AuthorizerV2Adapter::new(NoopAuthorizer);
         let node = server_conn.node();
         let resp = node
-            .power_with_context(NodePowerRequest::Reboot, &auth_ctx, &authorizer)
+            .power_with_context(NodePowerRequest::GracefulReboot, &auth_ctx, &authorizer)
             .await
             .unwrap();
-        assert_eq!(resp, NodePowerResponse::Initiated);
+        assert!(matches!(
+            resp,
+            NodePowerOutcome::Response(NodePowerResponse::Initiated)
+        ));
 
         let client_res = client_handle.await.unwrap();
         assert!(client_res.is_ok());
@@ -824,6 +1000,170 @@ mod tests {
         assert_eq!(resp, NodeServiceResponse::Status { active: true });
 
         let client_res = client_handle.await.unwrap();
+        assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    /// Verifies that `Node::power` with `Reboot` returns `Sent`
+    /// and does not wait for a response.
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn power_reboot_returns_sent() {
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        // Client accepts the stream but closes it immediately without
+        // sending a response, simulating an agent that reboots.
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+            // Read the request frame
+            let _ = crate::frame::recv_msg::<NodePowerRequest>(&mut recv).await;
+            // Close the send side without sending a response
+            send.finish().ok();
+        });
+
+        let node = server_conn.node();
+        let result = node.power(NodePowerRequest::Reboot).await;
+        assert!(result.is_ok());
+        assert!(matches!(result.unwrap(), NodePowerOutcome::Sent));
+
+        let client_res = client_handle.await;
+        assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    /// Verifies that `Node::power` with `Shutdown` returns `Sent`
+    /// and does not wait for a response.
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn power_shutdown_returns_sent() {
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+            let _ = crate::frame::recv_msg::<NodePowerRequest>(&mut recv).await;
+            send.finish().ok();
+        });
+
+        let node = server_conn.node();
+        let result = node.power(NodePowerRequest::Shutdown).await;
+        assert!(result.is_ok());
+        assert!(matches!(result.unwrap(), NodePowerOutcome::Sent));
+
+        let client_res = client_handle.await;
+        assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    /// Verifies that `Node::reboot` succeeds without waiting for a
+    /// response.
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn reboot_no_response() {
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+            let _ = crate::frame::recv_msg::<NodePowerRequest>(&mut recv).await;
+            send.finish().ok();
+        });
+
+        let node = server_conn.node();
+        let result = node.reboot().await;
+        assert!(result.is_ok());
+
+        let client_res = client_handle.await;
+        assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    /// Verifies that `Node::shutdown` succeeds without waiting for a
+    /// response.
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn shutdown_no_response() {
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+            let _ = crate::frame::recv_msg::<NodePowerRequest>(&mut recv).await;
+            send.finish().ok();
+        });
+
+        let node = server_conn.node();
+        let result = node.shutdown().await;
+        assert!(result.is_ok());
+
+        let client_res = client_handle.await;
+        assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    /// Verifies that `Node::reboot_authorized` succeeds when
+    /// authorized and does not wait for a response.
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn reboot_authorized_no_response() {
+        use crate::auth::{NoopAuthorizer, PeerContext};
+
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+            let _ = crate::frame::recv_msg::<NodePowerRequest>(&mut recv).await;
+            send.finish().ok();
+        });
+
+        let peer = PeerContext::new("test-agent");
+        let authorizer = NoopAuthorizer;
+        let node = server_conn.node();
+        let result = node.reboot_authorized(&peer, &authorizer).await;
+        assert!(result.is_ok());
+
+        let client_res = client_handle.await;
+        assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    /// Verifies that `Node::shutdown_authorized` succeeds when
+    /// authorized and does not wait for a response.
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn shutdown_authorized_no_response() {
+        use crate::auth::{NoopAuthorizer, PeerContext};
+
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+            let _ = crate::frame::recv_msg::<NodePowerRequest>(&mut recv).await;
+            send.finish().ok();
+        });
+
+        let peer = PeerContext::new("test-agent");
+        let authorizer = NoopAuthorizer;
+        let node = server_conn.node();
+        let result = node.shutdown_authorized(&peer, &authorizer).await;
+        assert!(result.is_ok());
+
+        let client_res = client_handle.await;
         assert!(client_res.is_ok());
 
         test_env.teardown(&server_conn);

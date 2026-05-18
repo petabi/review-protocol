@@ -2,6 +2,7 @@ use anyhow::anyhow;
 use oinq::frame;
 
 use super::Connection;
+use super::node::NodePowerOutcome;
 use crate::{
     client,
     types::{
@@ -29,7 +30,7 @@ use crate::{
 /// # use review_protocol::server::Connection;
 /// # use review_protocol::types::node::NodePowerRequest;
 /// # async fn example(conn: Connection) -> anyhow::Result<()> {
-/// let resp = conn.node().power(NodePowerRequest::Reboot).await?;
+/// let resp = conn.node().power(NodePowerRequest::GracefulReboot).await?;
 /// # Ok(())
 /// # }
 /// ```
@@ -367,13 +368,34 @@ impl Connection {
     /// [`node_power_authorized`](Self::node_power_authorized)
     /// instead.
     ///
+    /// Immediate operations (`Reboot`, `Shutdown`) return
+    /// [`NodePowerOutcome::Sent`] after the request frame has been
+    /// queued and the send stream finished.  The agent may close the
+    /// connection while processing the command, so no response is
+    /// awaited.
+    ///
+    /// Graceful operations (`GracefulReboot`, `GracefulShutdown`)
+    /// return [`NodePowerOutcome::Response`] after receiving the
+    /// agent's acknowledgment.
+    ///
     /// # Errors
     ///
-    /// Returns an error if serialization/deserialization failed or
-    /// communication with the client failed.
-    pub async fn node_power(&self, req: NodePowerRequest) -> anyhow::Result<NodePowerResponse> {
-        self.send_request(client::RequestCode::NodePower, &req)
-            .await
+    /// Returns an error if serialization failed or communication
+    /// with the client failed.
+    pub async fn node_power(&self, req: NodePowerRequest) -> anyhow::Result<NodePowerOutcome> {
+        match req {
+            NodePowerRequest::Reboot | NodePowerRequest::Shutdown => {
+                self.send_request_no_response(client::RequestCode::NodePower, &req)
+                    .await?;
+                Ok(NodePowerOutcome::Sent)
+            }
+            NodePowerRequest::GracefulReboot | NodePowerRequest::GracefulShutdown => {
+                let resp: NodePowerResponse = self
+                    .send_request(client::RequestCode::NodePower, &req)
+                    .await?;
+                Ok(NodePowerOutcome::Response(resp))
+            }
+        }
     }
 
     /// Sends a node host-observation request to the agent.
@@ -626,20 +648,36 @@ impl Connection {
     /// [`ServiceId`](crate::service_id::ServiceId) from `req`
     /// (e.g. `"node.power.reboot"`).
     ///
+    /// Immediate operations (`Reboot`, `Shutdown`) return
+    /// [`NodePowerOutcome::Sent`]; graceful operations return
+    /// [`NodePowerOutcome::Response`].
+    ///
     /// # Errors
     ///
     /// Returns an error if authorization was denied,
-    /// serialization/deserialization failed, or communication with
-    /// the client failed.
+    /// serialization failed, or communication with the client
+    /// failed.
     pub async fn node_power_authorized(
         &self,
         req: NodePowerRequest,
         peer: &crate::auth::PeerContext,
         authorizer: &dyn crate::auth::Authorizer,
-    ) -> anyhow::Result<NodePowerResponse> {
+    ) -> anyhow::Result<NodePowerOutcome> {
         let sid = req.service_id();
-        self.send_request_authorized(client::RequestCode::NodePower, &req, &sid, peer, authorizer)
-            .await
+        authorizer.authorize(peer, &sid).map_err(|e| anyhow!(e))?;
+        match req {
+            NodePowerRequest::Reboot | NodePowerRequest::Shutdown => {
+                self.send_request_no_response(client::RequestCode::NodePower, &req)
+                    .await?;
+                Ok(NodePowerOutcome::Sent)
+            }
+            NodePowerRequest::GracefulReboot | NodePowerRequest::GracefulShutdown => {
+                let resp: NodePowerResponse = self
+                    .send_request(client::RequestCode::NodePower, &req)
+                    .await?;
+                Ok(NodePowerOutcome::Response(resp))
+            }
+        }
     }
 
     /// Sends a node host-observation request to the agent with
@@ -861,26 +899,37 @@ impl Connection {
     /// Sends a node power-control request with
     /// [`AuthorizerV2`](crate::auth::AuthorizerV2) authorization.
     ///
+    /// See [`node_power`](Self::node_power) for the semantics of
+    /// immediate vs graceful operations.
+    ///
     /// # Errors
     ///
     /// Returns an error if authorization was denied,
-    /// serialization/deserialization failed, or communication with
-    /// the client failed.
+    /// serialization failed, or communication with the client
+    /// failed.
     pub async fn node_power_with_context(
         &self,
         req: NodePowerRequest,
         auth_ctx: &crate::auth::AuthorizationContext,
         authorizer: &dyn crate::auth::AuthorizerV2,
-    ) -> anyhow::Result<NodePowerResponse> {
+    ) -> anyhow::Result<NodePowerOutcome> {
         let sid = req.service_id();
-        self.send_request_authorized_with_context(
-            client::RequestCode::NodePower,
-            &req,
-            &sid,
-            auth_ctx,
-            authorizer,
-        )
-        .await
+        authorizer
+            .authorize_with_context(auth_ctx, &sid)
+            .map_err(|e| anyhow!(e))?;
+        match req {
+            NodePowerRequest::Reboot | NodePowerRequest::Shutdown => {
+                self.send_request_no_response(client::RequestCode::NodePower, &req)
+                    .await?;
+                Ok(NodePowerOutcome::Sent)
+            }
+            NodePowerRequest::GracefulReboot | NodePowerRequest::GracefulShutdown => {
+                let resp: NodePowerResponse = self
+                    .send_request(client::RequestCode::NodePower, &req)
+                    .await?;
+                Ok(NodePowerOutcome::Response(resp))
+            }
+        }
     }
 
     /// Sends a node host-observation request with
@@ -954,6 +1003,34 @@ impl Connection {
         frame::recv::<Result<S, String>>(&mut recv, &mut buf)
             .await?
             .map_err(|e| anyhow!(e))
+    }
+
+    /// Sends the given payload to the client without waiting for a
+    /// response.
+    ///
+    /// After writing the request frame, the send stream is finished
+    /// to ensure the frame is flushed.  This is used for
+    /// fire-and-forget operations where the agent may close the
+    /// connection while processing the command.
+    async fn send_request_no_response<T: serde::Serialize + ?Sized>(
+        &self,
+        request_code: client::RequestCode,
+        payload: &T,
+    ) -> anyhow::Result<()> {
+        let code: u32 = request_code.into();
+        let Ok(mut buf) = bincode::serde::encode_to_vec(
+            code,
+            bincode::config::standard().with_fixed_int_encoding(),
+        ) else {
+            unreachable!("serialization of u32 into memory buffer should not fail")
+        };
+        bincode::serde::encode_into_std_write(payload, &mut buf, bincode::config::standard())?;
+
+        let (mut send, _recv) = self.conn.open_bi().await?;
+        frame::send_raw(&mut send, &buf).await?;
+        send.finish().ok();
+
+        Ok(())
     }
 
     /// Checks authorization then sends the given payload to the
@@ -1633,6 +1710,7 @@ mod tests {
     #[cfg(all(feature = "client", feature = "server"))]
     #[tokio::test]
     async fn node_power() {
+        use crate::server::node::NodePowerOutcome;
         use crate::types::node::{NodePowerRequest, NodePowerResponse};
 
         let test_env = TEST_ENV.lock().await;
@@ -1647,7 +1725,10 @@ mod tests {
 
         let req = NodePowerRequest::GracefulReboot;
         let resp = server_conn.node_power(req).await.unwrap();
-        assert_eq!(resp, NodePowerResponse::Initiated);
+        assert!(matches!(
+            resp,
+            NodePowerOutcome::Response(NodePowerResponse::Initiated)
+        ));
 
         let client_res = client_handle.await.unwrap();
         assert!(client_res.is_ok());
@@ -1696,6 +1777,7 @@ mod tests {
     #[tokio::test]
     async fn node_power_authorization_allowed() {
         use crate::auth::{NoopAuthorizer, PeerContext};
+        use crate::server::node::NodePowerOutcome;
         use crate::types::node::{NodePowerRequest, NodePowerResponse};
 
         let test_env = TEST_ENV.lock().await;
@@ -1710,12 +1792,15 @@ mod tests {
 
         let peer = PeerContext::new("test-agent");
         let authorizer = NoopAuthorizer;
-        let req = NodePowerRequest::Reboot;
+        let req = NodePowerRequest::GracefulReboot;
         let resp = server_conn
             .node_power_authorized(req, &peer, &authorizer)
             .await
             .unwrap();
-        assert_eq!(resp, NodePowerResponse::Initiated);
+        assert!(matches!(
+            resp,
+            NodePowerOutcome::Response(NodePowerResponse::Initiated)
+        ));
 
         let client_res = client_handle.await.unwrap();
         assert!(client_res.is_ok());
@@ -1839,8 +1924,9 @@ mod tests {
     #[tokio::test]
     async fn node_power_authorization_method_level() {
         use crate::auth::{AuthorizationError, Authorizer, PeerContext};
+        use crate::server::node::NodePowerOutcome;
         use crate::service_id::{self, ServiceId};
-        use crate::types::node::{NodePowerRequest, NodePowerResponse};
+        use crate::types::node::NodePowerRequest;
 
         /// Allows only `node.power.reboot`, denies everything else.
         struct RebootOnly;
@@ -1864,20 +1950,21 @@ mod tests {
         let peer = PeerContext::new("test-agent");
         let authorizer = RebootOnly;
 
-        // Reboot should be allowed.
-        let mut handler = TestHandler;
+        // Reboot should be allowed and return Sent (no-response).
+        // The client reads the request and closes without responding.
         let handler_conn = client_conn.clone();
         let client_handle = tokio::spawn(async move {
             let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
-            crate::request::handle(&mut handler, &mut send, &mut recv).await
+            let _ = crate::frame::recv_msg::<NodePowerRequest>(&mut recv).await;
+            send.finish().ok();
         });
 
         let resp = server_conn
             .node_power_authorized(NodePowerRequest::Reboot, &peer, &authorizer)
             .await
             .unwrap();
-        assert_eq!(resp, NodePowerResponse::Initiated);
-        let client_res = client_handle.await.unwrap();
+        assert!(matches!(resp, NodePowerOutcome::Sent));
+        let client_res = client_handle.await;
         assert!(client_res.is_ok());
 
         // Shutdown (same family, different method) should be denied.

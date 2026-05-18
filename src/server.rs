@@ -341,7 +341,7 @@ impl Connection {
     /// use review_protocol::types::node::NodePowerRequest;
     ///
     /// let node = conn.node();
-    /// let resp = node.power(NodePowerRequest::Reboot).await?;
+    /// let resp = node.power(NodePowerRequest::GracefulReboot).await?;
     /// # Ok(())
     /// # }
     /// ```

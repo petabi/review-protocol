@@ -1944,9 +1944,7 @@ mod tests {
     /// Helper: immediate `NodePower` ops run the handler but send no
     /// response frame (fire-and-forget).
     #[cfg(feature = "server")]
-    async fn node_power_immediate_no_response_handle(
-        req: crate::types::node::NodePowerRequest,
-    ) {
+    async fn node_power_immediate_no_response_handle(req: crate::types::node::NodePowerRequest) {
         use std::time::Duration;
 
         use crate::test::{TOKEN, channel};

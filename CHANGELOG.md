@@ -28,6 +28,12 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Client-side `NodePower` dispatch (`handle` and `handle_node`) no
+  longer sends a response for immediate operations (`Reboot`,
+  `Shutdown`). Graceful operations (`GracefulReboot`,
+  `GracefulShutdown`) continue to use the request/response path.
+  This matches the server-side fire-and-forget semantics introduced
+  in PR #195.
 - `Node::power()` now returns `anyhow::Result<NodePowerOutcome>`
   instead of `anyhow::Result<NodePowerResponse>`.  Immediate
   operations (`Reboot`, `Shutdown`) write the request frame,

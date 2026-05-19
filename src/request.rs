@@ -76,6 +76,19 @@ pub enum HandlerError {
     SendError(io::Error),
 }
 
+/// Returns whether a [`NodePowerRequest`] expects a wire response.
+///
+/// Immediate operations ([`NodePowerRequest::Reboot`],
+/// [`NodePowerRequest::Shutdown`]) are fire-and-forget because the
+/// agent may close the connection while rebooting or shutting down.
+/// Graceful operations use the normal request/response path.
+fn node_power_expects_response(req: &NodePowerRequest) -> bool {
+    matches!(
+        req,
+        NodePowerRequest::GracefulReboot | NodePowerRequest::GracefulShutdown
+    )
+}
+
 impl HandlerError {
     /// Returns the semantic [`ProtocolErrorKind`](crate::ProtocolErrorKind) for this error.
     ///
@@ -670,10 +683,13 @@ pub async fn handle_node<H: NodeHandler>(
                         &e,
                     ))
                 })?;
+                let expects_response = node_power_expects_response(&req);
                 let result = handler.node_power(req).await;
-                send_response(send, &mut buf, result)
-                    .await
-                    .map_err(HandlerError::SendError)?;
+                if expects_response {
+                    send_response(send, &mut buf, result)
+                        .await
+                        .map_err(HandlerError::SendError)?;
+                }
             }
             RequestCode::NodeObservation => {
                 let req =
@@ -978,10 +994,13 @@ pub async fn handle<H: Handler>(
                         &e,
                     ))
                 })?;
+                let expects_response = node_power_expects_response(&req);
                 let result = handler.node_power(req).await;
-                send_response(send, &mut buf, result)
-                    .await
-                    .map_err(HandlerError::SendError)?;
+                if expects_response {
+                    send_response(send, &mut buf, result)
+                        .await
+                        .map_err(HandlerError::SendError)?;
+                }
             }
             RequestCode::NodeObservation => {
                 let req =
@@ -1922,30 +1941,71 @@ mod tests {
         assert!(server_res.is_ok());
     }
 
-    /// `NodePower::Reboot` delegates to flat `reboot()` handler.
+    /// Helper: immediate `NodePower` ops run the handler but send no
+    /// response frame (fire-and-forget).
+    #[cfg(feature = "server")]
+    async fn node_power_immediate_no_response_handle(
+        req: crate::types::node::NodePowerRequest,
+    ) {
+        use std::time::Duration;
+
+        use crate::test::{TOKEN, channel};
+        use crate::types::node::NodePowerResponse;
+
+        let _lock = TOKEN.lock().await;
+        let channel = channel().await;
+
+        let (mut server_send, mut server_recv) = (channel.server.send, channel.server.recv);
+        let (mut client_send, mut client_recv) = (channel.client.send, channel.client.recv);
+
+        let server_task = tokio::spawn(async move {
+            let mut handler = FlatOnlyHandler;
+            super::handle(&mut handler, &mut server_send, &mut server_recv).await
+        });
+
+        let mut buf = Vec::new();
+        oinq::message::send_request(
+            &mut client_send,
+            &mut buf,
+            u32::from(RequestCode::NodePower),
+            req,
+        )
+        .await
+        .expect("should send request");
+
+        let recv_result = tokio::time::timeout(
+            Duration::from_millis(200),
+            oinq::frame::recv::<Result<NodePowerResponse, String>>(&mut client_recv, &mut buf),
+        )
+        .await;
+        assert!(
+            recv_result.is_err(),
+            "immediate NodePower should not produce a response frame"
+        );
+
+        drop(client_send);
+        drop(client_recv);
+
+        let server_res = server_task.await.unwrap();
+        assert!(server_res.is_ok());
+    }
+
+    /// `NodePower::Reboot` delegates to flat `reboot()` without a
+    /// wire response.
     #[tokio::test]
     #[cfg(feature = "server")]
     async fn node_power_reboot_delegates_to_flat() {
-        use crate::types::node::{NodePowerRequest, NodePowerResponse};
-        flat_delegation_roundtrip(
-            RequestCode::NodePower,
-            NodePowerRequest::Reboot,
-            NodePowerResponse::Initiated,
-        )
-        .await;
+        use crate::types::node::NodePowerRequest;
+        node_power_immediate_no_response_handle(NodePowerRequest::Reboot).await;
     }
 
-    /// `NodePower::Shutdown` delegates to flat `shutdown()` handler.
+    /// `NodePower::Shutdown` delegates to flat `shutdown()` without a
+    /// wire response.
     #[tokio::test]
     #[cfg(feature = "server")]
     async fn node_power_shutdown_delegates_to_flat() {
-        use crate::types::node::{NodePowerRequest, NodePowerResponse};
-        flat_delegation_roundtrip(
-            RequestCode::NodePower,
-            NodePowerRequest::Shutdown,
-            NodePowerResponse::Initiated,
-        )
-        .await;
+        use crate::types::node::NodePowerRequest;
+        node_power_immediate_no_response_handle(NodePowerRequest::Shutdown).await;
     }
 
     /// `NodeObservation::ProcessList` delegates to flat
@@ -2308,6 +2368,71 @@ mod tests {
             NodePowerResponse::Initiated,
         )
         .await;
+    }
+
+    /// Helper: `handle_node` immediate `NodePower` ops send no
+    /// response frame.
+    #[cfg(feature = "server")]
+    async fn node_power_immediate_no_response_handle_node(
+        req: crate::types::node::NodePowerRequest,
+    ) {
+        use std::time::Duration;
+
+        use crate::test::{TOKEN, channel};
+        use crate::types::node::NodePowerResponse;
+
+        let _lock = TOKEN.lock().await;
+        let channel = channel().await;
+
+        let (mut server_send, mut server_recv) = (channel.server.send, channel.server.recv);
+        let (mut client_send, mut client_recv) = (channel.client.send, channel.client.recv);
+
+        let server_task = tokio::spawn(async move {
+            let mut handler = StandaloneNodeHandler;
+            super::handle_node(&mut handler, &mut server_send, &mut server_recv).await
+        });
+
+        let mut buf = Vec::new();
+        oinq::message::send_request(
+            &mut client_send,
+            &mut buf,
+            u32::from(RequestCode::NodePower),
+            req,
+        )
+        .await
+        .expect("should send request");
+
+        let recv_result = tokio::time::timeout(
+            Duration::from_millis(200),
+            oinq::frame::recv::<Result<NodePowerResponse, String>>(&mut client_recv, &mut buf),
+        )
+        .await;
+        assert!(
+            recv_result.is_err(),
+            "handle_node immediate NodePower should not produce a response frame"
+        );
+
+        drop(client_send);
+        drop(client_recv);
+
+        let server_res = server_task.await.unwrap();
+        assert!(server_res.is_ok());
+    }
+
+    /// `handle_node` runs `NodePower::Reboot` without a wire response.
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn handle_node_power_reboot_no_response() {
+        use crate::types::node::NodePowerRequest;
+        node_power_immediate_no_response_handle_node(NodePowerRequest::Reboot).await;
+    }
+
+    /// `handle_node` runs `NodePower::Shutdown` without a wire response.
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn handle_node_power_shutdown_no_response() {
+        use crate::types::node::NodePowerRequest;
+        node_power_immediate_no_response_handle_node(NodePowerRequest::Shutdown).await;
     }
 
     /// Unimplemented node methods return `"not supported"` through

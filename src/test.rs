@@ -150,8 +150,8 @@ impl TestEnvironment {
 
         // client configuration
         const CLIENT_NAME: &str = "test-client";
-        const APP_NAME: &str = "review-protocol";
-        const APP_VERSION: &str = "1.0.0";
+        const AGENT_NAME: &str = "review-protocol";
+        const AGENT_VERSION: &str = "1.0.0";
         const PROTOCOL_VERSION: &str = env!("CARGO_PKG_VERSION");
 
         let server_endpoint = loop {
@@ -195,8 +195,8 @@ impl TestEnvironment {
         let mut builder = crate::client::ConnectionBuilder::new(
             Self::SERVER_NAME,
             Self::SERVER_ADDR,
-            APP_NAME,
-            APP_VERSION,
+            AGENT_NAME,
+            AGENT_VERSION,
             PROTOCOL_VERSION,
             Status::Ready,
             client_cert_pem.as_bytes(),
@@ -209,8 +209,8 @@ impl TestEnvironment {
         // Connect to the server
         let client_conn = builder.connect().await.unwrap();
         let (server_conn, agent_info) = server_handle.await.unwrap();
-        assert_eq!(agent_info.app_name, APP_NAME);
-        assert_eq!(agent_info.version, APP_VERSION);
+        assert_eq!(agent_info.agent_name, AGENT_NAME);
+        assert_eq!(agent_info.agent_version, AGENT_VERSION);
 
         (
             crate::server::Connection::from_quinn(server_conn),

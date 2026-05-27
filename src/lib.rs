@@ -164,8 +164,10 @@ fn handle_handshake_recv_io_error(e: std::io::Error) -> HandshakeError {
 /// Properties of an agent.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AgentInfo {
-    pub app_name: String,
-    pub version: String,
+    #[serde(rename = "agent_name", alias = "app_name")]
+    pub agent_name: String,
+    #[serde(rename = "agent_version", alias = "app_version", alias = "version")]
+    pub agent_version: String,
     pub protocol_version: String,
     pub addr: SocketAddr,
     pub status: Status,
@@ -196,6 +198,81 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
+    use crate::types::Status;
+
+    fn sample_agent_info() -> super::AgentInfo {
+        super::AgentInfo {
+            agent_name: "oinq".to_string(),
+            agent_version: "1.0.0".to_string(),
+            protocol_version: env!("CARGO_PKG_VERSION").to_string(),
+            addr: SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0),
+            status: Status::Ready,
+        }
+    }
+
+    #[test]
+    fn agent_info_serializes_agent_metadata_keys() {
+        let info = sample_agent_info();
+        let value = serde_json::to_value(&info).unwrap();
+        let object = value.as_object().expect("object");
+
+        assert_eq!(
+            object.get("agent_name").and_then(|v| v.as_str()),
+            Some("oinq")
+        );
+        assert_eq!(
+            object.get("agent_version").and_then(|v| v.as_str()),
+            Some("1.0.0")
+        );
+        assert!(!object.contains_key("app_name"));
+        assert!(!object.contains_key("app_version"));
+        assert!(!object.contains_key("version"));
+    }
+
+    #[test]
+    fn agent_info_deserializes_agent_metadata_keys() {
+        let value = serde_json::json!({
+            "agent_name": "oinq",
+            "agent_version": "1.0.0",
+            "protocol_version": env!("CARGO_PKG_VERSION"),
+            "addr": "127.0.0.1:0",
+            "status": "Ready"
+        });
+        let info: super::AgentInfo = serde_json::from_value(value).unwrap();
+        assert_eq!(info.agent_name, "oinq");
+        assert_eq!(info.agent_version, "1.0.0");
+    }
+
+    #[test]
+    fn agent_info_deserializes_legacy_app_metadata_keys() {
+        let value = serde_json::json!({
+            "app_name": "oinq",
+            "version": "1.0.0",
+            "protocol_version": env!("CARGO_PKG_VERSION"),
+            "addr": "127.0.0.1:0",
+            "status": "Ready"
+        });
+        let info: super::AgentInfo = serde_json::from_value(value).unwrap();
+        assert_eq!(info.agent_name, "oinq");
+        assert_eq!(info.agent_version, "1.0.0");
+    }
+
+    #[test]
+    fn agent_info_deserializes_legacy_app_version_key() {
+        let value = serde_json::json!({
+            "app_name": "oinq",
+            "app_version": "1.0.0",
+            "protocol_version": env!("CARGO_PKG_VERSION"),
+            "addr": "127.0.0.1:0",
+            "status": "Ready"
+        });
+        let info: super::AgentInfo = serde_json::from_value(value).unwrap();
+        assert_eq!(info.agent_name, "oinq");
+        assert_eq!(info.agent_version, "1.0.0");
+    }
+
     #[cfg(all(feature = "client", feature = "server"))]
     use crate::test::{TOKEN, channel};
 
@@ -206,8 +283,8 @@ mod tests {
 
         use crate::Status;
 
-        const APP_NAME: &str = "oinq";
-        const APP_VERSION: &str = "1.0.0";
+        const AGENT_NAME: &str = "oinq";
+        const AGENT_VERSION: &str = "1.0.0";
         const PROTOCOL_VERSION: &str = env!("CARGO_PKG_VERSION");
 
         let _lock = TOKEN.lock().await;
@@ -217,8 +294,8 @@ mod tests {
         let handle = tokio::spawn(async move {
             super::client::handshake(
                 &client.conn,
-                APP_NAME,
-                APP_VERSION,
+                AGENT_NAME,
+                AGENT_VERSION,
                 PROTOCOL_VERSION,
                 Status::Ready,
             )
@@ -234,8 +311,8 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(agent_info.app_name, APP_NAME);
-        assert_eq!(agent_info.version, APP_VERSION);
+        assert_eq!(agent_info.agent_name, AGENT_NAME);
+        assert_eq!(agent_info.agent_version, AGENT_VERSION);
         assert_eq!(agent_info.protocol_version, PROTOCOL_VERSION);
 
         let res = tokio::join!(handle).0.unwrap();
@@ -249,8 +326,8 @@ mod tests {
 
         use crate::Status;
 
-        const APP_NAME: &str = "oinq";
-        const APP_VERSION: &str = "1.0.0";
+        const AGENT_NAME: &str = "oinq";
+        const AGENT_VERSION: &str = "1.0.0";
         const PROTOCOL_VERSION: &str = env!("CARGO_PKG_VERSION");
 
         let _lock = TOKEN.lock().await;
@@ -260,8 +337,8 @@ mod tests {
         let handle = tokio::spawn(async move {
             super::client::handshake(
                 &client.conn,
-                APP_NAME,
-                APP_VERSION,
+                AGENT_NAME,
+                AGENT_VERSION,
                 PROTOCOL_VERSION,
                 Status::Ready,
             )
@@ -289,8 +366,8 @@ mod tests {
 
         use crate::Status;
 
-        const APP_NAME: &str = "oinq";
-        const APP_VERSION: &str = "1.0.0";
+        const AGENT_NAME: &str = "oinq";
+        const AGENT_VERSION: &str = "1.0.0";
         const PROTOCOL_VERSION: &str = env!("CARGO_PKG_VERSION");
 
         let version_req = semver::VersionReq::parse(&format!(">={PROTOCOL_VERSION}")).unwrap();
@@ -306,8 +383,8 @@ mod tests {
         let handle = tokio::spawn(async move {
             super::client::handshake(
                 &client.conn,
-                APP_NAME,
-                APP_VERSION,
+                AGENT_NAME,
+                AGENT_VERSION,
                 &protocol_version.to_string(),
                 Status::Ready,
             )

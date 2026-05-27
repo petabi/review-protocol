@@ -5,6 +5,15 @@ file is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and
 this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Changed
+
+- Handshake metadata uses `agent_name` and `agent_version` on
+  `ConnectionBuilder`, `AgentInfo`, and the serialized map keys emitted for
+  those fields. Deserialization still accepts legacy `app_name`,
+  `app_version`, and `version` keys for compatibility.
+
 ## [0.19.0] - 2026-05-19
 
 ### Added

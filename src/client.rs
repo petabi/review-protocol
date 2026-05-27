@@ -128,8 +128,8 @@ pub struct ConnectionBuilder {
     remote_name: String,
     remote_addr: SocketAddr,
     local_addr: IpAddr,
-    app_name: String,
-    app_version: String,
+    agent_name: String,
+    agent_version: String,
     protocol_version: String,
     status: crate::Status,
     roots: rustls::RootCertStore,
@@ -149,8 +149,8 @@ impl ConnectionBuilder {
     pub fn new(
         remote_name: &str,
         remote_addr: SocketAddr,
-        app_name: &str,
-        app_version: &str,
+        agent_name: &str,
+        agent_version: &str,
         protocol_version: &str,
         status: crate::Status,
         cert: &[u8],
@@ -178,8 +178,8 @@ impl ConnectionBuilder {
             remote_name: remote_name.to_string(),
             remote_addr,
             local_addr,
-            app_name: app_name.to_string(),
-            app_version: app_version.to_string(),
+            agent_name: agent_name.to_string(),
+            agent_version: agent_version.to_string(),
             protocol_version: protocol_version.to_string(),
             status,
             roots: rustls::RootCertStore::empty(),
@@ -331,8 +331,8 @@ impl ConnectionBuilder {
         };
 
         let agent_info = AgentInfo {
-            app_name: self.app_name.clone(),
-            version: self.app_version.clone(),
+            agent_name: self.agent_name.clone(),
+            agent_version: self.agent_version.clone(),
             protocol_version: self.protocol_version.clone(),
             status: self.status,
             addr,
@@ -463,8 +463,8 @@ impl Connection {
 #[cfg(all(test, feature = "client", feature = "server"))]
 pub(crate) async fn handshake(
     conn: &quinn::Connection,
-    app_name: &str,
-    app_version: &str,
+    agent_name: &str,
+    agent_version: &str,
     protocol_version: &str,
     status: crate::Status,
 ) -> Result<(), super::HandshakeError> {
@@ -482,8 +482,8 @@ pub(crate) async fn handshake(
     };
 
     let agent_info = AgentInfo {
-        app_name: app_name.to_string(),
-        version: app_version.to_string(),
+        agent_name: agent_name.to_string(),
+        agent_version: agent_version.to_string(),
         protocol_version: protocol_version.to_string(),
         status,
         addr,

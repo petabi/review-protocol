@@ -557,7 +557,7 @@ mod tests {
         let builder = ConnectionBuilder::new(
             "test-server",
             "127.0.0.1:443".parse().unwrap(),
-            "app",
+            "test-agent",
             "1.0",
             "1.0",
             crate::Status::Ready,
@@ -582,7 +582,7 @@ mod tests {
         let mut builder = ConnectionBuilder::new(
             "test-server",
             "127.0.0.1:443".parse().unwrap(),
-            "app",
+            "test-agent",
             "1.0",
             "1.0",
             crate::Status::Ready,
@@ -620,7 +620,7 @@ mod tests {
         let mut builder = ConnectionBuilder::new(
             "test-server",
             "127.0.0.1:443".parse().unwrap(),
-            "app",
+            "test-agent",
             "1.0",
             "1.0",
             crate::Status::Ready,
@@ -645,7 +645,7 @@ mod tests {
         let mut builder = ConnectionBuilder::new(
             "test-server",
             "[::1]:443".parse().unwrap(),
-            "app",
+            "test-agent",
             "1.0",
             "1.0",
             crate::Status::Ready,

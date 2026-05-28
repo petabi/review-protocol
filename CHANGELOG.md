@@ -5,14 +5,12 @@ file is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and
 this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [Unreleased]
 
 ### Changed
 
-- Handshake metadata uses `agent_name` and `agent_version` on
-  `ConnectionBuilder`, `AgentInfo`, and the serialized map keys emitted for
-  those fields. Deserialization still accepts legacy `app_name`,
-  `app_version`, and `version` keys for compatibility.
+- Renamed handshake metadata fields from `app_name` / `version` to
+  `agent_name` / `agent_version` in `ConnectionBuilder` and `AgentInfo`.
 
 ## [0.19.0] - 2026-05-19
 
@@ -785,6 +783,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - `client::handshake` implements the application-level handshake process for the
   client after a QUIC connection is established.
 
+[Unreleased]: https://github.com/petabi/review-protocol/compare/0.19.0...main
 [0.18.1]: https://github.com/petabi/review-protocol/compare/0.18.0...0.18.1
 [0.18.0]: https://github.com/petabi/review-protocol/compare/0.17.0...0.18.0
 [0.17.0]: https://github.com/petabi/review-protocol/compare/0.16.0...0.17.0

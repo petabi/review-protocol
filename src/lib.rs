@@ -208,7 +208,7 @@ mod tests {
 
         use crate::Status;
 
-        const AGENT_NAME: &str = "oinq";
+        const AGENT_NAME: &str = "test-agent";
         const AGENT_VERSION: &str = "1.0.0";
         const PROTOCOL_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -251,7 +251,7 @@ mod tests {
 
         use crate::Status;
 
-        const AGENT_NAME: &str = "oinq";
+        const AGENT_NAME: &str = "test-agent";
         const AGENT_VERSION: &str = "1.0.0";
         const PROTOCOL_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -291,7 +291,7 @@ mod tests {
 
         use crate::Status;
 
-        const AGENT_NAME: &str = "oinq";
+        const AGENT_NAME: &str = "test-agent";
         const AGENT_VERSION: &str = "1.0.0";
         const PROTOCOL_VERSION: &str = env!("CARGO_PKG_VERSION");
 

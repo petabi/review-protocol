@@ -12,6 +12,13 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - Renamed handshake metadata fields from `app_name` / `version` to
   `agent_name` / `agent_version` in `ConnectionBuilder` and `AgentInfo`.
 
+### Removed
+
+- `unary_request` is no longer part of the public API; it remains available
+  internally for crate use. Downstream crates should use the typed client and
+  server APIs (for example `client::Connection` methods or
+  `server::Connection` helpers) instead of calling `unary_request` directly.
+
 ## [0.19.0] - 2026-05-19
 
 ### Added

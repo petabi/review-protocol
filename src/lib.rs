@@ -180,7 +180,7 @@ pub struct AgentInfo {
 /// Returns an error if there was a problem sending the request or receiving the
 /// response.
 #[cfg(any(feature = "client", feature = "server"))]
-pub async fn unary_request<I, O>(
+pub(crate) async fn unary_request<I, O>(
     send: &mut quinn::SendStream,
     recv: &mut quinn::RecvStream,
     code: u32,

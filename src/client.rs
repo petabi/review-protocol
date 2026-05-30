@@ -10,8 +10,6 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use num_enum::{FromPrimitive, IntoPrimitive};
 #[cfg(feature = "client")]
 use oinq::frame;
-#[cfg(feature = "client")]
-pub use oinq::message::{send_err, send_ok, send_request};
 
 #[cfg(feature = "client")]
 use crate::AgentInfo;

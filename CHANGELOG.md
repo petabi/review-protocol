@@ -14,6 +14,10 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Removed
 
+- `client::send_err`, `client::send_ok`, and `client::send_request` are no
+  longer part of the public API. Downstream crates should use the typed
+  client APIs (for example `client::Connection` methods) instead of calling
+  these low-level message helpers directly.
 - `unary_request` is no longer part of the public API; it remains available
   internally for crate use. Downstream crates should use the typed client and
   server APIs (for example `client::Connection` methods or

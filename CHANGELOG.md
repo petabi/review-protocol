@@ -7,6 +7,14 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added the `DeleteCustomerData` request, including
+  `Connection::send_delete_customer_data_cmd` and
+  `Handler::delete_customer_data`, so services can delete customer-owned
+  filesystem data. The service implementation remains responsible for the
+  actual deletion.
+
 ### Changed
 
 - Renamed handshake metadata fields from `app_name` / `version` to

@@ -79,6 +79,9 @@ pub(crate) enum RequestCode {
     /// Shutdown the host
     Shutdown = 21,
 
+    /// Delete customer-owned filesystem data
+    DeleteCustomerData = 22,
+
     // ── node feature-family request codes ──────────────────────
     //
     // Each node feature family maps to exactly one request code.

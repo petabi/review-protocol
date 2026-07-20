@@ -292,6 +292,7 @@ pub const COMMON_DNS_START: ServiceId = ServiceId::new("common", "dns_start");
 pub const COMMON_DNS_STOP: ServiceId = ServiceId::new("common", "dns_stop");
 pub const COMMON_RELOAD_CONFIG: ServiceId = ServiceId::new("common", "reload_config");
 pub const COMMON_UPDATE_CONFIG: ServiceId = ServiceId::new("common", "update_config");
+pub const COMMON_DELETE_CUSTOMER_DATA: ServiceId = ServiceId::new("common", "delete_customer_data");
 pub const COMMON_RELOAD_TI: ServiceId = ServiceId::new("common", "reload_ti");
 pub const COMMON_TOR_EXIT_NODE_LIST: ServiceId = ServiceId::new("common", "tor_exit_node_list");
 pub const COMMON_TRUSTED_DOMAIN_LIST: ServiceId = ServiceId::new("common", "trusted_domain_list");
@@ -548,6 +549,7 @@ pub(crate) fn from_client_request_code(code: ClientRequestCode) -> Option<Servic
         ClientRequestCode::SamplingPolicyList => Some(COMMON_SAMPLING_POLICY_LIST),
         ClientRequestCode::ReloadFilterRule => Some(COMMON_RELOAD_FILTER_RULE),
         ClientRequestCode::UpdateConfig => Some(COMMON_UPDATE_CONFIG),
+        ClientRequestCode::DeleteCustomerData => Some(COMMON_DELETE_CUSTOMER_DATA),
         ClientRequestCode::DeleteSamplingPolicy => Some(COMMON_DELETE_SAMPLING_POLICY),
         ClientRequestCode::InternalNetworkList => Some(COMMON_INTERNAL_NETWORK_LIST),
         ClientRequestCode::Allowlist => Some(COMMON_ALLOWLIST),
@@ -694,6 +696,7 @@ pub fn all() -> &'static [ServiceId] {
         COMMON_DNS_STOP,
         COMMON_RELOAD_CONFIG,
         COMMON_UPDATE_CONFIG,
+        COMMON_DELETE_CUSTOMER_DATA,
         COMMON_RELOAD_TI,
         COMMON_TOR_EXIT_NODE_LIST,
         COMMON_TRUSTED_DOMAIN_LIST,
@@ -893,6 +896,7 @@ mod tests {
             ClientRequestCode::SamplingPolicyList,
             ClientRequestCode::ReloadFilterRule,
             ClientRequestCode::UpdateConfig,
+            ClientRequestCode::DeleteCustomerData,
             ClientRequestCode::DeleteSamplingPolicy,
             ClientRequestCode::InternalNetworkList,
             ClientRequestCode::Allowlist,

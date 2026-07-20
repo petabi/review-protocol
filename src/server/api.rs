@@ -96,6 +96,16 @@ impl Connection {
             .await
     }
 
+    /// Sends the customer-data deletion command.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization failed or communication with the client failed.
+    pub async fn send_delete_customer_data_cmd(&self) -> anyhow::Result<()> {
+        self.send_request(client::RequestCode::DeleteCustomerData, &())
+            .await
+    }
+
     /// Sends the traffic filtering rules.
     ///
     /// # Errors
@@ -1215,6 +1225,10 @@ mod tests {
             Ok(())
         }
 
+        async fn delete_customer_data(&mut self) -> Result<(), String> {
+            Ok(())
+        }
+
         async fn update_traffic_filter_rules(
             &mut self,
             rules: &[super::TrafficFilterRule],
@@ -1338,6 +1352,27 @@ mod tests {
             crate::request::handle(&mut handler, &mut send, &mut recv).await
         });
         let server_res = server_conn.send_config_update_cmd().await;
+        assert!(server_res.is_ok());
+        let client_res = client_handle.await.unwrap();
+        assert!(client_res.is_ok());
+
+        test_env.teardown(&server_conn);
+    }
+
+    #[cfg(all(feature = "client", feature = "server"))]
+    #[tokio::test]
+    async fn send_delete_customer_data_cmd() {
+        let test_env = TEST_ENV.lock().await;
+        let (server_conn, client_conn) = test_env.setup().await;
+
+        let mut handler = TestHandler;
+        let handler_conn = client_conn.clone();
+        let client_handle = tokio::spawn(async move {
+            let (mut send, mut recv) = handler_conn.accept_bi().await.unwrap();
+
+            crate::request::handle(&mut handler, &mut send, &mut recv).await
+        });
+        let server_res = server_conn.send_delete_customer_data_cmd().await;
         assert!(server_res.is_ok());
         let client_res = client_handle.await.unwrap();
         assert!(client_res.is_ok());

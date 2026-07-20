@@ -295,6 +295,10 @@ pub trait Handler: Send {
         return Err("not supported".to_string());
     }
 
+    async fn delete_customer_data(&mut self) -> Result<(), String> {
+        return Err("not supported".to_string());
+    }
+
     async fn reload_ti(&mut self, _version: &str) -> Result<(), String> {
         return Err("not supported".to_string());
     }
@@ -901,6 +905,12 @@ pub async fn handle<H: Handler>(
                     .await
                     .map_err(HandlerError::SendError)?;
             }
+            RequestCode::DeleteCustomerData => {
+                let result = handler.delete_customer_data().await;
+                send_response(send, &mut buf, result)
+                    .await
+                    .map_err(HandlerError::SendError)?;
+            }
             // Compatibility: routes through `node_observation` and
             // extracts the process list from the typed response.
             RequestCode::ProcessList => {
@@ -1040,6 +1050,11 @@ mod tests {
     fn request_code_serde() {
         assert_eq!(7u32, u32::from(RequestCode::ResourceUsage));
         assert_eq!(RequestCode::ResourceUsage, RequestCode::from_primitive(7));
+        assert_eq!(22u32, u32::from(RequestCode::DeleteCustomerData));
+        assert_eq!(
+            RequestCode::DeleteCustomerData,
+            RequestCode::from_primitive(22)
+        );
     }
 
     /// Verify that every node feature-family request code maps to a
@@ -1067,7 +1082,7 @@ mod tests {
     /// (non-node) codes and that unknown values still map to `Unknown`.
     #[test]
     fn node_request_codes_no_collision() {
-        // All existing non-node codes live in 0..=21; node codes
+        // All existing non-node codes live in 0..=22; node codes
         // start at 100. Verify that the gap maps to Unknown.
         assert_eq!(RequestCode::from_primitive(50), RequestCode::Unknown);
         assert_eq!(RequestCode::from_primitive(99), RequestCode::Unknown);

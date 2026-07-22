@@ -9,11 +9,13 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Added the `DeleteCustomerData` request, including
+- Added the `common.delete_customer_data` (`DeleteCustomerData`) request,
+  including
   `Connection::send_delete_customer_data_cmd` and
   `Handler::delete_customer_data`, so services can delete customer-owned
-  filesystem data. The service implementation remains responsible for the
-  actual deletion.
+  filesystem data. Its payload contains the target service FQDN and deletion
+  request timestamp for correlation. The service implementation remains
+  responsible for the actual deletion.
 
 ### Changed
 

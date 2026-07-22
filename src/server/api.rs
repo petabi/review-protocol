@@ -96,14 +96,23 @@ impl Connection {
             .await
     }
 
-    /// Sends the customer-data deletion command.
+    /// Sends the customer-data deletion command for `host_fqdn`.
+    ///
+    /// `requested_at` identifies the deletion request for later result correlation.
     ///
     /// # Errors
     ///
     /// Returns an error if serialization failed or communication with the client failed.
-    pub async fn send_delete_customer_data_cmd(&self) -> anyhow::Result<()> {
-        self.send_request(client::RequestCode::DeleteCustomerData, &())
-            .await
+    pub async fn send_delete_customer_data_cmd(
+        &self,
+        host_fqdn: &str,
+        requested_at: i64,
+    ) -> anyhow::Result<()> {
+        self.send_request(
+            client::RequestCode::DeleteCustomerData,
+            &(host_fqdn, requested_at),
+        )
+        .await
     }
 
     /// Sends the traffic filtering rules.
@@ -1104,6 +1113,12 @@ mod tests {
     const IP_ADDR_1: IpAddr = IpAddr::V4(Ipv4Addr::LOCALHOST);
 
     #[cfg(all(feature = "client", feature = "server"))]
+    const HOST_FQDN: &str = "sensor.example.com";
+
+    #[cfg(all(feature = "client", feature = "server"))]
+    const REQUESTED_AT: i64 = 1_753_174_800;
+
+    #[cfg(all(feature = "client", feature = "server"))]
     // Shared handler for all tests
     struct TestHandler;
 
@@ -1225,8 +1240,16 @@ mod tests {
             Ok(())
         }
 
-        async fn delete_customer_data(&mut self) -> Result<(), String> {
-            Ok(())
+        async fn delete_customer_data(
+            &mut self,
+            host_fqdn: String,
+            requested_at: i64,
+        ) -> Result<(), String> {
+            if host_fqdn == HOST_FQDN && requested_at == REQUESTED_AT {
+                Ok(())
+            } else {
+                Err("unexpected customer-data deletion request".to_string())
+            }
         }
 
         async fn update_traffic_filter_rules(
@@ -1372,7 +1395,9 @@ mod tests {
 
             crate::request::handle(&mut handler, &mut send, &mut recv).await
         });
-        let server_res = server_conn.send_delete_customer_data_cmd().await;
+        let server_res = server_conn
+            .send_delete_customer_data_cmd(HOST_FQDN, REQUESTED_AT)
+            .await;
         assert!(server_res.is_ok());
         let client_res = client_handle.await.unwrap();
         assert!(client_res.is_ok());

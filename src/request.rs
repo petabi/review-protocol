@@ -295,7 +295,11 @@ pub trait Handler: Send {
         return Err("not supported".to_string());
     }
 
-    async fn delete_customer_data(&mut self) -> Result<(), String> {
+    async fn delete_customer_data(
+        &mut self,
+        _host_fqdn: String,
+        _requested_at: i64,
+    ) -> Result<(), String> {
         return Err("not supported".to_string());
     }
 
@@ -906,7 +910,9 @@ pub async fn handle<H: Handler>(
                     .map_err(HandlerError::SendError)?;
             }
             RequestCode::DeleteCustomerData => {
-                let result = handler.delete_customer_data().await;
+                let (host_fqdn, requested_at) =
+                    parse_args::<(String, i64)>(body).map_err(HandlerError::RecvError)?;
+                let result = handler.delete_customer_data(host_fqdn, requested_at).await;
                 send_response(send, &mut buf, result)
                     .await
                     .map_err(HandlerError::SendError)?;
@@ -1095,6 +1101,19 @@ mod tests {
     #[cfg(feature = "server")]
     #[async_trait::async_trait]
     impl super::Handler for NoopHandler {}
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn delete_customer_data_default_not_supported() {
+        let result = super::Handler::delete_customer_data(
+            &mut NoopHandler,
+            "sensor.example.com".to_string(),
+            1_753_174_800,
+        )
+        .await;
+
+        assert_eq!(result.unwrap_err(), "not supported");
+    }
 
     /// Dispatch round-trip test helper: sends a typed node request
     /// through `request::handle` with a `NoopHandler` and verifies

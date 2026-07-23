@@ -34,13 +34,21 @@ use oinq::request::parse_args;
 use super::RequestCode;
 use crate::protocol_error::{DispatchError, ProtocolErrorKind};
 use crate::types::{
-    ColumnStatisticsUpdate, DataSource, DataSourceKey, EventMessage, HostNetworkGroup, LabelDb,
-    OutlierInfo, SamplingPolicy, TimeSeriesUpdate, UpdateClusterRequest, UserAgent,
+    ColumnStatisticsUpdate, CustomerDataDeletionReport, DataSource, DataSourceKey, EventMessage,
+    HostNetworkGroup, LabelDb, OutlierInfo, SamplingPolicy, TimeSeriesUpdate, UpdateClusterRequest,
+    UserAgent,
 };
 
 /// A request handler that can handle a request to the server.
 #[async_trait::async_trait]
 pub trait Handler {
+    async fn report_customer_data_deletion(
+        &self,
+        _report: &CustomerDataDeletionReport,
+    ) -> Result<(), String> {
+        Err("not supported".to_string())
+    }
+
     async fn get_allowlist(&self, _peer: &str) -> Result<HostNetworkGroup, String> {
         Err("not supported".to_string())
     }
@@ -404,6 +412,11 @@ where
                 let result = handler.renew_certificate(peer_name).await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
+            RequestCode::ReportCustomerDataDeletion => {
+                let report = parse_args::<CustomerDataDeletionReport>(body)?;
+                let result = handler.report_customer_data_deletion(&report).await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
             RequestCode::UpdateClusters => {
                 let (input, model_id) = parse_args::<(Vec<UpdateClusterRequest>, u32)>(body)?;
                 let result = handler.update_clusters(&input, model_id).await;
@@ -637,6 +650,11 @@ where
                 let result = handler.renew_certificate(peer_name).await;
                 oinq::request::send_response(send, &mut buf, result).await?;
             }
+            RequestCode::ReportCustomerDataDeletion => {
+                let report = parse_args::<CustomerDataDeletionReport>(body)?;
+                let result = handler.report_customer_data_deletion(&report).await;
+                oinq::request::send_response(send, &mut buf, result).await?;
+            }
             RequestCode::UpdateClusters => {
                 let (input, model_id) = parse_args::<(Vec<UpdateClusterRequest>, u32)>(body)?;
                 let result = handler.update_clusters(&input, model_id).await;
@@ -694,6 +712,9 @@ mod tests {
 
     use super::*;
     use crate::test::{TOKEN, channel};
+    use crate::types::{
+        CustomerDataDeletionOutcome, CustomerDataDeletionReport, CustomerDataDeletionReporter,
+    };
 
     struct ModelHandler {
         insert_model_payload: Arc<Mutex<Option<Vec<u8>>>>,
@@ -711,6 +732,150 @@ mod tests {
             *self.update_model_payload.lock().unwrap() = Some(model.to_vec());
             Ok(55)
         }
+    }
+
+    struct DeletionReportHandler {
+        reports: Arc<Mutex<Vec<CustomerDataDeletionReport>>>,
+        response: Result<(), String>,
+    }
+
+    #[async_trait::async_trait]
+    impl Handler for DeletionReportHandler {
+        async fn report_customer_data_deletion(
+            &self,
+            report: &CustomerDataDeletionReport,
+        ) -> Result<(), String> {
+            self.reports.lock().unwrap().push(report.clone());
+            self.response.clone()
+        }
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn deletion_report_default_is_not_supported() {
+        struct DefaultHandler;
+        impl Handler for DefaultHandler {}
+
+        let report = CustomerDataDeletionReport {
+            host_fqdn: "sensor.example.test".to_string(),
+            requested_at: 1_700_000_000,
+            completed_at: Some(1_700_000_100),
+            reporter: CustomerDataDeletionReporter::Sensor,
+            outcome: CustomerDataDeletionOutcome::Succeeded,
+        };
+        assert_eq!(
+            DefaultHandler.report_customer_data_deletion(&report).await,
+            Err("not supported".to_string())
+        );
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn authorized_dispatches_deletion_reports_unchanged() {
+        let _lock = TOKEN.lock().await;
+        let channel = channel().await;
+        let reports = Arc::new(Mutex::new(Vec::new()));
+        let mut handler = DeletionReportHandler {
+            reports: Arc::clone(&reports),
+            response: Ok(()),
+        };
+        let (mut server_send, mut server_recv) = (channel.server.send, channel.server.recv);
+        let (mut client_send, mut client_recv) = (channel.client.send, channel.client.recv);
+        let peer = crate::auth::PeerContext::new("test-peer");
+
+        let server_task = tokio::spawn(async move {
+            super::handle_authorized(
+                &mut handler,
+                &mut server_send,
+                &mut server_recv,
+                &peer,
+                &crate::auth::NoopAuthorizer,
+            )
+            .await
+        });
+
+        let expected = vec![
+            CustomerDataDeletionReport {
+                host_fqdn: "sensor.example.test".to_string(),
+                requested_at: 1_700_000_000,
+                completed_at: Some(1_700_000_123),
+                reporter: CustomerDataDeletionReporter::Sensor,
+                outcome: CustomerDataDeletionOutcome::Succeeded,
+            },
+            CustomerDataDeletionReport {
+                host_fqdn: "semi-supervised.example.test".to_string(),
+                requested_at: 1_700_000_456,
+                completed_at: None,
+                reporter: CustomerDataDeletionReporter::SemiSupervised,
+                outcome: CustomerDataDeletionOutcome::Failed("clock unavailable".to_string()),
+            },
+        ];
+
+        for report in &expected {
+            let response: Result<(), String> = crate::unary_request(
+                &mut client_send,
+                &mut client_recv,
+                u32::from(RequestCode::ReportCustomerDataDeletion),
+                report,
+            )
+            .await
+            .unwrap();
+            assert_eq!(response, Ok(()));
+        }
+
+        drop(client_send);
+        drop(client_recv);
+        let _ = server_task.await.unwrap();
+        assert_eq!(*reports.lock().unwrap(), expected);
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "server")]
+    async fn authorized_with_context_dispatches_report_and_returns_handler_error() {
+        let _lock = TOKEN.lock().await;
+        let channel = channel().await;
+        let reports = Arc::new(Mutex::new(Vec::new()));
+        let mut handler = DeletionReportHandler {
+            reports: Arc::clone(&reports),
+            response: Err("database unavailable".to_string()),
+        };
+        let (mut server_send, mut server_recv) = (channel.server.send, channel.server.recv);
+        let (mut client_send, mut client_recv) = (channel.client.send, channel.client.recv);
+        let peer = crate::auth::PeerContext::new("test-peer");
+        let auth_ctx = crate::auth::AuthorizationContext::from_peer_context(&peer);
+        let authorizer = crate::auth::AuthorizerV2Adapter::new(crate::auth::NoopAuthorizer);
+
+        let server_task = tokio::spawn(async move {
+            super::handle_authorized_with_context(
+                &mut handler,
+                &mut server_send,
+                &mut server_recv,
+                &auth_ctx,
+                &authorizer,
+            )
+            .await
+        });
+        let report = CustomerDataDeletionReport {
+            host_fqdn: "semi-supervised.example.test".to_string(),
+            requested_at: 1_700_001_000,
+            completed_at: Some(1_700_001_100),
+            reporter: CustomerDataDeletionReporter::SemiSupervised,
+            outcome: CustomerDataDeletionOutcome::Failed("permission denied".to_string()),
+        };
+        let response: Result<(), String> = crate::unary_request(
+            &mut client_send,
+            &mut client_recv,
+            u32::from(RequestCode::ReportCustomerDataDeletion),
+            &report,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(response, Err("database unavailable".to_string()));
+        drop(client_send);
+        drop(client_recv);
+        let _ = server_task.await.unwrap();
+        assert_eq!(*reports.lock().unwrap(), vec![report]);
     }
 
     #[tokio::test]

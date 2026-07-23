@@ -15,6 +15,25 @@ use crate::{
 
 /// The client API.
 impl Connection {
+    /// Reports the final result of a customer-data deletion request.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails, the response is invalid, or the
+    /// server rejects the report.
+    pub async fn report_customer_data_deletion(
+        &self,
+        report: &crate::types::CustomerDataDeletionReport,
+    ) -> io::Result<()> {
+        let res: Result<(), String> = request(
+            self,
+            server::RequestCode::ReportCustomerDataDeletion,
+            report,
+        )
+        .await?;
+        res.map_err(io::Error::other)
+    }
+
     /// Fetches the configuration from the server.
     ///
     /// The format of the configuration is up to the caller to interpret.
@@ -410,7 +429,10 @@ mod tests {
     use crate::{
         server::handle,
         test::{TEST_ENV, TestServerHandler},
-        types::DataSourceKey,
+        types::{
+            CustomerDataDeletionOutcome, CustomerDataDeletionReport, CustomerDataDeletionReporter,
+            DataSourceKey,
+        },
     };
 
     async fn run_test<F, Fut>(client_logic: F)
@@ -450,6 +472,46 @@ mod tests {
             assert!(client_res.is_ok());
             let received_data_source = client_res.unwrap();
             assert_eq!(received_data_source.name, "name5");
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn report_customer_data_deletion_returns_handler_ok() {
+        run_test(|client_conn| async move {
+            let report = CustomerDataDeletionReport {
+                host_fqdn: "sensor.example.test".to_string(),
+                requested_at: 1_700_000_000,
+                completed_at: Some(1_700_000_100),
+                reporter: CustomerDataDeletionReporter::Sensor,
+                outcome: CustomerDataDeletionOutcome::Succeeded,
+            };
+            assert!(
+                client_conn
+                    .report_customer_data_deletion(&report)
+                    .await
+                    .is_ok()
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn report_customer_data_deletion_converts_handler_error() {
+        run_test(|client_conn| async move {
+            let report = CustomerDataDeletionReport {
+                host_fqdn: "reject.example.test".to_string(),
+                requested_at: 1_700_000_200,
+                completed_at: None,
+                reporter: CustomerDataDeletionReporter::SemiSupervised,
+                outcome: CustomerDataDeletionOutcome::Failed("deletion failed".to_string()),
+            };
+            let error = client_conn
+                .report_customer_data_deletion(&report)
+                .await
+                .unwrap_err();
+            assert_eq!(error.kind(), std::io::ErrorKind::Other);
+            assert_eq!(error.to_string(), "report rejected");
         })
         .await;
     }

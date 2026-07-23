@@ -16,6 +16,12 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   filesystem data. Its payload contains the target service FQDN and deletion
   request timestamp for correlation. The service implementation remains
   responsible for the actual deletion.
+- Added customer-data deletion result reporting, including the
+  `CustomerDataDeletionReport`, `CustomerDataDeletionReporter`, and
+  `CustomerDataDeletionOutcome` types, the
+  `server.customer_data_deletion.report` service identifier (request code 40),
+  the typed `Connection::report_customer_data_deletion` client API, and the
+  `Handler::report_customer_data_deletion` server hook.
 
 ### Changed
 

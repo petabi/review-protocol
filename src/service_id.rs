@@ -386,6 +386,11 @@ pub const SERVER_LIST_TRUSTED_USER_AGENT: ServiceId =
     ServiceId::new("server.list", "trusted_user_agent");
 pub const SERVER_LIST_SAMPLING_POLICY: ServiceId = ServiceId::new("server.list", "sampling_policy");
 
+// ── server.customer_data_deletion ──────────────────────────────
+
+pub const SERVER_CUSTOMER_DATA_DELETION_REPORT: ServiceId =
+    ServiceId::new("server.customer_data_deletion", "report");
+
 // ── Node request → method-level ServiceId ──────────────────────
 //
 // Each node request enum variant maps to the specific method-level
@@ -619,6 +624,7 @@ pub(crate) fn from_server_request_code(code: ServerRequestCode) -> Option<Servic
         ServerRequestCode::GetBlocklist => Some(SERVER_LIST_BLOCKLIST),
         ServerRequestCode::GetTrustedUserAgentList => Some(SERVER_LIST_TRUSTED_USER_AGENT),
         ServerRequestCode::GetSamplingPolicyList => Some(SERVER_LIST_SAMPLING_POLICY),
+        ServerRequestCode::ReportCustomerDataDeletion => Some(SERVER_CUSTOMER_DATA_DELETION_REPORT),
         ServerRequestCode::Unknown => None,
     }
 }
@@ -710,6 +716,8 @@ pub fn all() -> &'static [ServiceId] {
         COMMON_TRUSTED_USER_AGENT_LIST,
         COMMON_SEMI_SUPERVISED_MODELS,
         COMMON_RENEW_CERTIFICATE,
+        // server.customer_data_deletion
+        SERVER_CUSTOMER_DATA_DELETION_REPORT,
         // server.data_source
         SERVER_DATA_SOURCE_GET,
         SERVER_DATA_SOURCE_LIST,
@@ -960,6 +968,7 @@ mod tests {
             ServerRequestCode::UpdateHostOpenedPorts,
             ServerRequestCode::UpdateHostOsAgents,
             ServerRequestCode::GetSamplingPolicyList,
+            ServerRequestCode::ReportCustomerDataDeletion,
         ];
         for &code in codes {
             assert!(
@@ -991,6 +1000,10 @@ mod tests {
         assert_eq!(
             from_server_request_code(ServerRequestCode::RenewCertificate),
             Some(SERVER_CERTIFICATE_RENEW)
+        );
+        assert_eq!(
+            from_server_request_code(ServerRequestCode::ReportCustomerDataDeletion),
+            Some(SERVER_CUSTOMER_DATA_DELETION_REPORT)
         );
     }
 
@@ -1024,6 +1037,7 @@ mod tests {
         // Server
         assert!(ids.contains(&SERVER_MODEL_GET));
         assert!(ids.contains(&SERVER_DATA_SOURCE_LIST));
+        assert!(ids.contains(&SERVER_CUSTOMER_DATA_DELETION_REPORT));
     }
 
     #[test]

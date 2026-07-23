@@ -284,7 +284,7 @@ pub(crate) enum RequestCode {
     Unknown = u32::MAX,
 }
 
-#[cfg(test)]
+#[cfg(all(test, any(feature = "client", feature = "server")))]
 mod request_code_tests {
     use num_enum::FromPrimitive;
 

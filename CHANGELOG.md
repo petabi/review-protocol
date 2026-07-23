@@ -25,6 +25,8 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- Fixed no-feature test and Clippy builds by compiling the server request-code
+  tests only when the corresponding client or server feature is enabled.
 - Renamed handshake metadata fields from `app_name` / `version` to
   `agent_name` / `agent_version` in `ConnectionBuilder` and `AgentInfo`.
 

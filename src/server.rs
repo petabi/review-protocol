@@ -277,10 +277,27 @@ pub(crate) enum RequestCode {
     UpdateHostOpenedPorts = 37,
     UpdateHostOsAgents = 38,
     GetSamplingPolicyList = 39,
+    ReportCustomerDataDeletion = 40,
 
     /// Unknown request
     #[num_enum(default)]
     Unknown = u32::MAX,
+}
+
+#[cfg(test)]
+mod request_code_tests {
+    use num_enum::FromPrimitive;
+
+    use super::RequestCode;
+
+    #[test]
+    fn customer_data_deletion_report_uses_code_40() {
+        assert_eq!(u32::from(RequestCode::ReportCustomerDataDeletion), 40);
+        assert_eq!(
+            RequestCode::from_primitive(40),
+            RequestCode::ReportCustomerDataDeletion
+        );
+    }
 }
 
 #[cfg(feature = "server")]

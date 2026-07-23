@@ -12,6 +12,36 @@ use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 pub use structured::ColumnStatistics;
 
+/// The final result of processing a customer-data deletion request.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CustomerDataDeletionReport {
+    /// The service FQDN copied from the original deletion request.
+    pub host_fqdn: String,
+    /// The original deletion-request timestamp.
+    pub requested_at: i64,
+    /// The completion or recorded failure timestamp, in the same unit as
+    /// `requested_at`.
+    pub completed_at: Option<i64>,
+    /// The service that processed the deletion request.
+    pub reporter: CustomerDataDeletionReporter,
+    /// The final result of the deletion request.
+    pub outcome: CustomerDataDeletionOutcome,
+}
+
+/// The service reporting a customer-data deletion result.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CustomerDataDeletionReporter {
+    Sensor,
+    SemiSupervised,
+}
+
+/// The outcome of a customer-data deletion request.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CustomerDataDeletionOutcome {
+    Succeeded,
+    Failed(String),
+}
+
 /// The data source key, either a numeric ID or a name.
 #[derive(Debug, Deserialize, Serialize)]
 pub enum DataSourceKey<'a> {

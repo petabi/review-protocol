@@ -235,6 +235,17 @@ pub(crate) struct TestServerHandler;
 #[cfg(all(feature = "client", feature = "server"))]
 #[async_trait::async_trait]
 impl crate::server::Handler for TestServerHandler {
+    async fn report_customer_data_deletion(
+        &self,
+        report: &crate::types::CustomerDataDeletionReport,
+    ) -> Result<(), String> {
+        if report.host_fqdn == "reject.example.test" {
+            Err("report rejected".to_string())
+        } else {
+            Ok(())
+        }
+    }
+
     // Returns `Some` for `id` 5 and `name` "name5" only.
     async fn get_data_source(&self, key: &DataSourceKey<'_>) -> Result<Option<DataSource>, String> {
         let ds = DataSource {
